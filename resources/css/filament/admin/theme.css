@@ -1,7 +1,5 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
-@config './tailwind.config.js';
-
 /* Custom Sidebar Dark Blue */
 .fi-sidebar {
     background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%) !important;
