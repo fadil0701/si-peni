@@ -1,0 +1,207 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="mb-4">
+    <a href="{{ route('transaction.approval.index') }}" class="text-blue-600 hover:text-blue-900 inline-flex items-center">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Kembali ke Daftar Persetujuan
+    </a>
+</div>
+
+@if($permintaan)
+    <!-- Detail Permintaan -->
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 mb-6">
+        <div class="px-6 py-5 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">Detail Permintaan Barang</h2>
+            <p class="text-sm text-gray-600 mt-1">No. Permintaan: <span class="font-semibold">{{ $permintaan->no_permintaan }}</span></p>
+        </div>
+        
+        <div class="p-6">
+            <div class="grid grid-cols-1 gap-6">
+                <!-- Informasi Permintaan -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Informasi Permintaan</h3>
+                    <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 mb-1">No. Permintaan</dt>
+                            <dd class="text-sm font-semibold text-gray-900">{{ $permintaan->no_permintaan }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 mb-1">Unit Kerja</dt>
+                            <dd class="text-sm font-semibold text-gray-900">{{ $permintaan->unitKerja->nama_unit_kerja ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 mb-1">Pemohon</dt>
+                            <dd class="text-sm font-semibold text-gray-900">
+                                {{ $permintaan->pemohon->nama_pegawai ?? '-' }}
+                                @if($permintaan->pemohon && $permintaan->pemohon->jabatan)
+                                    <span class="text-gray-500">({{ $permintaan->pemohon->jabatan->nama_jabatan }})</span>
+                                @endif
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 mb-1">Tanggal Permintaan</dt>
+                            <dd class="text-sm font-semibold text-gray-900">{{ $permintaan->tanggal_permintaan->format('d/m/Y') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500 mb-1">Jenis Permintaan</dt>
+                            <dd class="text-sm font-semibold text-gray-900">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ $permintaan->jenis_permintaan == 'ASET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }}">
+                                    {{ $permintaan->jenis_permintaan }}
+                                </span>
+                            </dd>
+                        </div>
+                        @if($permintaan->keterangan)
+                        <div class="sm:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500 mb-1">Keterangan</dt>
+                            <dd class="text-sm text-gray-900">{{ $permintaan->keterangan }}</dd>
+                        </div>
+                        @endif
+                    </dl>
+                </div>
+
+                <!-- Detail Permintaan -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Detail Permintaan ({{ $permintaan->detailPermintaan->count() }} item)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kode Barang</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Diminta</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($permintaan->detailPermintaan as $index => $detail)
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang->kode_data_barang ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang->nama_barang ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_diminta, 2, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->keterangan ?? '-' }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
+
+<!-- Form Approval -->
+<div class="bg-white shadow-sm rounded-lg border border-gray-200">
+    <div class="px-6 py-5 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Persetujuan</h2>
+        <p class="text-sm text-gray-600 mt-1">Status: 
+            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $approval->status_approval == 'MENUNGGU' ? 'bg-yellow-100 text-yellow-800' : ($approval->status_approval == 'DISETUJUI' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
+                {{ $approval->status_approval }}
+            </span>
+        </p>
+    </div>
+    
+    <div class="p-6">
+        @if($approval->status_approval === 'MENUNGGU')
+            <form method="POST" action="{{ route('transaction.approval.approve', $approval->id_approval) }}" class="mb-4">
+                @csrf
+                <div class="mb-4">
+                    <label for="catatan_approve" class="block text-sm font-medium text-gray-700 mb-2">Catatan (Opsional)</label>
+                    <textarea 
+                        id="catatan_approve" 
+                        name="catatan" 
+                        rows="3"
+                        placeholder="Masukkan catatan persetujuan..."
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    ></textarea>
+                </div>
+                <button 
+                    type="submit" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?');"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Setujui
+                </button>
+            </form>
+
+            <form method="POST" action="{{ route('transaction.approval.reject', $approval->id_approval) }}">
+                @csrf
+                <div class="mb-4">
+                    <label for="catatan_reject" class="block text-sm font-medium text-gray-700 mb-2">
+                        Catatan Penolakan <span class="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                        id="catatan_reject" 
+                        name="catatan" 
+                        rows="3"
+                        required
+                        placeholder="Masukkan alasan penolakan..."
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
+                    ></textarea>
+                    @error('catatan')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <button 
+                    type="submit" 
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?');"
+                >
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Tolak
+                </button>
+            </form>
+        @else
+            <!-- Tampilkan informasi jika sudah diproses -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        @if($approval->status_approval === 'DISETUJUI')
+                            <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                            </svg>
+                        @else
+                            <svg class="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        @endif
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-gray-900">
+                            Permintaan {{ $approval->status_approval === 'DISETUJUI' ? 'Disetujui' : 'Ditolak' }}
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            @if($approval->approver)
+                                Oleh: {{ $approval->approver->nama_pegawai ?? 'N/A' }}
+                            @endif
+                        </p>
+                        @if($approval->tanggal_approval)
+                            <p class="mt-1 text-xs text-gray-500">
+                                Tanggal: {{ $approval->tanggal_approval->format('d/m/Y H:i') }}
+                            </p>
+                        @endif
+                        @if($approval->catatan)
+                            <p class="mt-2 text-sm text-gray-700">
+                                <strong>Catatan:</strong> {{ $approval->catatan }}
+                            </p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+    </div>
+</div>
+@endsection
+

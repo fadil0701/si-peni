@@ -18,10 +18,6 @@ class MasterDataBarang extends Model
         'kode_data_barang',
         'nama_barang',
         'deskripsi',
-        'spesifikasi',
-        'merk',
-        'tipe',
-        'tahun_produksi',
         'upload_foto',
         'foto_barang',
     ];

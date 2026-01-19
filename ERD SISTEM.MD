@@ -90,6 +90,7 @@ master_gudang {
     int id_lokasi FK
     varchar nama_gudang
     enum jenis_gudang  %% PUSAT / UNIT
+    enum kategori_gudang %% ASET / PERSEDIAAN / FARMASI
 }
 
 master_program {

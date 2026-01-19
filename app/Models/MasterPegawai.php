@@ -18,6 +18,7 @@ class MasterPegawai extends Model
         'id_jabatan',
         'email_pegawai',
         'no_telp',
+        'user_id',
     ];
 
     // Relationships
@@ -29,5 +30,10 @@ class MasterPegawai extends Model
     public function jabatan(): BelongsTo
     {
         return $this->belongsTo(MasterJabatan::class, 'id_jabatan', 'id_jabatan');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

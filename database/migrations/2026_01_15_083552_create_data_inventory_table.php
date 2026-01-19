@@ -40,6 +40,7 @@ return new class extends Migration
             
             // Status & dokumen
             $table->enum('status_inventory', ['DRAFT', 'AKTIF', 'DISTRIBUSI', 'HABIS'])->default('DRAFT');
+            $table->string('upload_foto', 255)->nullable(); // Foto barang
             $table->string('upload_dokumen', 255)->nullable(); // BA / Faktur / SP
             $table->text('auto_qr_code')->nullable();
             

@@ -49,10 +49,10 @@ class DataInventoryObserver
         $startIndex = $startFrom + 1;
 
         // Load relationships
-        $dataInventory->load(['dataBarang', 'gudang.lokasi.unitKerja']);
+        $dataInventory->load(['dataBarang', 'gudang.unitKerja']);
 
         // Get kode unit kerja
-        $kodeUnit = $dataInventory->gudang->lokasi->unitKerja->kode_unit_kerja ?? 'UNKNOWN';
+        $kodeUnit = $dataInventory->gudang->unitKerja->kode_unit_kerja ?? 'UNKNOWN';
         
         // Get kode data barang
         $kodeBarang = $dataInventory->dataBarang->kode_data_barang ?? 'UNKNOWN';

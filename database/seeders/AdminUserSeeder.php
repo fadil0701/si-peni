@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
+use App\Models\User;
+use App\Models\Role;
 
 class AdminUserSeeder extends Seeder
 {
@@ -14,24 +14,33 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Cek apakah user admin sudah ada
-        $adminExists = User::where('email', 'pusdatinppkp@gmail.com')->exists();
-
-        if (!$adminExists) {
-            User::create([
-                'name' => 'Administrator',
-                'email' => 'pusdatinppkp@gmail.com',
-                'email_verified_at' => now(),
-                'password' => Hash::make('Admin@123'), // Default password: password
-                'remember_token' => Str::random(10),
-            ]);
-
-            $this->command->info('✅ User admin berhasil dibuat!');
-            $this->command->info('📧 Email: pusdatinppkp@gmail.com');
-            $this->command->info('🔑 Password: Admin@123');
-            $this->command->warn('⚠️  Jangan lupa ubah password setelah login pertama kali!');
-        } else {
-            $this->command->warn('⚠️  User admin sudah ada, melewati pembuatan user admin.');
+        // Get admin role
+        $adminRole = Role::where('name', 'admin')->first();
+        
+        if (!$adminRole) {
+            $this->command->error('Admin role not found! Please run RoleSeeder first.');
+            return;
         }
+
+        // Create or update admin user
+        $admin = User::firstOrCreate(
+            ['email' => 'pusdatinppkp@gmail.com'],
+            [
+                'name' => 'Administrator',
+                'password' => Hash::make('Admin@123'),
+            ]
+        );
+
+        // Assign admin role if not already assigned
+        if (!$admin->roles->contains($adminRole->id)) {
+            $admin->roles()->attach($adminRole->id);
+            $this->command->info('Admin role assigned to user: ' . $admin->email);
+        } else {
+            $this->command->info('Admin user already has admin role.');
+        }
+
+        $this->command->info('Admin user created/updated successfully!');
+        $this->command->info('Email: pusdatinppkp@gmail.com');
+        $this->command->info('Password: Admin@123');
     }
 }

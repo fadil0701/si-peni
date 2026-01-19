@@ -15,12 +15,8 @@ return new class extends Migration
             $table->string('kode_data_barang', 50)->unique();
             $table->string('nama_barang', 255);
             $table->text('deskripsi')->nullable();
-            $table->text('spesifikasi')->nullable(); // Dari ERD copy.MD
-            $table->string('merk', 100)->nullable(); // Dari ERD copy.MD
-            $table->string('tipe', 100)->nullable(); // Dari ERD copy.MD
-            $table->integer('tahun_produksi')->nullable(); // Dari ERD copy.MD
             $table->string('upload_foto', 255)->nullable();
-            $table->string('foto_barang', 255)->nullable(); // Dari ERD copy.MD (alternatif)
+            $table->string('foto_barang', 255)->nullable();
             $table->timestamps();
         });
     }

@@ -2,9 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\DataInventory;
-use App\Observers\DataInventoryObserver;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\View;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,7 +20,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Register Observer untuk Auto Register Aset
-        DataInventory::observe(DataInventoryObserver::class);
+        // Share user roles with all views
+        View::composer('*', function ($view) {
+            if (auth()->check()) {
+                $user = auth()->user();
+                // Eager load roles to avoid N+1 queries
+                if (!$user->relationLoaded('roles')) {
+                    $user->load('roles');
+                }
+                $view->with('currentUser', $user);
+            }
+        });
     }
 }

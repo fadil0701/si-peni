@@ -28,6 +28,6 @@ class ApprovalPermintaan extends Model
     // Relationships
     public function approver(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'id_approver', 'id');
+        return $this->belongsTo(MasterPegawai::class, 'id_approver', 'id');
     }
 }
