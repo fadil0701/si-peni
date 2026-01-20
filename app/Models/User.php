@@ -75,6 +75,48 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user has a specific permission through their roles
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        // Admin always has all permissions
+        if ($this->hasRole('admin')) {
+            return true;
+        }
+
+        // Load roles with permissions if not already loaded
+        if (!$this->relationLoaded('roles')) {
+            $this->load('roles.permissions');
+        } else {
+            foreach ($this->roles as $role) {
+                if (!$role->relationLoaded('permissions')) {
+                    $role->load('permissions');
+                }
+            }
+        }
+
+        // Check if any role has this permission
+        foreach ($this->roles as $role) {
+            // Check exact permission
+            if ($role->permissions->contains('name', $permissionName)) {
+                return true;
+            }
+
+            // Check wildcard permissions (e.g., 'inventory.*' matches 'inventory.data-stock.index')
+            foreach ($role->permissions as $permission) {
+                if (str_ends_with($permission->name, '.*')) {
+                    $prefix = str_replace('.*', '', $permission->name);
+                    if (str_starts_with($permissionName, $prefix . '.')) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>

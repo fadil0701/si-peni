@@ -8,9 +8,10 @@ use App\Models\MasterSatuan;
 
 class SatuanController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $satuans = MasterSatuan::latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $satuans = MasterSatuan::latest()->paginate($perPage)->appends($request->query());
         return view('master-data.satuan.index', compact('satuans'));
     }
 

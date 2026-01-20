@@ -87,20 +87,44 @@
                     </div>
 
                     <div>
-                        <label for="jenis_permintaan" class="block text-sm font-medium text-gray-700 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
                             Jenis Permintaan <span class="text-red-500">*</span>
                         </label>
-                        <select 
-                            id="jenis_permintaan" 
-                            name="jenis_permintaan" 
-                            required
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('jenis_permintaan') border-red-500 @enderror"
-                        >
-                            <option value="">Pilih Jenis</option>
-                            <option value="BARANG" {{ old('jenis_permintaan', $permintaan->jenis_permintaan) == 'BARANG' ? 'selected' : '' }}>Barang</option>
-                            <option value="ASET" {{ old('jenis_permintaan', $permintaan->jenis_permintaan) == 'ASET' ? 'selected' : '' }}>Aset</option>
-                        </select>
+                        <div class="space-y-2">
+                            @php
+                                $jenisPermintaan = old('jenis_permintaan', is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []));
+                            @endphp
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="jenis_barang_edit" 
+                                    name="jenis_permintaan[]" 
+                                    value="BARANG"
+                                    {{ in_array('BARANG', $jenisPermintaan) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="jenis_barang_edit" class="ml-2 block text-sm text-gray-700">
+                                    Barang
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="jenis_aset_edit" 
+                                    name="jenis_permintaan[]" 
+                                    value="ASET"
+                                    {{ in_array('ASET', $jenisPermintaan) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="jenis_aset_edit" class="ml-2 block text-sm text-gray-700">
+                                    Aset
+                                </label>
+                            </div>
+                        </div>
                         @error('jenis_permintaan')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('jenis_permintaan.*')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
@@ -319,37 +343,63 @@
 <script>
 let itemIndex = {{ count(old('detail', $permintaan->detailPermintaan)) }};
 
-document.getElementById('btnTambahItem').addEventListener('click', function() {
+// Fungsi untuk menambahkan item baru
+function tambahItem() {
     const template = document.getElementById('itemTemplate');
     const container = document.getElementById('detailContainer');
+    
+    if (!template || !container) {
+        console.error('Template atau container tidak ditemukan');
+        return;
+    }
+    
     const newItem = template.content.cloneNode(true);
     
     // Replace INDEX dengan itemIndex
-    newItem.innerHTML = newItem.innerHTML.replace(/INDEX/g, itemIndex);
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(newItem);
+    let htmlContent = tempDiv.innerHTML;
+    htmlContent = htmlContent.replace(/INDEX/g, itemIndex);
+    tempDiv.innerHTML = htmlContent;
     
-    container.appendChild(newItem);
+    const finalItem = tempDiv.firstElementChild;
+    container.appendChild(finalItem);
     itemIndex++;
     
     // Auto-set satuan ketika data barang dipilih
-    const selectBarang = container.lastElementChild.querySelector('.select-data-barang');
-    const selectSatuan = container.lastElementChild.querySelector('.select-satuan');
+    const selectBarang = finalItem.querySelector('.select-data-barang');
+    const selectSatuan = finalItem.querySelector('.select-satuan');
     
-    selectBarang.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        const satuanId = selectedOption.getAttribute('data-satuan');
-        if (satuanId) {
-            selectSatuan.value = satuanId;
-        }
-    });
+    if (selectBarang && selectSatuan) {
+        selectBarang.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const satuanId = selectedOption.getAttribute('data-satuan');
+            if (satuanId) {
+                selectSatuan.value = satuanId;
+            }
+        });
+    }
     
     // Hapus item
-    container.lastElementChild.querySelector('.btnHapusItem').addEventListener('click', function() {
-        this.closest('.item-row').remove();
-    });
-});
+    const btnHapus = finalItem.querySelector('.btnHapusItem');
+    if (btnHapus) {
+        btnHapus.addEventListener('click', function() {
+            this.closest('.item-row').remove();
+        });
+    }
+}
 
-// Hapus item
+// Event listener untuk button tambah item
 document.addEventListener('DOMContentLoaded', function() {
+    const btnTambahItem = document.getElementById('btnTambahItem');
+    if (btnTambahItem) {
+        btnTambahItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            tambahItem();
+        });
+    }
+    
+    // Hapus item untuk item yang sudah ada
     document.querySelectorAll('.btnHapusItem').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('.item-row').remove();

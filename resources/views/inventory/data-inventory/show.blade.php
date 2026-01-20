@@ -169,6 +169,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kode Register</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No Seri</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kondisi</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
@@ -179,6 +180,20 @@
                             <tr>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $item->kode_register }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $item->no_seri ?? '-' }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    <div class="space-y-1">
+                                        <div class="flex items-center">
+                                            <span class="text-xs font-medium text-gray-500 mr-2">Gudang:</span>
+                                            <span class="text-xs text-gray-900">{{ $item->gudang->nama_gudang ?? '-' }}</span>
+                                        </div>
+                                        @if($item->ruangan)
+                                        <div class="flex items-center">
+                                            <span class="text-xs font-medium text-gray-500 mr-2">Ruangan:</span>
+                                            <span class="text-xs text-gray-900">{{ $item->ruangan->nama_ruangan ?? '-' }}</span>
+                                        </div>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">
                                     <span class="px-2 py-1 text-xs font-medium rounded-full {{ $item->kondisi_item == 'BAIK' ? 'bg-green-100 text-green-800' : ($item->kondisi_item == 'RUSAK_RINGAN' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') }}">
                                         {{ $item->kondisi_item }}

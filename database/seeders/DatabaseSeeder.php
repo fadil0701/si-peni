@@ -15,9 +15,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seed admin user
+        // Seed roles first, then permissions, then jabatan, then admin user, then approval flow
         $this->call([
+            RoleSeeder::class,
+            PermissionSeeder::class,
+            MasterJabatanSeeder::class,
             AdminUserSeeder::class,
+            ApprovalFlowDefinitionSeeder::class,
         ]);
     }
 }

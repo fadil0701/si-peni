@@ -66,6 +66,93 @@
                     class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >{{ old('description', $role->description) }}</textarea>
             </div>
+
+            <!-- Permissions -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-4">
+                    Hak Akses (Permissions) <span class="text-red-500">*</span>
+                </label>
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-96 overflow-y-auto">
+                    @foreach($permissions as $module => $modulePermissions)
+                        @php
+                            $modulePermissionIds = $modulePermissions->pluck('id')->toArray();
+                            $checkedInModule = array_intersect($modulePermissionIds, $rolePermissions);
+                            $allChecked = count($checkedInModule) === count($modulePermissionIds);
+                            $someChecked = count($checkedInModule) > 0 && count($checkedInModule) < count($modulePermissionIds);
+                        @endphp
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                                    {{ str_replace('-', ' ', $module) }}
+                                </h4>
+                                <label class="flex items-center text-xs text-blue-600 hover:text-blue-800 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        class="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded module-select-all"
+                                        data-module="{{ $module }}"
+                                        {{ $allChecked ? 'checked' : '' }}
+                                        {{ $someChecked ? 'indeterminate' : '' }}
+                                    >
+                                    <span class="ml-1">Pilih Semua</span>
+                                </label>
+                            </div>
+                            <div class="space-y-2 pl-4 module-permissions" data-module="{{ $module }}">
+                                @foreach($modulePermissions as $permission)
+                                    <label class="flex items-start">
+                                        <input 
+                                            type="checkbox" 
+                                            name="permissions[]" 
+                                            value="{{ $permission->id }}"
+                                            {{ in_array($permission->id, $rolePermissions) ? 'checked' : '' }}
+                                            class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded permission-checkbox"
+                                            data-module="{{ $module }}"
+                                        >
+                                        <div class="ml-2">
+                                            <span class="text-sm text-gray-700 font-medium">{{ $permission->display_name }}</span>
+                                            @if($permission->description)
+                                                <p class="text-xs text-gray-500 mt-0.5">{{ $permission->description }}</p>
+                                            @endif
+                                            <p class="text-xs text-gray-400 mt-0.5 font-mono">{{ $permission->name }}</p>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="mt-2 text-xs text-gray-500">Pilih hak akses yang akan diberikan kepada role ini</p>
+            </div>
+
+            @push('scripts')
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Handle "Select All" per module
+                document.querySelectorAll('.module-select-all').forEach(function(selectAll) {
+                    selectAll.addEventListener('change', function() {
+                        const module = this.dataset.module;
+                        const checkboxes = document.querySelectorAll(`.permission-checkbox[data-module="${module}"]`);
+                        checkboxes.forEach(function(checkbox) {
+                            checkbox.checked = selectAll.checked;
+                        });
+                    });
+                });
+
+                // Update "Select All" checkbox when individual checkboxes change
+                document.querySelectorAll('.permission-checkbox').forEach(function(checkbox) {
+                    checkbox.addEventListener('change', function() {
+                        const module = this.dataset.module;
+                        const moduleCheckboxes = document.querySelectorAll(`.permission-checkbox[data-module="${module}"]`);
+                        const checkedCount = Array.from(moduleCheckboxes).filter(cb => cb.checked).length;
+                        const selectAll = document.querySelector(`.module-select-all[data-module="${module}"]`);
+                        if (selectAll) {
+                            selectAll.checked = checkedCount === moduleCheckboxes.length;
+                            selectAll.indeterminate = checkedCount > 0 && checkedCount < moduleCheckboxes.length;
+                        }
+                    });
+                });
+            });
+            </script>
+            @endpush
         </div>
 
         <div class="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-6">

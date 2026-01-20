@@ -239,23 +239,13 @@
                                     >
                                 </div>
 
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Role User</label>
-                                    <div class="space-y-2">
-                                        @foreach($roles as $role)
-                                            <label class="flex items-center">
-                                                <input 
-                                                    type="checkbox" 
-                                                    name="user_roles[]" 
-                                                    value="{{ $role->id }}"
-                                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                >
-                                                <span class="ml-2 text-sm text-gray-700">{{ $role->display_name }}</span>
-                                                @if($role->description)
-                                                    <span class="ml-2 text-xs text-gray-500">({{ $role->description }})</span>
-                                                @endif
-                                            </label>
-                                        @endforeach
+                                <div id="roleInfo" class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                    <p class="text-sm text-blue-800">
+                                        <strong>Info:</strong> Role user akan otomatis mengikuti jabatan yang dipilih.
+                                    </p>
+                                    <div id="selectedRoleInfo" class="mt-2 text-sm text-blue-700">
+                                        <span class="font-medium">Role yang akan di-assign:</span>
+                                        <span id="roleName" class="ml-2">Pilih jabatan terlebih dahulu</span>
                                     </div>
                                 </div>
                             </div>
@@ -284,6 +274,9 @@
 
 @push('scripts')
 <script>
+// Data jabatan dengan role (dari backend)
+const jabatanData = @json($jabatanData);
+
 function toggleUserOptions() {
     const userOption = document.querySelector('input[name="user_option"]:checked').value;
     const existingUserOption = document.getElementById('existingUserOption');
@@ -319,7 +312,42 @@ function toggleUserOptions() {
         document.getElementById('user_email').required = false;
         document.getElementById('user_password').required = false;
     }
+    
+    // Update role info when user option changes
+    updateRoleInfo();
 }
+
+function updateRoleInfo() {
+    const jabatanId = document.getElementById('id_jabatan').value;
+    const roleNameElement = document.getElementById('roleName');
+    const roleInfoDiv = document.getElementById('roleInfo');
+    
+    if (jabatanId && jabatanData[jabatanId]) {
+        const jabatan = jabatanData[jabatanId];
+        if (jabatan.role_name) {
+            roleNameElement.textContent = jabatan.role_name;
+            if (jabatan.role_description) {
+                roleNameElement.innerHTML = `<strong>${jabatan.role_name}</strong> - ${jabatan.role_description}`;
+            }
+            roleInfoDiv.classList.remove('bg-yellow-50', 'border-yellow-200');
+            roleInfoDiv.classList.add('bg-blue-50', 'border-blue-200');
+        } else {
+            roleNameElement.textContent = 'Jabatan ini belum memiliki role';
+            roleInfoDiv.classList.remove('bg-blue-50', 'border-blue-200');
+            roleInfoDiv.classList.add('bg-yellow-50', 'border-yellow-200');
+        }
+    } else {
+        roleNameElement.textContent = 'Pilih jabatan terlebih dahulu';
+        roleInfoDiv.classList.remove('bg-yellow-50', 'border-yellow-200');
+        roleInfoDiv.classList.add('bg-blue-50', 'border-blue-200');
+    }
+}
+
+// Listen to jabatan change
+document.getElementById('id_jabatan').addEventListener('change', updateRoleInfo);
+
+// Initial update
+updateRoleInfo();
 </script>
 @endpush
 @endsection

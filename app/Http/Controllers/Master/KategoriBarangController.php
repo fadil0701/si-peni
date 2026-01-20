@@ -9,9 +9,10 @@ use App\Models\MasterKodeBarang;
 
 class KategoriBarangController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $kategoriBarangs = MasterKategoriBarang::with('kodeBarang.aset')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $kategoriBarangs = MasterKategoriBarang::with('kodeBarang.aset')->latest()->paginate($perPage)->appends($request->query());
         return view('master-data.kategori-barang.index', compact('kategoriBarangs'));
     }
 

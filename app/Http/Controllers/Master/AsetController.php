@@ -8,9 +8,10 @@ use App\Models\MasterAset;
 
 class AsetController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $asets = MasterAset::latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $asets = MasterAset::latest()->paginate($perPage)->appends($request->query());
         return view('master-data.aset.index', compact('asets'));
     }
 

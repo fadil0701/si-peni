@@ -42,7 +42,8 @@ class ReportController extends Controller
             });
         }
 
-        $stocks = $query->latest('last_updated')->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $stocks = $query->latest('last_updated')->paginate($perPage)->appends($request->query());
         $gudangs = MasterGudang::all();
 
         return view('report.stock-gudang', compact('stocks', 'gudangs'));

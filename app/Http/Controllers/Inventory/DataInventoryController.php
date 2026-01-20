@@ -14,14 +14,73 @@ use App\Models\MasterSumberAnggaran;
 use App\Models\MasterSubKegiatan;
 use App\Models\MasterSatuan;
 use App\Models\MasterUnitKerja;
+use App\Models\MasterPegawai;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DataInventoryController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan']);
+        $user = Auth::user();
+        
+        // GUDANG PUSAT (Admin/Admin Gudang): Melihat SEMUA data inventory (global view)
+        // GUDANG UNIT (Kepala Unit/Admin Unit): Hanya melihat data di unitnya saja (local view)
+        
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            // GUDANG UNIT: Hanya melihat data yang ada di gudang UNIT mereka
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Ambil id gudang UNIT yang terkait dengan unit kerja mereka
+                $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                if ($gudangUnitIds->isEmpty()) {
+                    // Jika tidak ada gudang unit, tidak tampilkan data
+                    $query = DataInventory::whereRaw('1 = 0');
+                } else {
+                    // Untuk GUDANG UNIT:
+                    // - PERSEDIAAN/FARMASI: melihat data_inventory yang id_gudang = gudang UNIT mereka
+                    // - ASET: melihat data_inventory yang memiliki inventory_item di gudang UNIT mereka
+                    $query = DataInventory::with([
+                        'dataBarang', 
+                        'gudang', 
+                        'sumberAnggaran', 
+                        'subKegiatan', 
+                        'satuan',
+                        // Eager load inventoryItems yang ada di gudang unit mereka untuk ASET
+                        'inventoryItems' => function($q) use ($gudangUnitIds) {
+                            $q->whereIn('id_gudang', $gudangUnitIds)
+                              ->where('status_item', 'AKTIF')
+                              ->with(['gudang', 'ruangan']);
+                        }
+                    ])
+                        ->where(function($q) use ($gudangUnitIds) {
+                            // PERSEDIAAN/FARMASI: inventory yang langsung di gudang UNIT
+                            $q->where(function($subQ) use ($gudangUnitIds) {
+                                $subQ->whereIn('id_gudang', $gudangUnitIds)
+                                      ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI']);
+                            })
+                            // ASET: inventory yang memiliki inventory_item di gudang UNIT (sudah didistribusikan)
+                            ->orWhere(function($subQ) use ($gudangUnitIds) {
+                                $subQ->where('jenis_inventory', 'ASET')
+                                      ->whereHas('inventoryItems', function($itemQ) use ($gudangUnitIds) {
+                                          $itemQ->whereIn('id_gudang', $gudangUnitIds)
+                                                ->where('status_item', 'AKTIF');
+                                      });
+                            });
+                        });
+                }
+            } else {
+                // Jika user tidak memiliki pegawai atau unit kerja, tidak tampilkan data
+                $query = DataInventory::whereRaw('1 = 0');
+            }
+        } else {
+            // GUDANG PUSAT: Melihat SEMUA data inventory (tidak ada filter)
+            $query = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan', 'inventoryItems.gudang', 'inventoryItems.ruangan']);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -39,8 +98,53 @@ class DataInventoryController extends Controller
             $query->where('id_gudang', $request->gudang);
         }
 
-        $inventories = $query->latest()->paginate(15);
-        $gudangs = MasterGudang::all();
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $inventories = $query->latest()->paginate($perPage)->appends($request->query());
+        
+        // Untuk GUDANG UNIT: Hitung ulang qty dan update gudang berdasarkan inventory_item untuk ASET
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                // Untuk ASET: Hitung ulang qty dan update gudang berdasarkan inventory_item yang sudah di-eager load
+                foreach ($inventories as $inventory) {
+                    if ($inventory->jenis_inventory === 'ASET' && $inventory->relationLoaded('inventoryItems')) {
+                        // Gunakan inventoryItems yang sudah di-eager load (sudah difilter untuk gudang unit)
+                        $itemsInUnit = $inventory->inventoryItems;
+                        
+                        if ($itemsInUnit->count() > 0) {
+                            // Update qty_input berdasarkan jumlah inventory_item di gudang unit
+                            $inventory->qty_input = $itemsInUnit->count();
+                            
+                            // Update gudang berdasarkan gudang dari inventory_item pertama
+                            $firstItem = $itemsInUnit->first();
+                            if ($firstItem->relationLoaded('gudang') && $firstItem->gudang) {
+                                // Set gudang dari inventory_item
+                                $inventory->setRelation('gudang', $firstItem->gudang);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Filter gudang yang ditampilkan di dropdown berdasarkan role
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangs = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->get();
+            } else {
+                $gudangs = collect([]);
+            }
+        } else {
+            $gudangs = MasterGudang::all();
+        }
+        
         $dataBarangs = MasterDataBarang::all();
 
         return view('inventory.data-inventory.index', compact('inventories', 'gudangs', 'dataBarangs'));
@@ -48,6 +152,14 @@ class DataInventoryController extends Controller
 
     public function create()
     {
+        $user = Auth::user();
+        
+        // GUDANG UNIT: Tidak bisa menambah data inventory baru
+        // Hanya bisa menerima melalui distribusi
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            abort(403, 'Unauthorized - Gudang unit tidak dapat menambah data inventory baru. Inventory hanya dapat ditambahkan melalui distribusi dari gudang pusat.');
+        }
+        
         $dataBarangs = MasterDataBarang::all();
         // Hanya tampilkan gudang PUSAT untuk input inventory
         $gudangs = MasterGudang::where('jenis_gudang', 'PUSAT')->get();
@@ -252,18 +364,129 @@ class DataInventoryController extends Controller
 
     public function show($id)
     {
-        $inventory = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan', 'inventoryItems'])
-            ->findOrFail($id);
+        $user = Auth::user();
+        
+        // GUDANG PUSAT: Load semua inventoryItems
+        // GUDANG UNIT: Load hanya inventoryItems di gudang unit mereka
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                // Load inventory dengan filter inventoryItems untuk gudang unit mereka
+                $inventory = DataInventory::with([
+                    'dataBarang', 
+                    'gudang', 
+                    'sumberAnggaran', 
+                    'subKegiatan', 
+                    'satuan',
+                    'inventoryItems' => function($q) use ($gudangUnitIds) {
+                        $q->whereIn('id_gudang', $gudangUnitIds)
+                          ->where('status_item', 'AKTIF')
+                          ->with(['gudang', 'ruangan']);
+                    }
+                ])->findOrFail($id);
+                
+                // Validasi akses
+                $hasAccess = false;
+                
+                if ($inventory->jenis_inventory === 'ASET') {
+                    // Untuk ASET: cek apakah ada inventory_item di gudang unit mereka
+                    $hasAccess = $inventory->inventoryItems->count() > 0;
+                } else {
+                    // Untuk PERSEDIAAN/FARMASI: cek apakah id_gudang mengarah ke gudang unit mereka
+                    $hasAccess = $gudangUnitIds->contains($inventory->id_gudang);
+                }
+                
+                if (!$hasAccess) {
+                    abort(403, 'Unauthorized - Anda hanya dapat melihat inventory dari gudang unit Anda sendiri');
+                }
+                
+                // Untuk ASET: Update gudang dan qty berdasarkan inventoryItems di gudang unit
+                if ($inventory->jenis_inventory === 'ASET' && $inventory->inventoryItems->count() > 0) {
+                    // Update qty_input berdasarkan jumlah inventory_item di gudang unit
+                    $inventory->qty_input = $inventory->inventoryItems->count();
+                    
+                    // Update gudang berdasarkan gudang dari inventory_item pertama
+                    $firstItem = $inventory->inventoryItems->first();
+                    if ($firstItem->gudang) {
+                        $inventory->setRelation('gudang', $firstItem->gudang);
+                    }
+                }
+            } else {
+                abort(403, 'Unauthorized - User tidak memiliki unit kerja');
+            }
+        } else {
+            // GUDANG PUSAT: Load semua inventoryItems
+            $inventory = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan', 'inventoryItems.gudang', 'inventoryItems.ruangan'])
+                ->findOrFail($id);
+        }
+
         return view('inventory.data-inventory.show', compact('inventory'));
     }
 
     public function edit($id)
     {
-        $dataInventory = DataInventory::findOrFail($id);
+        $user = Auth::user();
+        $dataInventory = DataInventory::with(['gudang', 'inventoryItems.gudang', 'inventoryItems.ruangan'])->findOrFail($id);
+
+        // GUDANG UNIT: Pastikan inventory ini bisa diedit oleh unit mereka
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                $canEdit = false;
+                
+                if ($dataInventory->jenis_inventory === 'ASET') {
+                    // Untuk ASET: cek apakah ada inventory_item di gudang unit mereka
+                    // Catatan: Untuk ASET yang sudah didistribusikan, edit dilakukan di level inventory_item
+                    $canEdit = $dataInventory->inventoryItems()
+                        ->whereIn('id_gudang', $gudangUnitIds)
+                        ->where('status_item', 'AKTIF')
+                        ->exists();
+                    
+                    // Jika ASET sudah didistribusikan (data_inventory masih di gudang pusat), redirect ke show
+                    if ($canEdit && $dataInventory->gudang->jenis_gudang === 'PUSAT') {
+                        return redirect()->route('inventory.data-inventory.show', $id)
+                            ->with('info', 'Untuk ASET yang sudah didistribusikan, edit dilakukan di level per register (inventory item).');
+                    }
+                } else {
+                    // Untuk PERSEDIAAN/FARMASI: cek apakah id_gudang mengarah ke gudang unit mereka
+                    $canEdit = $gudangUnitIds->contains($dataInventory->id_gudang);
+                }
+                
+                if (!$canEdit) {
+                    abort(403, 'Unauthorized - Anda hanya dapat mengedit inventory dari gudang unit Anda sendiri');
+                }
+            } else {
+                abort(403, 'Unauthorized - User tidak memiliki unit kerja');
+            }
+        }
+        // GUDANG PUSAT: Bisa edit semua (tidak perlu validasi khusus)
         
         $dataBarangs = MasterDataBarang::all();
-        // Hanya tampilkan gudang PUSAT untuk edit inventory
-        $gudangs = MasterGudang::where('jenis_gudang', 'PUSAT')->get();
+        
+        // Filter gudang berdasarkan role
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan gudang UNIT yang terkait dengan unit kerja mereka
+                $gudangs = MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->get();
+            } else {
+                $gudangs = collect([]);
+            }
+        } else {
+            // GUDANG PUSAT: Hanya bisa edit inventory di gudang PUSAT
+            $gudangs = MasterGudang::where('jenis_gudang', 'PUSAT')->get();
+        }
+        
         $sumberAnggarans = MasterSumberAnggaran::all();
         $subKegiatans = MasterSubKegiatan::all();
         $satuans = MasterSatuan::all();
@@ -276,20 +499,52 @@ class DataInventoryController extends Controller
 
     public function update(Request $request, $id)
     {
-        $inventory = DataInventory::findOrFail($id);
+        $user = Auth::user();
+        $inventory = DataInventory::with('gudang')->findOrFail($id);
+
+        // Filter berdasarkan jenis gudang untuk kepala_unit dan pegawai
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Pastikan inventory ini dari gudang UNIT yang terkait dengan unit kerja mereka
+                if ($inventory->gudang->jenis_gudang !== 'UNIT' || 
+                    $inventory->gudang->id_unit_kerja !== $pegawai->id_unit_kerja) {
+                    abort(403, 'Unauthorized - Anda hanya dapat mengupdate inventory dari gudang unit Anda sendiri');
+                }
+            } else {
+                abort(403, 'Unauthorized - User tidak memiliki unit kerja');
+            }
+        }
+
+        // Validation rules berbeda untuk admin/admin_gudang vs kepala_unit/pegawai
+        $gudangRules = ['required', 'exists:master_gudang,id_gudang'];
+        
+        if ($user->hasAnyRole(['admin', 'admin_gudang'])) {
+            // Admin dan admin_gudang hanya bisa update inventory di gudang PUSAT
+            $gudangRules[] = function ($attribute, $value, $fail) {
+                $gudang = MasterGudang::find($value);
+                if ($gudang && $gudang->jenis_gudang !== 'PUSAT') {
+                    $fail('Data inventory hanya dapat disimpan di gudang PUSAT. Gudang UNIT hanya menerima distribusi barang.');
+                }
+            };
+        } else {
+            // Kepala unit dan pegawai hanya bisa update inventory di gudang UNIT mereka
+            $gudangRules[] = function ($attribute, $value, $fail) use ($user) {
+                $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+                if ($pegawai && $pegawai->id_unit_kerja) {
+                    $gudang = MasterGudang::find($value);
+                    if ($gudang && ($gudang->jenis_gudang !== 'UNIT' || $gudang->id_unit_kerja !== $pegawai->id_unit_kerja)) {
+                        $fail('Anda hanya dapat mengupdate inventory di gudang unit Anda sendiri.');
+                    }
+                } else {
+                    $fail('User tidak memiliki unit kerja.');
+                }
+            };
+        }
 
         $validated = $request->validate([
             'id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
-            'id_gudang' => [
-                'required',
-                'exists:master_gudang,id_gudang',
-                function ($attribute, $value, $fail) {
-                    $gudang = MasterGudang::find($value);
-                    if ($gudang && $gudang->jenis_gudang !== 'PUSAT') {
-                        $fail('Data inventory hanya dapat disimpan di gudang PUSAT. Gudang UNIT hanya menerima distribusi barang.');
-                    }
-                },
-            ],
+            'id_gudang' => $gudangRules,
             'id_anggaran' => 'required|exists:master_sumber_anggaran,id_anggaran',
             'id_sub_kegiatan' => 'required|exists:master_sub_kegiatan,id_sub_kegiatan',
             'jenis_inventory' => 'required|in:ASET,PERSEDIAAN,FARMASI',
@@ -337,6 +592,14 @@ class DataInventoryController extends Controller
 
     public function destroy($id)
     {
+        $user = Auth::user();
+        
+        // GUDANG UNIT: Tidak bisa menghapus data inventory
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            abort(403, 'Unauthorized - Anda tidak memiliki izin untuk menghapus data inventory.');
+        }
+        
+        // GUDANG PUSAT: Bisa menghapus data inventory
         $inventory = DataInventory::findOrFail($id);
         $inventory->delete();
 

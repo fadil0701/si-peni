@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use App\Helpers\PermissionHelper;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -20,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Share user roles with all views
+        // Share user roles and accessible menus with all views
         View::composer('*', function ($view) {
             if (auth()->check()) {
                 $user = auth()->user();
@@ -29,6 +30,7 @@ class AppServiceProvider extends ServiceProvider
                     $user->load('roles');
                 }
                 $view->with('currentUser', $user);
+                $view->with('accessibleMenus', PermissionHelper::getAccessibleMenus($user));
             }
         });
     }

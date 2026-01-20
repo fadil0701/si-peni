@@ -50,6 +50,39 @@
             </div>
 
             <div>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Hak Akses (Permissions) ({{ $role->permissions->count() }})</h3>
+                @if($role->permissions->count() > 0)
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-96 overflow-y-auto">
+                        @foreach($role->permissions->groupBy('module') as $module => $modulePermissions)
+                            <div class="mb-4">
+                                <h4 class="text-sm font-semibold text-gray-900 mb-2 uppercase tracking-wide">
+                                    {{ str_replace('-', ' ', $module) }}
+                                </h4>
+                                <div class="space-y-1 pl-4">
+                                    @foreach($modulePermissions as $permission)
+                                        <div class="flex items-start">
+                                            <svg class="w-4 h-4 text-green-500 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                            </svg>
+                                            <div>
+                                                <span class="text-sm text-gray-700 font-medium">{{ $permission->display_name }}</span>
+                                                @if($permission->description)
+                                                    <p class="text-xs text-gray-500 mt-0.5">{{ $permission->description }}</p>
+                                                @endif
+                                                <p class="text-xs text-gray-400 mt-0.5 font-mono">{{ $permission->name }}</p>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-gray-500">Role ini belum memiliki hak akses. <a href="{{ route('admin.roles.edit', $role->id) }}" class="text-blue-600 hover:text-blue-800">Tambahkan hak akses</a></p>
+                @endif
+            </div>
+
+            <div>
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Users dengan Role Ini ({{ $role->users->count() }})</h3>
                 @if($role->users->count() > 0)
                     <div class="overflow-x-auto">

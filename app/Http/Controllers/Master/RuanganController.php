@@ -9,9 +9,10 @@ use App\Models\MasterUnitKerja;
 
 class RuanganController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $ruangans = MasterRuangan::with('unitKerja')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $ruangans = MasterRuangan::with('unitKerja')->latest()->paginate($perPage)->appends($request->query());
         return view('master.ruangan.index', compact('ruangans'));
     }
 

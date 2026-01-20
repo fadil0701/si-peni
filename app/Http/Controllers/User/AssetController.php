@@ -8,14 +8,15 @@ use App\Models\InventoryItem;
 
 class AssetController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
         $assets = InventoryItem::whereHas('inventory', function ($query) {
             $query->where('jenis_inventory', 'ASET');
         })
         ->with(['inventory.dataBarang', 'ruangan'])
         ->latest()
-        ->paginate(15);
+        ->paginate($perPage)->appends($request->query());
 
         return view('user.assets.index', compact('assets'));
     }

@@ -11,13 +11,33 @@ use App\Models\TransaksiDistribusi;
 use App\Models\MasterUnitKerja;
 use App\Models\MasterPegawai;
 use App\Models\MasterSatuan;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class PenerimaanBarangController extends Controller
 {
     public function index(Request $request)
     {
+        $user = Auth::user();
         $query = PenerimaanBarang::with(['distribusi', 'unitKerja', 'pegawaiPenerima']);
+
+        // Filter berdasarkan unit kerja user yang login untuk pegawai/kepala_unit
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan penerimaan dari unit kerja user yang login
+                $query->where('id_unit_kerja', $pegawai->id_unit_kerja);
+                // Hanya tampilkan unit kerja user yang login di dropdown
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                // Jika user tidak memiliki unit kerja, tidak tampilkan data
+                $query->whereRaw('1 = 0');
+                $unitKerjas = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+        }
 
         // Filters
         if ($request->filled('unit_kerja')) {
@@ -38,24 +58,50 @@ class PenerimaanBarangController extends Controller
             });
         }
 
-        $penerimaans = $query->latest('tanggal_penerimaan')->paginate(15);
-        $unitKerjas = MasterUnitKerja::all();
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $penerimaans = $query->latest('tanggal_penerimaan')->paginate($perPage)->appends($request->query());
 
         return view('transaction.penerimaan-barang.index', compact('penerimaans', 'unitKerjas'));
     }
 
     public function create(Request $request)
     {
+        $user = Auth::user();
+        
         // Filter distribusi yang sudah dikirim dan belum diterima
-        $distribusis = TransaksiDistribusi::where('status_distribusi', 'DIKIRIM')
+        $distribusiQuery = TransaksiDistribusi::where('status_distribusi', 'DIKIRIM')
             ->whereDoesntHave('penerimaanBarang', function($q) {
                 $q->where('status_penerimaan', 'DITERIMA');
             })
-            ->with(['gudangAsal', 'gudangTujuan', 'permintaan.unitKerja'])
-            ->get();
+            ->with(['gudangAsal', 'gudangTujuan', 'permintaan.unitKerja']);
 
-        $unitKerjas = MasterUnitKerja::all();
-        $pegawais = MasterPegawai::all();
+        // Filter distribusi berdasarkan unit kerja user yang login untuk pegawai/kepala_unit
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan distribusi yang ditujukan ke gudang unit kerja user
+                $gudangUnitIds = \App\Models\MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                $distribusiQuery->whereIn('id_gudang_tujuan', $gudangUnitIds);
+                
+                // Hanya tampilkan unit kerja user yang login
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+                // Hanya tampilkan pegawai dari unit kerja yang sama
+                $pegawais = MasterPegawai::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                $distribusiQuery->whereRaw('1 = 0');
+                $unitKerjas = collect([]);
+                $pegawais = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+            $pegawais = MasterPegawai::all();
+        }
+
+        $distribusis = $distribusiQuery->get();
         $satuans = MasterSatuan::all();
 
         // Jika ada distribusi_id di request, load detail distribusi
@@ -159,14 +205,41 @@ class PenerimaanBarangController extends Controller
 
     public function edit($id)
     {
+        $user = Auth::user();
         $penerimaan = PenerimaanBarang::with('detailPenerimaan')->findOrFail($id);
         
         // Hanya bisa edit jika status DITERIMA (belum final)
         // Atau bisa diubah sesuai kebutuhan bisnis
 
-        $distribusis = TransaksiDistribusi::where('status_distribusi', 'DIKIRIM')->get();
-        $unitKerjas = MasterUnitKerja::all();
-        $pegawais = MasterPegawai::all();
+        $distribusiQuery = TransaksiDistribusi::where('status_distribusi', 'DIKIRIM');
+        
+        // Filter distribusi berdasarkan unit kerja user yang login untuk pegawai/kepala_unit
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan distribusi yang ditujukan ke gudang unit kerja user
+                $gudangUnitIds = \App\Models\MasterGudang::where('jenis_gudang', 'UNIT')
+                    ->where('id_unit_kerja', $pegawai->id_unit_kerja)
+                    ->pluck('id_gudang');
+                
+                $distribusiQuery->whereIn('id_gudang_tujuan', $gudangUnitIds);
+                
+                // Hanya tampilkan unit kerja user yang login
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+                // Hanya tampilkan pegawai dari unit kerja yang sama
+                $pegawais = MasterPegawai::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                $distribusiQuery->whereRaw('1 = 0');
+                $unitKerjas = collect([]);
+                $pegawais = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+            $pegawais = MasterPegawai::all();
+        }
+
+        $distribusis = $distribusiQuery->get();
         $satuans = MasterSatuan::all();
 
         return view('transaction.penerimaan-barang.edit', compact('penerimaan', 'distribusis', 'unitKerjas', 'pegawais', 'satuans'));

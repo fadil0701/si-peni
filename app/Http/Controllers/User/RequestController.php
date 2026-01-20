@@ -9,11 +9,12 @@ use App\Models\MasterDataBarang;
 
 class RequestController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
         $requests = PermintaanBarang::with('user')
             ->latest()
-            ->paginate(15);
+            ->paginate($perPage)->appends($request->query());
 
         return view('user.requests.index', compact('requests'));
     }

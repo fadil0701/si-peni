@@ -8,9 +8,10 @@ use App\Models\MasterUnitKerja;
 
 class UnitKerjaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $unitKerjas = MasterUnitKerja::latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $unitKerjas = MasterUnitKerja::latest()->paginate($perPage)->appends($request->query());
         return view('master.unit-kerja.index', compact('unitKerjas'));
     }
 

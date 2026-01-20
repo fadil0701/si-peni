@@ -15,7 +15,45 @@
         <h2 class="text-xl font-semibold text-gray-900">Tambah Permintaan Barang</h2>
     </div>
     
-    <form action="{{ route('transaction.permintaan-barang.store') }}" method="POST" class="p-6" id="formPermintaan">
+    <!-- Error Messages -->
+    @if($errors->any())
+        <div class="mx-6 mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Terjadi kesalahan saat menyimpan data:</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <ul class="list-disc list-inside space-y-1">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="mx-6 mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
+                </div>
+            </div>
+        </div>
+    @endif
+    
+    <form action="{{ route('transaction.permintaan-barang.store') }}" method="POST" class="p-6" id="formPermintaan" onsubmit="return validateForm()">
         @csrf
         
         <div class="space-y-6">
@@ -35,7 +73,7 @@
                         >
                             <option value="">Pilih Unit Kerja</option>
                             @foreach($unitKerjas as $unitKerja)
-                                <option value="{{ $unitKerja->id_unit_kerja }}" {{ old('id_unit_kerja') == $unitKerja->id_unit_kerja ? 'selected' : '' }}>
+                                <option value="{{ $unitKerja->id_unit_kerja }}" {{ old('id_unit_kerja', optional(auth()->user()->pegawai)->id_unit_kerja ?? '') == $unitKerja->id_unit_kerja ? 'selected' : '' }}>
                                     {{ $unitKerja->nama_unit_kerja }}
                                 </option>
                             @endforeach
@@ -57,7 +95,7 @@
                         >
                             <option value="">Pilih Pemohon</option>
                             @foreach($pegawais as $pegawai)
-                                <option value="{{ $pegawai->id }}" {{ old('id_pemohon') == $pegawai->id ? 'selected' : '' }}>
+                                <option value="{{ $pegawai->id }}" {{ old('id_pemohon', optional(auth()->user()->pegawai)->id ?? '') == $pegawai->id ? 'selected' : '' }}>
                                     {{ $pegawai->nama_pegawai }} ({{ $pegawai->nip_pegawai }})
                                 </option>
                             @endforeach
@@ -85,20 +123,41 @@
                     </div>
 
                     <div>
-                        <label for="jenis_permintaan" class="block text-sm font-medium text-gray-700 mb-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
                             Jenis Permintaan <span class="text-red-500">*</span>
                         </label>
-                        <select 
-                            id="jenis_permintaan" 
-                            name="jenis_permintaan" 
-                            required
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('jenis_permintaan') border-red-500 @enderror"
-                        >
-                            <option value="">Pilih Jenis</option>
-                            <option value="BARANG" {{ old('jenis_permintaan') == 'BARANG' ? 'selected' : '' }}>Barang</option>
-                            <option value="ASET" {{ old('jenis_permintaan') == 'ASET' ? 'selected' : '' }}>Aset</option>
-                        </select>
+                        <div class="space-y-2">
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="jenis_barang" 
+                                    name="jenis_permintaan[]" 
+                                    value="BARANG"
+                                    {{ in_array('BARANG', old('jenis_permintaan', [])) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="jenis_barang" class="ml-2 block text-sm text-gray-700">
+                                    Barang
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="jenis_aset" 
+                                    name="jenis_permintaan[]" 
+                                    value="ASET"
+                                    {{ in_array('ASET', old('jenis_permintaan', [])) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="jenis_aset" class="ml-2 block text-sm text-gray-700">
+                                    Aset
+                                </label>
+                            </div>
+                        </div>
                         @error('jenis_permintaan')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('jenis_permintaan.*')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                         @enderror
                     </div>
@@ -134,6 +193,94 @@
 
                 <div id="detailContainer" class="space-y-4">
                     <!-- Item akan ditambahkan di sini via JavaScript -->
+                    @if(old('detail'))
+                        @foreach(old('detail') as $index => $detail)
+                            <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                                    <div class="sm:col-span-5">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            Data Barang <span class="text-red-500">*</span>
+                                        </label>
+                                        <select 
+                                            name="detail[{{ $index }}][id_data_barang]" 
+                                            required
+                                            class="select-data-barang block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.id_data_barang') border-red-500 @enderror"
+                                        >
+                                            <option value="">Pilih Data Barang</option>
+                                            @foreach($dataBarangs as $dataBarang)
+                                                <option value="{{ $dataBarang->id_data_barang }}" 
+                                                    data-satuan="{{ $dataBarang->id_satuan }}"
+                                                    {{ old('detail.'.$index.'.id_data_barang') == $dataBarang->id_data_barang ? 'selected' : '' }}>
+                                                    {{ $dataBarang->kode_data_barang }} - {{ $dataBarang->nama_barang }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('detail.'.$index.'.id_data_barang')
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            Qty <span class="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            type="number" 
+                                            name="detail[{{ $index }}][qty_diminta]" 
+                                            required
+                                            min="0.01"
+                                            step="0.01"
+                                            value="{{ old('detail.'.$index.'.qty_diminta') }}"
+                                            placeholder="0"
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.qty_diminta') border-red-500 @enderror"
+                                        >
+                                        @error('detail.'.$index.'.qty_diminta')
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            Satuan <span class="text-red-500">*</span>
+                                        </label>
+                                        <select 
+                                            name="detail[{{ $index }}][id_satuan]" 
+                                            required
+                                            class="select-satuan block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.id_satuan') border-red-500 @enderror"
+                                        >
+                                            <option value="">Pilih Satuan</option>
+                                            @foreach($satuans as $satuan)
+                                                <option value="{{ $satuan->id_satuan }}" {{ old('detail.'.$index.'.id_satuan') == $satuan->id_satuan ? 'selected' : '' }}>{{ $satuan->nama_satuan }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('detail.'.$index.'.id_satuan')
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
+                                        <input 
+                                            type="text" 
+                                            name="detail[{{ $index }}][keterangan]" 
+                                            value="{{ old('detail.'.$index.'.keterangan') }}"
+                                            placeholder="Opsional"
+                                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        >
+                                    </div>
+
+                                    <div class="sm:col-span-1 flex items-end">
+                                        <button 
+                                            type="button" 
+                                            class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    @endif
                 </div>
 
                 @error('detail')
@@ -236,39 +383,65 @@
 
 @push('scripts')
 <script>
-let itemIndex = 0;
+let itemIndex = {{ old('detail') ? count(old('detail')) : 0 }};
 
-document.getElementById('btnTambahItem').addEventListener('click', function() {
+// Fungsi untuk menambahkan item baru
+function tambahItem() {
     const template = document.getElementById('itemTemplate');
     const container = document.getElementById('detailContainer');
+    
+    if (!template || !container) {
+        console.error('Template atau container tidak ditemukan');
+        return;
+    }
+    
     const newItem = template.content.cloneNode(true);
     
     // Replace INDEX dengan itemIndex
-    newItem.innerHTML = newItem.innerHTML.replace(/INDEX/g, itemIndex);
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(newItem);
+    let htmlContent = tempDiv.innerHTML;
+    htmlContent = htmlContent.replace(/INDEX/g, itemIndex);
+    tempDiv.innerHTML = htmlContent;
     
-    container.appendChild(newItem);
+    const finalItem = tempDiv.firstElementChild;
+    container.appendChild(finalItem);
     itemIndex++;
     
     // Auto-set satuan ketika data barang dipilih
-    const selectBarang = container.lastElementChild.querySelector('.select-data-barang');
-    const selectSatuan = container.lastElementChild.querySelector('.select-satuan');
+    const selectBarang = finalItem.querySelector('.select-data-barang');
+    const selectSatuan = finalItem.querySelector('.select-satuan');
     
-    selectBarang.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        const satuanId = selectedOption.getAttribute('data-satuan');
-        if (satuanId) {
-            selectSatuan.value = satuanId;
-        }
-    });
+    if (selectBarang && selectSatuan) {
+        selectBarang.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const satuanId = selectedOption.getAttribute('data-satuan');
+            if (satuanId) {
+                selectSatuan.value = satuanId;
+            }
+        });
+    }
     
     // Hapus item
-    container.lastElementChild.querySelector('.btnHapusItem').addEventListener('click', function() {
-        this.closest('.item-row').remove();
-    });
-});
+    const btnHapus = finalItem.querySelector('.btnHapusItem');
+    if (btnHapus) {
+        btnHapus.addEventListener('click', function() {
+            this.closest('.item-row').remove();
+        });
+    }
+}
 
-// Hapus item untuk item pertama jika ada
+// Event listener untuk button tambah item
 document.addEventListener('DOMContentLoaded', function() {
+    const btnTambahItem = document.getElementById('btnTambahItem');
+    if (btnTambahItem) {
+        btnTambahItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            tambahItem();
+        });
+    }
+    
+    // Hapus item untuk item yang sudah ada
     document.querySelectorAll('.btnHapusItem').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('.item-row').remove();
@@ -288,10 +461,106 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Tambah item pertama jika belum ada
-    if (document.getElementById('detailContainer').children.length === 0) {
-        document.getElementById('btnTambahItem').click();
+    // Tambah item pertama jika belum ada (hanya jika tidak ada old input)
+    const container = document.getElementById('detailContainer');
+    if (container && container.children.length === 0) {
+        tambahItem();
     }
+    
+    // Setup event listeners untuk detail items yang sudah ada (dari old input)
+    container.querySelectorAll('.item-row').forEach(row => {
+        const selectBarang = row.querySelector('.select-data-barang');
+        const selectSatuan = row.querySelector('.select-satuan');
+        const btnHapus = row.querySelector('.btnHapusItem');
+        
+        // Auto-set satuan ketika data barang dipilih
+        if (selectBarang && selectSatuan) {
+            selectBarang.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const satuanId = selectedOption.getAttribute('data-satuan');
+                if (satuanId) {
+                    selectSatuan.value = satuanId;
+                }
+            });
+        }
+        
+        // Hapus item
+        if (btnHapus) {
+            btnHapus.addEventListener('click', function() {
+                this.closest('.item-row').remove();
+            });
+        }
+    });
+    
+    // Auto-select unit kerja dan pemohon berdasarkan user yang login
+    @php
+        $userPegawai = auth()->user()->pegawai;
+    @endphp
+    @if($userPegawai)
+        const unitKerjaSelect = document.getElementById('id_unit_kerja');
+        const pemohonSelect = document.getElementById('id_pemohon');
+        
+        if (unitKerjaSelect && !unitKerjaSelect.value) {
+            const userUnitKerja = {{ $userPegawai->id_unit_kerja ?? 'null' }};
+            if (userUnitKerja) {
+                unitKerjaSelect.value = userUnitKerja;
+            }
+        }
+        
+        if (pemohonSelect && !pemohonSelect.value) {
+            const userPegawaiId = {{ $userPegawai->id ?? 'null' }};
+            if (userPegawaiId) {
+                pemohonSelect.value = userPegawaiId;
+            }
+        }
+    @endif
+    
+    // Form validation sebelum submit
+    window.validateForm = function() {
+        const form = document.getElementById('formPermintaan');
+        const jenisPermintaan = form.querySelectorAll('input[name="jenis_permintaan[]"]:checked');
+        const detailItems = form.querySelectorAll('.item-row');
+        
+        // Validasi jenis permintaan
+        if (jenisPermintaan.length === 0) {
+            alert('Jenis permintaan harus dipilih minimal satu.');
+            return false;
+        }
+        
+        // Validasi detail items
+        if (detailItems.length === 0) {
+            alert('Detail permintaan harus diisi minimal satu item.');
+            return false;
+        }
+        
+        // Validasi setiap detail item
+        let isValid = true;
+        detailItems.forEach((item, index) => {
+            const idDataBarang = item.querySelector('select[name*="[id_data_barang]"]');
+            const qtyDiminta = item.querySelector('input[name*="[qty_diminta]"]');
+            const idSatuan = item.querySelector('select[name*="[id_satuan]"]');
+            
+            if (!idDataBarang || !idDataBarang.value) {
+                alert(`Data barang pada item ${index + 1} harus dipilih.`);
+                isValid = false;
+                return false;
+            }
+            
+            if (!qtyDiminta || !qtyDiminta.value || parseFloat(qtyDiminta.value) <= 0) {
+                alert(`Jumlah yang diminta pada item ${index + 1} harus diisi dan lebih dari 0.`);
+                isValid = false;
+                return false;
+            }
+            
+            if (!idSatuan || !idSatuan.value) {
+                alert(`Satuan pada item ${index + 1} harus dipilih.`);
+                isValid = false;
+                return false;
+            }
+        });
+        
+        return isValid;
+    };
 });
 </script>
 @endpush

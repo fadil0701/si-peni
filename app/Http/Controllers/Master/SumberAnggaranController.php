@@ -8,9 +8,10 @@ use App\Models\MasterSumberAnggaran;
 
 class SumberAnggaranController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $sumberAnggarans = MasterSumberAnggaran::latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $sumberAnggarans = MasterSumberAnggaran::latest()->paginate($perPage)->appends($request->query());
         return view('master-data.sumber-anggaran.index', compact('sumberAnggarans'));
     }
 

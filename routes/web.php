@@ -34,6 +34,7 @@ use App\Http\Controllers\Report\ReportController;
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::get('/logout', [LoginController::class, 'logout'])->name('logout.get'); // Fallback untuk GET request
 
 // Protected Routes (require authentication)
 Route::middleware(['auth'])->group(function () {
@@ -50,34 +51,35 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/requests', [RequestController::class, 'store'])->name('user.requests.store');
     Route::get('/requests/{id}', [RequestController::class, 'show'])->name('user.requests.show');
     
-    // Master Manajemen
-    Route::prefix('master-manajemen')->name('master-manajemen.')->group(function () {
+    // Master Manajemen - Admin only
+    Route::prefix('master-manajemen')->name('master-manajemen.')->middleware(['role:admin'])->group(function () {
         Route::resource('master-pegawai', \App\Http\Controllers\MasterManajemen\MasterPegawaiController::class);
+        Route::resource('master-jabatan', \App\Http\Controllers\MasterManajemen\MasterJabatanController::class);
     });
     
-    Route::prefix('master')->name('master.')->group(function () {
+    Route::prefix('master')->name('master.')->middleware(['role:admin'])->group(function () {
         Route::resource('unit-kerja', UnitKerjaController::class);
-        Route::resource('gudang', GudangController::class);
+        Route::resource('gudang', GudangController::class)->middleware(['role:admin,admin_gudang']);
         Route::resource('ruangan', RuanganController::class);
         Route::resource('program', ProgramController::class);
         Route::resource('kegiatan', KegiatanController::class);
         Route::resource('sub-kegiatan', SubKegiatanController::class);
     });
     
-    // Master Data
-    Route::prefix('master-data')->name('master-data.')->group(function () {
-        Route::resource('aset', AsetController::class);
-        Route::resource('kode-barang', KodeBarangController::class);
-        Route::resource('kategori-barang', KategoriBarangController::class);
-        Route::resource('jenis-barang', JenisBarangController::class);
-        Route::resource('subjenis-barang', SubjenisBarangController::class);
+    // Master Data - Admin & Admin Gudang
+    Route::prefix('master-data')->name('master-data.')->middleware(['role:admin,admin_gudang'])->group(function () {
+        Route::resource('aset', AsetController::class)->middleware(['role:admin']);
+        Route::resource('kode-barang', KodeBarangController::class)->middleware(['role:admin']);
+        Route::resource('kategori-barang', KategoriBarangController::class)->middleware(['role:admin']);
+        Route::resource('jenis-barang', JenisBarangController::class)->middleware(['role:admin']);
+        Route::resource('subjenis-barang', SubjenisBarangController::class)->middleware(['role:admin']);
         Route::resource('data-barang', DataBarangController::class);
-        Route::resource('satuan', SatuanController::class);
-        Route::resource('sumber-anggaran', SumberAnggaranController::class);
+        Route::resource('satuan', SatuanController::class)->middleware(['role:admin']);
+        Route::resource('sumber-anggaran', SumberAnggaranController::class)->middleware(['role:admin']);
     });
     
-    // Inventory
-    Route::prefix('inventory')->name('inventory.')->group(function () {
+    // Inventory - Admin, Admin Gudang (semua kategori), Kepala Unit, Admin Unit (Pegawai), Kasubbag TU
+    Route::prefix('inventory')->name('inventory.')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,kepala_unit,pegawai,kasubbag_tu'])->group(function () {
         Route::get('data-stock', [DataStockController::class, 'index'])->name('data-stock.index');
         Route::resource('data-inventory', DataInventoryController::class);
         Route::resource('inventory-item', \App\Http\Controllers\Inventory\InventoryItemController::class);
@@ -97,38 +99,83 @@ Route::middleware(['auth'])->group(function () {
     
     // Transaction
     Route::prefix('transaction')->name('transaction.')->group(function () {
-        Route::resource('distribusi', DistribusiController::class);
-        Route::post('distribusi/{id}/kirim', [DistribusiController::class, 'kirim'])->name('distribusi.kirim');
-        Route::resource('permintaan-barang', PermintaanBarangController::class);
-        Route::post('permintaan-barang/{id}/ajukan', [PermintaanBarangController::class, 'ajukan'])->name('permintaan-barang.ajukan');
-        Route::resource('penerimaan-barang', PenerimaanBarangController::class);
+        // Permintaan Barang - Pegawai, Kepala Unit, Kasubbag TU, Kepala Pusat, Admin
+        Route::resource('permintaan-barang', PermintaanBarangController::class)->middleware(['role:admin,pegawai,kepala_unit,kasubbag_tu,kepala_pusat']);
+        Route::post('permintaan-barang/{id}/ajukan', [PermintaanBarangController::class, 'ajukan'])->name('permintaan-barang.ajukan')->middleware(['role:admin,pegawai']);
         
-        // Approval
+        // Approval - Multi-level approval
         Route::prefix('approval')->name('approval.')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'index'])->name('index');
-            Route::get('/{id}', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'show'])->name('show');
-            Route::post('/{id}/approve', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'approve'])->name('approve');
-            Route::post('/{id}/reject', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'reject'])->name('reject');
+            Route::get('/', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'index'])->name('index')->middleware(['role:admin,kepala_unit,kasubbag_tu,kepala_pusat,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,perencanaan,pengadaan,keuangan']);
+            Route::get('/diagram', function () {
+                return view('transaction.approval.diagram');
+            })->name('diagram')->middleware(['role:admin,kepala_unit,kasubbag_tu,kepala_pusat,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,perencanaan,pengadaan,keuangan']);
+            Route::get('/{id}', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'show'])->name('show')->middleware(['role:admin,kepala_unit,kasubbag_tu,kepala_pusat,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,perencanaan,pengadaan,keuangan']);
+            
+            // Action khusus untuk Kepala Unit (mengetahui)
+            Route::post('/{id}/mengetahui', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'mengetahui'])->name('mengetahui')->middleware(['role:admin,kepala_unit']);
+            
+            // Action khusus untuk Kasubbag TU (verifikasi/kembalikan)
+            Route::post('/{id}/verifikasi', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'verifikasi'])->name('verifikasi')->middleware(['role:admin,kasubbag_tu']);
+            Route::post('/{id}/kembalikan', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'kembalikan'])->name('kembalikan')->middleware(['role:admin,kasubbag_tu']);
+            
+            // Action untuk Kepala Pusat (approve/reject)
+            Route::post('/{id}/approve', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'approve'])->name('approve')->middleware(['role:admin,kepala_pusat']);
+            Route::post('/{id}/reject', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'reject'])->name('reject')->middleware(['role:admin,kepala_pusat']);
+            
+            // Action untuk disposisi - Admin Gudang/Pengurus Barang melakukan disposisi ke admin gudang kategori
+            Route::post('/{id}/disposisi', [\App\Http\Controllers\Transaction\ApprovalPermintaanController::class, 'disposisi'])->name('disposisi')->middleware(['role:admin,admin_gudang']);
+        });
+        
+        // Draft Distribusi - Admin Gudang Kategori memproses disposisi
+        Route::prefix('draft-distribusi')->name('draft-distribusi.')->middleware(['role:admin,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi'])->group(function () {
+            Route::get('/', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'index'])->name('index');
+            Route::get('/create/{approvalLogId}', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'store'])->name('store');
+            Route::get('/{id}', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'show'])->name('show');
+        });
+        
+        // Compile Distribusi - Pengurus Barang/Admin Gudang compile menjadi SBBK
+        Route::prefix('compile-distribusi')->name('compile-distribusi.')->middleware(['role:admin,admin_gudang'])->group(function () {
+            Route::get('/', [\App\Http\Controllers\Transaction\CompileDistribusiController::class, 'index'])->name('index');
+            Route::get('/create/{permintaanId}', [\App\Http\Controllers\Transaction\CompileDistribusiController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Transaction\CompileDistribusiController::class, 'store'])->name('store');
+        });
+        
+        // Distribusi - Admin Gudang & Admin (termasuk admin gudang kategori)
+        Route::resource('distribusi', DistribusiController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
+        Route::post('distribusi/{id}/kirim', [DistribusiController::class, 'kirim'])->name('distribusi.kirim')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
+        Route::get('distribusi/api/gudang-tujuan/{permintaanId}', [DistribusiController::class, 'getGudangTujuanByPermintaan'])->name('distribusi.api.gudang-tujuan');
+        
+        // Penerimaan - Admin Gudang (semua kategori), Pegawai, Kepala Unit, Admin
+        Route::resource('penerimaan-barang', PenerimaanBarangController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
+        
+        // Retur Barang - Admin Gudang (semua kategori), Pegawai, Kepala Unit, Admin
+        // Route untuk return barang dari gudang unit ke gudang pusat
+        Route::prefix('retur')->name('retur.')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit'])->group(function () {
+            Route::get('/', function () {
+                return view('transaction.retur.index');
+            })->name('index');
+            // TODO: Implement retur controller
         });
     });
     
-    // Asset & KIR
-    Route::prefix('asset')->name('asset.')->group(function () {
+    // Asset & KIR - Admin, Admin Gudang, Kepala Unit, Pegawai (untuk unit mereka sendiri)
+    Route::prefix('asset')->name('asset.')->middleware(['role:admin,admin_gudang,kepala_unit,pegawai'])->group(function () {
         Route::resource('register-aset', RegisterAsetController::class);
     });
     
-    // Planning
-    Route::prefix('planning')->name('planning.')->group(function () {
+    // Planning - Admin only
+    Route::prefix('planning')->name('planning.')->middleware(['role:admin'])->group(function () {
         Route::resource('rku', RkuController::class);
     });
     
-    // Procurement
-    Route::prefix('procurement')->name('procurement.')->group(function () {
+    // Procurement - Admin only
+    Route::prefix('procurement')->name('procurement.')->middleware(['role:admin'])->group(function () {
         Route::resource('paket-pengadaan', PaketPengadaanController::class);
     });
     
-    // Finance
-    Route::prefix('finance')->name('finance.')->group(function () {
+    // Finance - Admin only
+    Route::prefix('finance')->name('finance.')->middleware(['role:admin'])->group(function () {
         Route::resource('pembayaran', PembayaranController::class);
     });
     
@@ -138,8 +185,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
     });
     
-    // Reports
-    Route::prefix('reports')->name('reports.')->group(function () {
+    // Reports - Admin, Kepala Pusat, Admin Gudang, Kasubbag TU
+    Route::prefix('reports')->name('reports.')->middleware(['role:admin,kepala_pusat,admin_gudang,kasubbag_tu'])->group(function () {
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('stock-gudang', [ReportController::class, 'stockGudang'])->name('stock-gudang');
         Route::get('stock-gudang/export', [ReportController::class, 'exportStockGudang'])->name('stock-gudang.export');

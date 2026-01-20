@@ -10,9 +10,10 @@ use App\Models\Role;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $users = User::with('roles')->latest()->paginate($perPage)->appends($request->query());
         return view('admin.users.index', compact('users'));
     }
 

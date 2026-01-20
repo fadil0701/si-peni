@@ -9,9 +9,10 @@ use App\Models\MasterKegiatan;
 
 class SubKegiatanController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $subKegiatans = MasterSubKegiatan::with('kegiatan.program')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $subKegiatans = MasterSubKegiatan::with('kegiatan.program')->latest()->paginate($perPage)->appends($request->query());
         return view('master.sub-kegiatan.index', compact('subKegiatans'));
     }
 

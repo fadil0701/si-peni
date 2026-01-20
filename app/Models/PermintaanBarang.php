@@ -24,7 +24,7 @@ class PermintaanBarang extends Model
 
     protected $casts = [
         'tanggal_permintaan' => 'date',
-        'jenis_permintaan' => 'string',
+        'jenis_permintaan' => 'array', // Cast sebagai array untuk JSON
         'status_permintaan' => 'string',
     ];
 
@@ -53,5 +53,10 @@ class PermintaanBarang extends Model
     public function transaksiDistribusi(): HasMany
     {
         return $this->hasMany(TransaksiDistribusi::class, 'id_permintaan', 'id_permintaan');
+    }
+
+    public function draftDetailDistribusi(): HasMany
+    {
+        return $this->hasMany(DraftDetailDistribusi::class, 'id_permintaan', 'id_permintaan');
     }
 }

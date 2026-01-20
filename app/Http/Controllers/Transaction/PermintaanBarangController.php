@@ -11,13 +11,33 @@ use App\Models\MasterUnitKerja;
 use App\Models\MasterPegawai;
 use App\Models\MasterDataBarang;
 use App\Models\MasterSatuan;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class PermintaanBarangController extends Controller
 {
     public function index(Request $request)
     {
+        $user = Auth::user();
         $query = PermintaanBarang::with(['unitKerja', 'pemohon']);
+
+        // Filter berdasarkan unit kerja user yang login untuk pegawai/kepala_unit
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan permintaan dari unit kerja user yang login
+                $query->where('id_unit_kerja', $pegawai->id_unit_kerja);
+                // Hanya tampilkan unit kerja user yang login di dropdown
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                // Jika user tidak memiliki unit kerja, tidak tampilkan data
+                $query->whereRaw('1 = 0');
+                $unitKerjas = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+        }
 
         // Filters
         if ($request->filled('unit_kerja')) {
@@ -29,7 +49,8 @@ class PermintaanBarangController extends Controller
         }
 
         if ($request->filled('jenis')) {
-            $query->where('jenis_permintaan', $request->jenis);
+            // Filter berdasarkan jenis_permintaan yang sekarang berupa JSON array
+            $query->whereJsonContains('jenis_permintaan', $request->jenis);
         }
 
         if ($request->filled('search')) {
@@ -42,16 +63,34 @@ class PermintaanBarangController extends Controller
             });
         }
 
-        $permintaans = $query->latest('tanggal_permintaan')->paginate(15);
-        $unitKerjas = MasterUnitKerja::all();
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $permintaans = $query->latest('tanggal_permintaan')->paginate($perPage)->appends($request->query());
 
         return view('transaction.permintaan-barang.index', compact('permintaans', 'unitKerjas'));
     }
 
     public function create()
     {
-        $unitKerjas = MasterUnitKerja::all();
-        $pegawais = MasterPegawai::all();
+        $user = Auth::user();
+        
+        // Filter unit kerja dan pegawai berdasarkan unit kerja user yang login
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan unit kerja user yang login
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+                // Hanya tampilkan pegawai dari unit kerja yang sama
+                $pegawais = MasterPegawai::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                $unitKerjas = collect([]);
+                $pegawais = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+            $pegawais = MasterPegawai::all();
+        }
+        
         $dataBarangs = MasterDataBarang::with(['subjenisBarang', 'satuan'])->get();
         $satuans = MasterSatuan::all();
 
@@ -60,18 +99,46 @@ class PermintaanBarangController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
-            'id_pemohon' => 'required|exists:master_pegawai,id',
-            'tanggal_permintaan' => 'required|date',
-            'jenis_permintaan' => 'required|in:BARANG,ASET',
-            'keterangan' => 'nullable|string',
-            'detail' => 'required|array|min:1',
-            'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
-            'detail.*.qty_diminta' => 'required|numeric|min:0.01',
-            'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
-            'detail.*.keterangan' => 'nullable|string',
+        // Debug: Log request data
+        \Log::info('Store Permintaan Request:', [
+            'all' => $request->all(),
+            'jenis_permintaan' => $request->jenis_permintaan,
+            'detail' => $request->detail,
         ]);
+
+        try {
+            $validated = $request->validate([
+                'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
+                'id_pemohon' => 'required|exists:master_pegawai,id',
+                'tanggal_permintaan' => 'required|date',
+                'jenis_permintaan' => 'required|array|min:1',
+                'jenis_permintaan.*' => 'required|in:BARANG,ASET',
+                'keterangan' => 'nullable|string',
+                'detail' => 'required|array|min:1',
+                'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
+                'detail.*.qty_diminta' => 'required|numeric|min:0.01',
+                'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
+                'detail.*.keterangan' => 'nullable|string',
+            ], [
+                'jenis_permintaan.required' => 'Jenis permintaan harus dipilih minimal satu.',
+                'jenis_permintaan.array' => 'Jenis permintaan harus berupa array.',
+                'jenis_permintaan.min' => 'Jenis permintaan harus dipilih minimal satu.',
+                'detail.required' => 'Detail permintaan harus diisi.',
+                'detail.array' => 'Detail permintaan harus berupa array.',
+                'detail.min' => 'Detail permintaan harus diisi minimal satu item.',
+                'detail.*.id_data_barang.required' => 'Data barang harus dipilih.',
+                'detail.*.qty_diminta.required' => 'Jumlah yang diminta harus diisi.',
+                'detail.*.qty_diminta.numeric' => 'Jumlah yang diminta harus berupa angka.',
+                'detail.*.qty_diminta.min' => 'Jumlah yang diminta minimal 0.01.',
+                'detail.*.id_satuan.required' => 'Satuan harus dipilih.',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::error('Validation failed:', [
+                'errors' => $e->errors(),
+                'request' => $request->all(),
+            ]);
+            return back()->withInput()->withErrors($e->errors());
+        }
 
         DB::beginTransaction();
         try {
@@ -90,12 +157,13 @@ class PermintaanBarangController extends Controller
             $noPermintaan = sprintf('PMT/%s/%04d', $tahun, $urut);
 
             // Create permintaan
+            // Simpan jenis_permintaan sebagai JSON array
             $permintaan = PermintaanBarang::create([
                 'no_permintaan' => $noPermintaan,
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'jenis_permintaan' => $validated['jenis_permintaan'],
+                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON
                 'status_permintaan' => 'DRAFT',
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
@@ -132,6 +200,7 @@ class PermintaanBarangController extends Controller
 
     public function edit($id)
     {
+        $user = Auth::user();
         $permintaan = PermintaanBarang::with('detailPermintaan')->findOrFail($id);
         
         // Hanya bisa edit jika status DRAFT
@@ -140,8 +209,24 @@ class PermintaanBarangController extends Controller
                 ->with('error', 'Permintaan yang sudah diajukan tidak dapat di-edit.');
         }
 
-        $unitKerjas = MasterUnitKerja::all();
-        $pegawais = MasterPegawai::all();
+        // Filter unit kerja dan pegawai berdasarkan unit kerja user yang login
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                // Hanya tampilkan unit kerja user yang login
+                $unitKerjas = MasterUnitKerja::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+                // Hanya tampilkan pegawai dari unit kerja yang sama
+                $pegawais = MasterPegawai::where('id_unit_kerja', $pegawai->id_unit_kerja)->get();
+            } else {
+                $unitKerjas = collect([]);
+                $pegawais = collect([]);
+            }
+        } else {
+            // Admin dan Admin Gudang melihat semua
+            $unitKerjas = MasterUnitKerja::all();
+            $pegawais = MasterPegawai::all();
+        }
+
         $dataBarangs = MasterDataBarang::with(['subjenisBarang', 'satuan'])->get();
         $satuans = MasterSatuan::all();
 
@@ -162,7 +247,8 @@ class PermintaanBarangController extends Controller
             'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
             'id_pemohon' => 'required|exists:master_pegawai,id',
             'tanggal_permintaan' => 'required|date',
-            'jenis_permintaan' => 'required|in:BARANG,ASET',
+            'jenis_permintaan' => 'required|array|min:1',
+            'jenis_permintaan.*' => 'required|in:BARANG,ASET',
             'keterangan' => 'nullable|string',
             'detail' => 'required|array|min:1',
             'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
@@ -174,11 +260,12 @@ class PermintaanBarangController extends Controller
         DB::beginTransaction();
         try {
             // Update permintaan
+            // Simpan jenis_permintaan sebagai JSON array
             $permintaan->update([
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'jenis_permintaan' => $validated['jenis_permintaan'],
+                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
 
@@ -238,14 +325,33 @@ class PermintaanBarangController extends Controller
             // Update status permintaan
             $permintaan->update(['status_permintaan' => 'DIAJUKAN']);
 
-            // Buat record approval
-            \App\Models\ApprovalPermintaan::create([
+            // Buat ApprovalLog untuk step pertama (Kepala Unit - Mengetahui)
+            // Step 1: Diajukan oleh pegawai (otomatis, tidak perlu approval log)
+            // Step 2: Kepala Unit mengetahui
+            $flowStep2 = \App\Models\ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('step_order', 2)
+                ->first();
+            
+            if (!$flowStep2) {
+                \Log::error('ApprovalFlowDefinition step 2 tidak ditemukan untuk PERMINTAAN_BARANG');
+                throw new \Exception('Konfigurasi approval flow tidak ditemukan. Silakan jalankan seeder ApprovalFlowDefinitionSeeder.');
+            }
+            
+            \App\Models\ApprovalLog::create([
                 'modul_approval' => 'PERMINTAAN_BARANG',
                 'id_referensi' => $permintaan->id_permintaan,
-                'id_approver' => auth()->user()->id, // TODO: Ambil dari kepala unit kerja atau role
-                'status_approval' => 'MENUNGGU',
+                'id_approval_flow' => $flowStep2->id,
+                'user_id' => null, // Akan diisi saat kepala unit mengetahui
+                'role_id' => $flowStep2->role_id,
+                'status' => 'MENUNGGU',
                 'catatan' => null,
-                'tanggal_approval' => null,
+                'approved_at' => null,
+            ]);
+            
+            \Log::info('ApprovalLog created:', [
+                'id_referensi' => $permintaan->id_permintaan,
+                'id_approval_flow' => $flowStep2->id,
+                'role_id' => $flowStep2->role_id,
             ]);
 
             DB::commit();
@@ -254,7 +360,10 @@ class PermintaanBarangController extends Controller
                 ->with('success', 'Permintaan berhasil diajukan untuk persetujuan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Error mengajukan permintaan: ' . $e->getMessage());
+            \Log::error('Error mengajukan permintaan: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'permintaan_id' => $id,
+            ]);
             return redirect()->route('transaction.permintaan-barang.show', $id)
                 ->with('error', 'Terjadi kesalahan saat mengajukan permintaan: ' . $e->getMessage());
         }

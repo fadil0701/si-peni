@@ -48,9 +48,20 @@
                         <div>
                             <dt class="text-sm font-medium text-gray-500 mb-1">Jenis Permintaan</dt>
                             <dd class="text-sm font-semibold text-gray-900">
-                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ $permintaan->jenis_permintaan == 'ASET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }}">
-                                    {{ $permintaan->jenis_permintaan }}
-                                </span>
+                                @php
+                                    $jenisPermintaan = is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []);
+                                @endphp
+                                @if(is_array($jenisPermintaan) && count($jenisPermintaan) > 0)
+                                    @foreach($jenisPermintaan as $jenis)
+                                        <span class="px-2 py-1 text-xs font-medium rounded-full {{ $jenis == 'ASET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }} mr-1">
+                                            {{ $jenis }}
+                                        </span>
+                                    @endforeach
+                                @else
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                        {{ is_string($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : '-' }}
+                                    </span>
+                                @endif
                             </dd>
                         </div>
                         @if($permintaan->keterangan)
@@ -97,99 +108,302 @@
     </div>
 @endif
 
+<!-- Approval History -->
+@if(isset($approvalHistory) && $approvalHistory->count() > 0)
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 mb-6">
+        <div class="px-6 py-5 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">Riwayat Persetujuan</h2>
+        </div>
+        <div class="p-6">
+            <div class="flow-root">
+                <ul class="-mb-8">
+                    @foreach($approvalHistory as $index => $hist)
+                        <li>
+                            <div class="relative pb-8">
+                                @if(!$loop->last)
+                                    <span class="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                @endif
+                                <div class="relative flex space-x-3">
+                                    <div>
+                                        @php
+                                            $statusIcon = match($hist->status) {
+                                                'MENUNGGU' => 'bg-yellow-100 text-yellow-800',
+                                                'DIKETAHUI' => 'bg-blue-100 text-blue-800',
+                                                'DIVERIFIKASI' => 'bg-purple-100 text-purple-800',
+                                                'DISETUJUI' => 'bg-green-100 text-green-800',
+                                                'DITOLAK' => 'bg-red-100 text-red-800',
+                                                default => 'bg-gray-100 text-gray-800',
+                                            };
+                                        @endphp
+                                        <span class="h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white {{ $statusIcon }}">
+                                            @if($hist->status === 'DISETUJUI')
+                                                <svg class="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                                </svg>
+                                            @elseif($hist->status === 'DITOLAK')
+                                                <svg class="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                </svg>
+                                            @else
+                                                <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                                                </svg>
+                                            @endif
+                                        </span>
+                                    </div>
+                                    <div class="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                                        <div>
+                                            <p class="text-sm text-gray-500">
+                                                <span class="font-medium text-gray-900">{{ $hist->approvalFlow->nama_step ?? 'Step ' . $hist->approvalFlow->step_order }}</span>
+                                                @if($hist->user)
+                                                    oleh <span class="font-medium">{{ $hist->user->name ?? 'N/A' }}</span>
+                                                @endif
+                                            </p>
+                                            @if($hist->catatan)
+                                                <p class="mt-1 text-sm text-gray-600">{{ $hist->catatan }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="text-right text-sm whitespace-nowrap text-gray-500">
+                                            @if($hist->approved_at)
+                                                {{ $hist->approved_at->format('d/m/Y H:i') }}
+                                            @else
+                                                {{ $hist->created_at->format('d/m/Y H:i') }}
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    </div>
+@endif
+
 <!-- Form Approval -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200">
     <div class="px-6 py-5 border-b border-gray-200">
         <h2 class="text-xl font-semibold text-gray-900">Persetujuan</h2>
-        <p class="text-sm text-gray-600 mt-1">Status: 
-            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $approval->status_approval == 'MENUNGGU' ? 'bg-yellow-100 text-yellow-800' : ($approval->status_approval == 'DISETUJUI' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') }}">
-                {{ $approval->status_approval }}
+        <p class="text-sm text-gray-600 mt-1">
+            Step: <span class="font-semibold">{{ $currentFlow->nama_step ?? 'N/A' }}</span> | 
+            Status: 
+            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $approval->status == 'MENUNGGU' ? 'bg-yellow-100 text-yellow-800' : ($approval->status == 'DISETUJUI' ? 'bg-green-100 text-green-800' : ($approval->status == 'DITOLAK' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')) }}">
+                {{ $approval->status }}
             </span>
         </p>
     </div>
     
     <div class="p-6">
-        @if($approval->status_approval === 'MENUNGGU')
-            <form method="POST" action="{{ route('transaction.approval.approve', $approval->id_approval) }}" class="mb-4">
-                @csrf
-                <div class="mb-4">
-                    <label for="catatan_approve" class="block text-sm font-medium text-gray-700 mb-2">Catatan (Opsional)</label>
-                    <textarea 
-                        id="catatan_approve" 
-                        name="catatan" 
-                        rows="3"
-                        placeholder="Masukkan catatan persetujuan..."
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    ></textarea>
-                </div>
-                <button 
-                    type="submit" 
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                    onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?');"
-                >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Setujui
-                </button>
-            </form>
+        @if($approval->status === 'MENUNGGU')
+            @php
+                $user = auth()->user();
+                $stepOrder = $currentFlow->step_order ?? 0;
+                
+                // Cek apakah step sebelumnya sudah diverifikasi (untuk kepala_pusat)
+                $previousStepVerified = true;
+                if ($stepOrder == 4) {
+                    // Untuk step 4 (kepala_pusat), cek apakah step 3 (kasubbag_tu) sudah diverifikasi
+                    $step3Flow = \App\Models\ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                        ->where('step_order', 3)
+                        ->first();
+                    if ($step3Flow) {
+                        $step3Log = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                            ->where('id_referensi', $approval->id_referensi)
+                            ->where('id_approval_flow', $step3Flow->id)
+                            ->first();
+                        $previousStepVerified = $step3Log && $step3Log->status === 'DIVERIFIKASI';
+                    }
+                }
+            @endphp
+            
+            {{-- Kepala Unit - Mengetahui (Step 2) --}}
+            @if($stepOrder == 2 && ($user->hasRole('kepala_unit') || $user->hasRole('admin')))
+                <form method="POST" action="{{ route('transaction.approval.mengetahui', $approval->id) }}" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label for="catatan_mengetahui" class="block text-sm font-medium text-gray-700 mb-2">Catatan (Opsional)</label>
+                        <textarea 
+                            id="catatan_mengetahui" 
+                            name="catatan" 
+                            rows="3"
+                            placeholder="Masukkan catatan..."
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        ></textarea>
+                    </div>
+                    <button 
+                        type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Mengetahui
+                    </button>
+                </form>
+            
+            {{-- Kasubbag TU - Verifikasi/Kembalikan (Step 3) --}}
+            @elseif($stepOrder == 3 && ($user->hasRole('kasubbag_tu') || $user->hasRole('admin')))
+                <div class="space-y-4">
+                    <form method="POST" action="{{ route('transaction.approval.verifikasi', $approval->id) }}" class="mb-4">
+                        @csrf
+                        <div class="mb-4">
+                            <label for="catatan_verifikasi" class="block text-sm font-medium text-gray-700 mb-2">Catatan Verifikasi (Opsional)</label>
+                            <textarea 
+                                id="catatan_verifikasi" 
+                                name="catatan" 
+                                rows="3"
+                                placeholder="Masukkan catatan verifikasi..."
+                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            ></textarea>
+                        </div>
+                        <button 
+                            type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Verifikasi & Lanjutkan
+                        </button>
+                    </form>
 
-            <form method="POST" action="{{ route('transaction.approval.reject', $approval->id_approval) }}">
-                @csrf
-                <div class="mb-4">
-                    <label for="catatan_reject" class="block text-sm font-medium text-gray-700 mb-2">
-                        Catatan Penolakan <span class="text-red-500">*</span>
-                    </label>
-                    <textarea 
-                        id="catatan_reject" 
-                        name="catatan" 
-                        rows="3"
-                        required
-                        placeholder="Masukkan alasan penolakan..."
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
-                    ></textarea>
-                    @error('catatan')
-                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
+                    <form method="POST" action="{{ route('transaction.approval.kembalikan', $approval->id) }}">
+                        @csrf
+                        <div class="mb-4">
+                            <label for="catatan_kembalikan" class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan Pengembalian <span class="text-red-500">*</span>
+                            </label>
+                            <textarea 
+                                id="catatan_kembalikan" 
+                                name="catatan" 
+                                rows="3"
+                                required
+                                minlength="10"
+                                placeholder="Masukkan alasan pengembalian (minimal 10 karakter)..."
+                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
+                            ></textarea>
+                            @error('catatan')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <button 
+                            type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            onclick="return confirm('Apakah Anda yakin ingin mengembalikan permintaan ini?');"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Kembalikan
+                        </button>
+                    </form>
                 </div>
-                <button 
-                    type="submit" 
-                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                    onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?');"
-                >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Tolak
-                </button>
-            </form>
+            
+            {{-- Kepala Pusat - Approve/Reject (Step 4) --}}
+            @elseif($stepOrder == 4 && ($user->hasRole('kepala_pusat') || $user->hasRole('admin')))
+                @if(!$previousStepVerified)
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                        <p class="text-sm text-yellow-700">
+                            <strong>Perhatian:</strong> Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum dapat disetujui atau ditolak.
+                        </p>
+                    </div>
+                @else
+                <div class="space-y-4">
+                    <form method="POST" action="{{ route('transaction.approval.approve', $approval->id) }}" class="mb-4">
+                        @csrf
+                        <div class="mb-4">
+                            <label for="catatan_approve" class="block text-sm font-medium text-gray-700 mb-2">Catatan (Opsional)</label>
+                            <textarea 
+                                id="catatan_approve" 
+                                name="catatan" 
+                                rows="3"
+                                placeholder="Masukkan catatan persetujuan..."
+                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            ></textarea>
+                        </div>
+                        <button 
+                            type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                            onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?');"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Setujui
+                        </button>
+                    </form>
+
+                    <form method="POST" action="{{ route('transaction.approval.reject', $approval->id) }}">
+                        @csrf
+                        <div class="mb-4">
+                            <label for="catatan_reject" class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan Penolakan <span class="text-red-500">*</span>
+                            </label>
+                            <textarea 
+                                id="catatan_reject" 
+                                name="catatan" 
+                                rows="3"
+                                required
+                                minlength="10"
+                                placeholder="Masukkan alasan penolakan (minimal 10 karakter)..."
+                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
+                            ></textarea>
+                            @error('catatan')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <button 
+                            type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?');"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Tolak
+                        </button>
+                    </form>
+                </div>
+                @endif
+            @else
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                    <p class="text-sm text-yellow-700">
+                        Anda tidak memiliki hak untuk memproses approval pada step ini.
+                    </p>
+                </div>
+            @endif
         @else
             <!-- Tampilkan informasi jika sudah diproses -->
             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
-                        @if($approval->status_approval === 'DISETUJUI')
+                        @if($approval->status === 'DISETUJUI')
                             <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                        @else
+                        @elseif($approval->status === 'DITOLAK')
                             <svg class="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        @else
+                            <svg class="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
                             </svg>
                         @endif
                     </div>
                     <div class="ml-3 flex-1">
                         <h3 class="text-sm font-medium text-gray-900">
-                            Permintaan {{ $approval->status_approval === 'DISETUJUI' ? 'Disetujui' : 'Ditolak' }}
+                            Permintaan {{ $approval->status === 'DISETUJUI' ? 'Disetujui' : ($approval->status === 'DITOLAK' ? 'Ditolak' : $approval->status) }}
                         </h3>
                         <p class="mt-1 text-sm text-gray-600">
-                            @if($approval->approver)
-                                Oleh: {{ $approval->approver->nama_pegawai ?? 'N/A' }}
+                            @if($approval->user)
+                                Oleh: {{ $approval->user->name ?? 'N/A' }}
                             @endif
                         </p>
-                        @if($approval->tanggal_approval)
+                        @if($approval->approved_at)
                             <p class="mt-1 text-xs text-gray-500">
-                                Tanggal: {{ $approval->tanggal_approval->format('d/m/Y H:i') }}
+                                Tanggal: {{ $approval->approved_at->format('d/m/Y H:i') }}
                             </p>
                         @endif
                         @if($approval->catatan)

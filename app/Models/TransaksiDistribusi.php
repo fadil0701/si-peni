@@ -20,6 +20,8 @@ class TransaksiDistribusi extends Model
         'id_gudang_tujuan',
         'id_pegawai_pengirim',
         'status_distribusi',
+        'tipe_distribusi',
+        'id_distribusi_parent',
         'keterangan',
     ];
 

@@ -21,7 +21,8 @@ class DataBarangController extends Controller
                   ->orWhere('kode_data_barang', 'like', "%{$search}%");
         }
 
-        $dataBarangs = $query->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $dataBarangs = $query->latest()->paginate($perPage)->appends($request->query());
         return view('master-data.data-barang.index', compact('dataBarangs'));
     }
 

@@ -9,9 +9,10 @@ use App\Models\MasterUnitKerja;
 
 class GudangController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $gudangs = MasterGudang::with('unitKerja')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $gudangs = MasterGudang::with('unitKerja')->latest()->paginate($perPage)->appends($request->query());
         return view('master.gudang.index', compact('gudangs'));
     }
 

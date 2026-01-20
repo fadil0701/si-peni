@@ -261,9 +261,14 @@ function loadDistribusiDetail(distribusiId) {
     }
 
     fetch(`/api/distribusi/${distribusiId}/detail`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
+            if (data.success && data.details && data.details.length > 0) {
                 distribusiDetails = data.details;
                 
                 // Tampilkan info distribusi
@@ -295,10 +300,17 @@ function loadDistribusiDetail(distribusiId) {
                 }
 
                 // Load detail penerimaan
+                console.log('Loading detail penerimaan with', data.details.length, 'items');
                 loadDetailPenerimaan(data.details);
+            } else {
+                console.error('No details found in response:', data);
+                alert('Detail distribusi tidak ditemukan. Silakan pilih distribusi lain.');
             }
         })
-        .catch(error => console.error('Error loading distribusi detail:', error));
+        .catch(error => {
+            console.error('Error loading distribusi detail:', error);
+            alert('Terjadi kesalahan saat memuat detail distribusi. Silakan coba lagi.');
+        });
 }
 
 // Load detail penerimaan berdasarkan detail distribusi
@@ -306,24 +318,47 @@ function loadDetailPenerimaan(details) {
     const container = document.getElementById('detailContainer');
     container.innerHTML = '';
     
+    if (!details || details.length === 0) {
+        console.error('No details provided');
+        return;
+    }
+    
     let index = 0;
     details.forEach(detail => {
         const template = document.getElementById('itemTemplate');
-        const newItem = template.content.cloneNode(true);
+        if (!template) {
+            console.error('Template not found');
+            return;
+        }
         
-        newItem.innerHTML = newItem.innerHTML.replace(/INDEX/g, index);
-        const itemElement = newItem.querySelector('.item-row');
+        // Clone template dengan cara yang benar
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = template.innerHTML.replace(/INDEX/g, index);
+        const itemElement = tempDiv.firstElementChild;
+        
+        if (!itemElement) {
+            console.error('Failed to clone template');
+            return;
+        }
         
         // Set values
-        itemElement.querySelector('.nama-barang').value = detail.nama_barang;
-        itemElement.querySelector('.id-inventory-input').value = detail.id_inventory;
-        itemElement.querySelector('.qty-distribusi').value = detail.qty_distribusi;
-        itemElement.querySelector('.qty-diterima-input').value = detail.qty_distribusi; // Default sama dengan qty distribusi
-        itemElement.querySelector('.select-satuan').value = detail.id_satuan;
+        const namaBarangInput = itemElement.querySelector('.nama-barang');
+        const idInventoryInput = itemElement.querySelector('.id-inventory-input');
+        const qtyDistribusiInput = itemElement.querySelector('.qty-distribusi');
+        const qtyDiterimaInput = itemElement.querySelector('.qty-diterima-input');
+        const satuanSelect = itemElement.querySelector('.select-satuan');
+        
+        if (namaBarangInput) namaBarangInput.value = detail.nama_barang || '';
+        if (idInventoryInput) idInventoryInput.value = detail.id_inventory || '';
+        if (qtyDistribusiInput) qtyDistribusiInput.value = detail.qty_distribusi || '0';
+        if (qtyDiterimaInput) qtyDiterimaInput.value = detail.qty_distribusi || '0'; // Default sama dengan qty distribusi
+        if (satuanSelect) satuanSelect.value = detail.id_satuan || '';
         
         container.appendChild(itemElement);
         index++;
     });
+    
+    console.log('Detail penerimaan loaded:', index, 'items');
 }
 
 // Load distribusi detail jika sudah dipilih
@@ -331,6 +366,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const distribusiId = document.getElementById('id_distribusi').value;
     if (distribusiId) {
         loadDistribusiDetail(distribusiId);
+    }
+    
+    // Validasi form sebelum submit
+    const formPenerimaan = document.getElementById('formPenerimaan');
+    if (formPenerimaan) {
+        formPenerimaan.addEventListener('submit', function(e) {
+            const detailContainer = document.getElementById('detailContainer');
+            const detailRows = detailContainer.querySelectorAll('.item-row');
+            
+            if (detailRows.length === 0) {
+                e.preventDefault();
+                alert('Detail penerimaan tidak ditemukan. Silakan pilih distribusi (SBBK) terlebih dahulu.');
+                return false;
+            }
+            
+            // Validasi setiap item
+            let isValid = true;
+            let emptyFields = [];
+            detailRows.forEach((row, index) => {
+                const idInventory = row.querySelector('[name*="[id_inventory]"]');
+                const qtyDiterima = row.querySelector('[name*="[qty_diterima]"]');
+                const idSatuan = row.querySelector('[name*="[id_satuan]"]');
+                
+                if (!idInventory || !idInventory.value) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Inventory`);
+                }
+                if (!qtyDiterima || !qtyDiterima.value || parseFloat(qtyDiterima.value) <= 0) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Qty Diterima`);
+                }
+                if (!idSatuan || !idSatuan.value) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Satuan`);
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                alert('Mohon lengkapi semua field yang wajib diisi:\n' + emptyFields.join('\n'));
+                return false;
+            }
+        });
     }
 });
 </script>

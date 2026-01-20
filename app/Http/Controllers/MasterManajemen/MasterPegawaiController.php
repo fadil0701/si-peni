@@ -43,7 +43,8 @@ class MasterPegawaiController extends Controller
             });
         }
 
-        $pegawais = $query->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $pegawais = $query->latest()->paginate($perPage)->appends($request->query());
         $unitKerjas = MasterUnitKerja::all();
         $jabatans = MasterJabatan::all();
 
@@ -53,11 +54,20 @@ class MasterPegawaiController extends Controller
     public function create()
     {
         $unitKerjas = MasterUnitKerja::all();
-        $jabatans = MasterJabatan::all();
+        $jabatans = MasterJabatan::with('role')->orderBy('urutan')->get();
         $users = User::whereDoesntHave('pegawai')->get(); // Users yang belum punya pegawai
-        $roles = Role::all();
 
-        return view('master-manajemen.master-pegawai.create', compact('unitKerjas', 'jabatans', 'users', 'roles'));
+        // Prepare jabatan data for JavaScript
+        $jabatanData = $jabatans->mapWithKeys(function($jabatan) {
+            return [$jabatan->id_jabatan => [
+                'nama' => $jabatan->nama_jabatan,
+                'role_id' => $jabatan->role_id,
+                'role_name' => $jabatan->role ? $jabatan->role->display_name : null,
+                'role_description' => $jabatan->role ? $jabatan->role->description : null
+            ]];
+        });
+
+        return view('master-manajemen.master-pegawai.create', compact('unitKerjas', 'jabatans', 'users', 'jabatanData'));
     }
 
     public function store(Request $request)
@@ -74,12 +84,13 @@ class MasterPegawaiController extends Controller
             'user_name' => 'nullable|string|max:255|required_if:create_user,1',
             'user_email' => 'nullable|email|max:255|required_if:create_user,1|unique:users,email',
             'user_password' => 'nullable|string|min:8|required_if:create_user,1|confirmed',
-            'user_roles' => 'nullable|array|required_if:create_user,1',
-            'user_roles.*' => 'exists:roles,id',
         ]);
 
         \DB::beginTransaction();
         try {
+            // Get jabatan untuk mengambil role
+            $jabatan = MasterJabatan::with('role')->findOrFail($validated['id_jabatan']);
+            
             // Create user jika diperlukan
             $userId = null;
             if ($request->filled('create_user') && $request->create_user == '1') {
@@ -89,14 +100,21 @@ class MasterPegawaiController extends Controller
                     'password' => Hash::make($validated['user_password']),
                 ]);
 
-                // Assign roles
-                if (!empty($validated['user_roles'])) {
-                    $user->roles()->attach($validated['user_roles']);
+                // Assign role dari jabatan
+                if ($jabatan->role_id) {
+                    $user->roles()->attach($jabatan->role_id);
                 }
 
                 $userId = $user->id;
             } elseif ($request->filled('user_id')) {
                 $userId = $validated['user_id'];
+                
+                // Update role user sesuai jabatan baru
+                $user = User::find($userId);
+                if ($user && $jabatan->role_id) {
+                    // Sync role dari jabatan (replace semua role dengan role dari jabatan)
+                    $user->roles()->sync([$jabatan->role_id]);
+                }
             }
 
             // Create pegawai
@@ -131,11 +149,20 @@ class MasterPegawaiController extends Controller
     {
         $pegawai = MasterPegawai::with('user.roles')->findOrFail($id);
         $unitKerjas = MasterUnitKerja::all();
-        $jabatans = MasterJabatan::all();
+        $jabatans = MasterJabatan::with('role')->orderBy('urutan')->get();
         $users = User::whereDoesntHave('pegawai')->orWhere('id', $pegawai->user_id)->get();
-        $roles = Role::all();
 
-        return view('master-manajemen.master-pegawai.edit', compact('pegawai', 'unitKerjas', 'jabatans', 'users', 'roles'));
+        // Prepare jabatan data for JavaScript
+        $jabatanData = $jabatans->mapWithKeys(function($jabatan) {
+            return [$jabatan->id_jabatan => [
+                'nama' => $jabatan->nama_jabatan,
+                'role_id' => $jabatan->role_id,
+                'role_name' => $jabatan->role ? $jabatan->role->display_name : null,
+                'role_description' => $jabatan->role ? $jabatan->role->description : null
+            ]];
+        });
+
+        return view('master-manajemen.master-pegawai.edit', compact('pegawai', 'unitKerjas', 'jabatans', 'users', 'jabatanData'));
     }
 
     public function update(Request $request, $id)
@@ -154,12 +181,13 @@ class MasterPegawaiController extends Controller
             'user_name' => 'nullable|string|max:255|required_if:create_user,1',
             'user_email' => 'nullable|email|max:255|required_if:create_user,1|unique:users,email,' . ($pegawai->user_id ?? 'NULL'),
             'user_password' => 'nullable|string|min:8|required_if:create_user,1' . ($request->filled('user_password') ? '|confirmed' : ''),
-            'user_roles' => 'nullable|array|required_if:create_user,1',
-            'user_roles.*' => 'exists:roles,id',
         ]);
 
         \DB::beginTransaction();
         try {
+            // Get jabatan untuk mengambil role
+            $jabatan = MasterJabatan::with('role')->findOrFail($validated['id_jabatan']);
+            
             // Handle user creation/update
             $userId = $pegawai->user_id;
             
@@ -176,9 +204,9 @@ class MasterPegawaiController extends Controller
                         $user->update(['password' => Hash::make($validated['user_password'])]);
                     }
 
-                    // Update roles
-                    if (!empty($validated['user_roles'])) {
-                        $user->roles()->sync($validated['user_roles']);
+                    // Update role sesuai jabatan baru
+                    if ($jabatan->role_id) {
+                        $user->roles()->sync([$jabatan->role_id]);
                     }
                 } else {
                     // Create new user
@@ -188,16 +216,31 @@ class MasterPegawaiController extends Controller
                         'password' => Hash::make($validated['user_password']),
                     ]);
 
-                    if (!empty($validated['user_roles'])) {
-                        $user->roles()->attach($validated['user_roles']);
+                    // Assign role dari jabatan
+                    if ($jabatan->role_id) {
+                        $user->roles()->attach($jabatan->role_id);
                     }
 
                     $userId = $user->id;
                 }
             } elseif ($request->filled('user_id')) {
                 $userId = $validated['user_id'];
+                
+                // Update role user sesuai jabatan baru
+                $user = User::find($userId);
+                if ($user && $jabatan->role_id) {
+                    $user->roles()->sync([$jabatan->role_id]);
+                }
             } elseif ($request->filled('remove_user') && $request->remove_user == '1') {
                 $userId = null;
+            } else {
+                // Jika hanya mengubah jabatan tanpa mengubah user, update role sesuai jabatan baru
+                if ($pegawai->user_id && $jabatan->role_id) {
+                    $user = User::find($pegawai->user_id);
+                    if ($user) {
+                        $user->roles()->sync([$jabatan->role_id]);
+                    }
+                }
             }
 
             // Update pegawai

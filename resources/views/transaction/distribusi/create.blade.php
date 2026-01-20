@@ -95,6 +95,7 @@
                             name="id_gudang_tujuan" 
                             required
                             class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('id_gudang_tujuan') border-red-500 @enderror"
+                            data-old-value="{{ old('id_gudang_tujuan') }}"
                         >
                             <option value="">Pilih Gudang Tujuan</option>
                             @foreach($gudangs as $gudang)
@@ -286,13 +287,68 @@
 let itemIndex = 0;
 let inventoryData = {};
 
-// Load detail permintaan
+// Simpan data gudang untuk fallback
+const allGudangs = [
+    @foreach($gudangs as $gudang)
+    {
+        id_gudang: {{ $gudang->id_gudang }},
+        nama_gudang: '{{ $gudang->nama_gudang }}',
+        jenis_gudang: '{{ $gudang->jenis_gudang }}',
+        kategori_gudang: '{{ $gudang->kategori_gudang }}'
+    }{{ !$loop->last ? ',' : '' }}
+    @endforeach
+];
+
+// Load detail permintaan dan set gudang tujuan
 function loadPermintaanDetail(permintaanId) {
     if (!permintaanId) {
         document.getElementById('permintaanDetail').style.display = 'none';
+        // Reset gudang tujuan
+        const gudangTujuanSelect = document.getElementById('id_gudang_tujuan');
+        gudangTujuanSelect.innerHTML = '<option value="">Pilih Gudang Tujuan</option>';
         return;
     }
 
+    // Load gudang tujuan berdasarkan permintaan
+    fetch(`{{ route('transaction.distribusi.api.gudang-tujuan', ':id') }}`.replace(':id', permintaanId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.gudang.length > 0) {
+                const gudangTujuanSelect = document.getElementById('id_gudang_tujuan');
+                gudangTujuanSelect.innerHTML = '<option value="">Pilih Gudang Tujuan</option>';
+                
+                data.gudang.forEach(gudang => {
+                    const option = document.createElement('option');
+                    option.value = gudang.id_gudang;
+                    option.textContent = `${gudang.nama_gudang} (${gudang.jenis_gudang})`;
+                    gudangTujuanSelect.appendChild(option);
+                });
+                
+                // Auto-select jika hanya ada 1 gudang atau jika ada old value
+                const oldValue = gudangTujuanSelect.getAttribute('data-old-value');
+                if (oldValue && data.gudang.some(g => g.id_gudang == oldValue)) {
+                    gudangTujuanSelect.value = oldValue;
+                } else if (data.gudang.length === 1) {
+                    gudangTujuanSelect.value = data.gudang[0].id_gudang;
+                }
+            } else {
+                // Jika tidak ada gudang unit, tampilkan semua gudang
+                const gudangTujuanSelect = document.getElementById('id_gudang_tujuan');
+                gudangTujuanSelect.innerHTML = '<option value="">Pilih Gudang Tujuan</option>';
+                
+                allGudangs.forEach(gudang => {
+                    const option = document.createElement('option');
+                    option.value = gudang.id_gudang;
+                    option.textContent = `${gudang.nama_gudang} (${gudang.jenis_gudang})`;
+                    gudangTujuanSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading gudang tujuan:', error);
+        });
+
+    // Load detail permintaan
     fetch(`/api/permintaan/${permintaanId}/detail`)
         .then(response => response.json())
         .then(data => {
@@ -320,6 +376,9 @@ function loadPermintaanDetail(permintaanId) {
         .catch(error => console.error('Error loading permintaan detail:', error));
 }
 
+// Auto-load gudang tujuan jika permintaan sudah dipilih saat halaman dimuat
+// (Dipindahkan ke DOMContentLoaded di bawah)
+
 // Load inventory dari gudang
 function loadInventoryFromGudang(gudangId) {
     if (!gudangId) {
@@ -332,7 +391,9 @@ function loadInventoryFromGudang(gudangId) {
             inventoryData = {};
             data.inventory.forEach(inv => {
                 inventoryData[inv.id_inventory] = {
+                    id_inventory: inv.id_inventory,
                     nama_barang: inv.nama_barang,
+                    kode_barang: inv.kode_barang || '',
                     harga_satuan: inv.harga_satuan,
                     id_satuan: inv.id_satuan,
                     qty_available: inv.qty_available
@@ -347,7 +408,8 @@ function loadInventoryFromGudang(gudangId) {
                 data.inventory.forEach(inv => {
                     const option = document.createElement('option');
                     option.value = inv.id_inventory;
-                    option.textContent = `${inv.nama_barang} (Stok: ${inv.qty_available})`;
+                    const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
+                    option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_available}`;
                     option.setAttribute('data-harga', inv.harga_satuan);
                     option.setAttribute('data-satuan', inv.id_satuan);
                     select.appendChild(option);
@@ -392,36 +454,112 @@ function calculateSubtotal(input) {
     // Subtotal akan dihitung di backend, tapi bisa ditampilkan di sini jika perlu
 }
 
+// Load inventory ke select
+function loadInventoryToSelect(selectElement, gudangId) {
+    if (!gudangId) {
+        return;
+    }
+    
+    fetch(`/api/gudang/${gudangId}/inventory`)
+        .then(response => response.json())
+        .then(data => {
+            selectElement.innerHTML = '<option value="">Pilih Inventory</option>';
+            data.inventory.forEach(inv => {
+                const option = document.createElement('option');
+                option.value = inv.id_inventory;
+                const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
+                option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_available}`;
+                option.setAttribute('data-harga', inv.harga_satuan);
+                option.setAttribute('data-satuan', inv.id_satuan);
+                selectElement.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading inventory:', error);
+        });
+}
+
 // Tambah item
-document.getElementById('btnTambahItem').addEventListener('click', function() {
+function addItemRow() {
     const template = document.getElementById('itemTemplate');
     const container = document.getElementById('detailContainer');
-    const newItem = template.content.cloneNode(true);
     
-    newItem.innerHTML = newItem.innerHTML.replace(/INDEX/g, itemIndex);
+    if (!template || !container) {
+        console.error('Template or container not found');
+        alert('Terjadi kesalahan saat menambahkan item. Silakan refresh halaman.');
+        return;
+    }
+    
+    // Clone template content dan replace INDEX
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = template.innerHTML.replace(/INDEX/g, itemIndex);
+    const newItem = tempDiv.firstElementChild;
+    
+    if (!newItem) {
+        console.error('Failed to clone template');
+        alert('Terjadi kesalahan saat menambahkan item. Silakan refresh halaman.');
+        return;
+    }
+    
     container.appendChild(newItem);
+    
+    const newRow = container.lastElementChild;
+    const inventorySelect = newRow.querySelector('.select-inventory');
+    
+    if (!inventorySelect) {
+        console.error('Inventory select not found in new row');
+        alert('Terjadi kesalahan saat menambahkan item. Silakan refresh halaman.');
+        return;
+    }
+    
+    // Attach event handler untuk update harga satuan
+    inventorySelect.addEventListener('change', function() {
+        updateHargaSatuan(this);
+    });
     
     // Load inventory ke select baru
     const gudangAsal = document.getElementById('id_gudang_asal').value;
     if (gudangAsal) {
-        loadInventoryFromGudang(gudangAsal);
+        // Jika inventoryData sudah ada, langsung isi
+        if (Object.keys(inventoryData).length > 0) {
+            inventorySelect.innerHTML = '<option value="">Pilih Inventory</option>';
+            Object.values(inventoryData).forEach(inv => {
+                const option = document.createElement('option');
+                option.value = inv.id_inventory;
+                const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
+                option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_available}`;
+                option.setAttribute('data-harga', inv.harga_satuan);
+                option.setAttribute('data-satuan', inv.id_satuan);
+                inventorySelect.appendChild(option);
+            });
+        } else {
+            // Jika belum ada, load dari API
+            loadInventoryToSelect(inventorySelect, gudangAsal);
+        }
     }
     
     // Hapus item
-    container.lastElementChild.querySelector('.btnHapusItem').addEventListener('click', function() {
-        this.closest('.item-row').remove();
-    });
-    
-    itemIndex++;
-});
-
-// Hapus item
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.btnHapusItem').forEach(btn => {
-        btn.addEventListener('click', function() {
+    const btnHapus = newRow.querySelector('.btnHapusItem');
+    if (btnHapus) {
+        btnHapus.addEventListener('click', function() {
             this.closest('.item-row').remove();
         });
-    });
+    }
+    
+    itemIndex++;
+    console.log('Item row added successfully, current index:', itemIndex);
+}
+
+// Event listener untuk tombol tambah item dan initialization
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup tombol tambah item
+    const btnTambahItem = document.getElementById('btnTambahItem');
+    if (btnTambahItem) {
+        btnTambahItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            addItemRow();
+        });
+    }
     
     // Load permintaan detail jika sudah dipilih
     const permintaanId = document.getElementById('id_permintaan').value;
@@ -436,8 +574,55 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Tambah item pertama jika belum ada
-    if (document.getElementById('detailContainer').children.length === 0) {
-        document.getElementById('btnTambahItem').click();
+    const detailContainer = document.getElementById('detailContainer');
+    if (detailContainer && detailContainer.children.length === 0) {
+        addItemRow();
+    }
+    
+    // Validasi form sebelum submit
+    const formDistribusi = document.getElementById('formDistribusi');
+    if (formDistribusi) {
+        formDistribusi.addEventListener('submit', function(e) {
+            const detailRows = detailContainer.querySelectorAll('.item-row');
+            if (detailRows.length === 0) {
+                e.preventDefault();
+                alert('Minimal harus ada 1 item distribusi. Silakan klik tombol "Tambah Item" terlebih dahulu.');
+                return false;
+            }
+            
+            // Validasi setiap item
+            let isValid = true;
+            let emptyFields = [];
+            detailRows.forEach((row, index) => {
+                const idInventory = row.querySelector('[name*="[id_inventory]"]');
+                const qtyDistribusi = row.querySelector('[name*="[qty_distribusi]"]');
+                const idSatuan = row.querySelector('[name*="[id_satuan]"]');
+                const hargaSatuan = row.querySelector('[name*="[harga_satuan]"]');
+                
+                if (!idInventory || !idInventory.value) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Inventory`);
+                }
+                if (!qtyDistribusi || !qtyDistribusi.value || parseFloat(qtyDistribusi.value) <= 0) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Qty Distribusi`);
+                }
+                if (!idSatuan || !idSatuan.value) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Satuan`);
+                }
+                if (!hargaSatuan || !hargaSatuan.value || parseFloat(hargaSatuan.value) <= 0) {
+                    isValid = false;
+                    emptyFields.push(`Item ${index + 1}: Harga Satuan`);
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                alert('Mohon lengkapi semua field yang wajib diisi:\n' + emptyFields.join('\n'));
+                return false;
+            }
+        });
     }
 });
 </script>

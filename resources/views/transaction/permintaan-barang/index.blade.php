@@ -148,9 +148,20 @@
                             {{ $permintaan->tanggal_permintaan->format('d/m/Y') }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $permintaan->jenis_permintaan == 'ASET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }}">
-                                {{ $permintaan->jenis_permintaan }}
-                            </span>
+                            @php
+                                $jenisPermintaan = is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []);
+                            @endphp
+                            @if(is_array($jenisPermintaan) && count($jenisPermintaan) > 0)
+                                @foreach($jenisPermintaan as $jenis)
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full {{ $jenis == 'ASET' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' }} mr-1">
+                                        {{ $jenis }}
+                                    </span>
+                                @endforeach
+                            @else
+                                <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                    {{ is_string($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : '-' }}
+                                </span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @php

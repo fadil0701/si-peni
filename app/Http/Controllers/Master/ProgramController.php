@@ -8,9 +8,10 @@ use App\Models\MasterProgram;
 
 class ProgramController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $programs = MasterProgram::latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $programs = MasterProgram::latest()->paginate($perPage)->appends($request->query());
         return view('master.program.index', compact('programs'));
     }
 

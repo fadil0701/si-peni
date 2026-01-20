@@ -9,9 +9,10 @@ use App\Models\MasterProgram;
 
 class KegiatanController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $kegiatans = MasterKegiatan::with('program')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $kegiatans = MasterKegiatan::with('program')->latest()->paginate($perPage)->appends($request->query());
         return view('master.kegiatan.index', compact('kegiatans'));
     }
 

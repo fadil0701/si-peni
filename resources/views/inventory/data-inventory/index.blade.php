@@ -7,6 +7,7 @@
         <h1 class="text-2xl font-bold text-gray-900">Data Inventory</h1>
         <p class="mt-1 text-sm text-gray-600">Daftar semua data inventory barang dan aset</p>
     </div>
+    @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('admin_gudang'))
     <a 
         href="{{ route('inventory.data-inventory.create') }}" 
         class="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -16,6 +17,7 @@
         </svg>
         Tambah Inventory
     </a>
+    @endif
 </div>
 
 <!-- Filters -->
@@ -164,6 +166,7 @@
                                 >
                                     Edit
                                 </a>
+                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('admin_gudang'))
                                 <form 
                                     action="{{ route('inventory.data-inventory.destroy', $inventory->id_inventory) }}" 
                                     method="POST" 
@@ -179,6 +182,7 @@
                                         Hapus
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

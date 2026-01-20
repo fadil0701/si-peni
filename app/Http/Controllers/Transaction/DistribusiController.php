@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use App\Models\TransaksiDistribusi;
 use App\Models\DetailDistribusi;
 use App\Models\PermintaanBarang;
@@ -18,7 +19,21 @@ class DistribusiController extends Controller
 {
     public function index(Request $request)
     {
+        $user = Auth::user();
+        
         $query = TransaksiDistribusi::with(['gudangAsal', 'gudangTujuan', 'permintaan', 'pegawaiPengirim']);
+
+        // Filter berdasarkan kategori gudang jika user adalah admin gudang kategori spesifik
+        if ($user->hasRole('admin_gudang_aset')) {
+            $gudangAsetIds = MasterGudang::where('kategori_gudang', 'ASET')->pluck('id_gudang');
+            $query->whereIn('id_gudang_asal', $gudangAsetIds);
+        } elseif ($user->hasRole('admin_gudang_persediaan')) {
+            $gudangPersediaanIds = MasterGudang::where('kategori_gudang', 'PERSEDIAAN')->pluck('id_gudang');
+            $query->whereIn('id_gudang_asal', $gudangPersediaanIds);
+        } elseif ($user->hasRole('admin_gudang_farmasi')) {
+            $gudangFarmasiIds = MasterGudang::where('kategori_gudang', 'FARMASI')->pluck('id_gudang');
+            $query->whereIn('id_gudang_asal', $gudangFarmasiIds);
+        }
 
         // Filters
         if ($request->filled('gudang')) {
@@ -42,14 +57,27 @@ class DistribusiController extends Controller
             });
         }
 
-        $distribusis = $query->latest('tanggal_distribusi')->paginate(15);
-        $gudangs = MasterGudang::all();
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $distribusis = $query->latest('tanggal_distribusi')->paginate($perPage)->appends($request->query());
+        
+        // Filter gudang untuk dropdown berdasarkan role
+        $gudangsQuery = MasterGudang::query();
+        if ($user->hasRole('admin_gudang_aset')) {
+            $gudangsQuery->where('kategori_gudang', 'ASET');
+        } elseif ($user->hasRole('admin_gudang_persediaan')) {
+            $gudangsQuery->where('kategori_gudang', 'PERSEDIAAN');
+        } elseif ($user->hasRole('admin_gudang_farmasi')) {
+            $gudangsQuery->where('kategori_gudang', 'FARMASI');
+        }
+        $gudangs = $gudangsQuery->get();
 
         return view('transaction.distribusi.index', compact('distribusis', 'gudangs'));
     }
 
     public function create(Request $request)
     {
+        $user = Auth::user();
+        
         // Filter permintaan yang sudah disetujui dan belum didistribusikan
         $permintaans = PermintaanBarang::where('status_permintaan', 'DISETUJUI')
             ->whereDoesntHave('transaksiDistribusi', function($q) {
@@ -58,7 +86,22 @@ class DistribusiController extends Controller
             ->with(['unitKerja', 'pemohon', 'detailPermintaan.dataBarang'])
             ->get();
 
-        $gudangs = MasterGudang::all();
+        // Filter gudang berdasarkan role user
+        $gudangsQuery = MasterGudang::query();
+        
+        // Jika user adalah admin gudang kategori spesifik, filter gudang sesuai kategori
+        if ($user->hasRole('admin_gudang_aset')) {
+            $gudangsQuery->where('kategori_gudang', 'ASET');
+        } elseif ($user->hasRole('admin_gudang_persediaan')) {
+            $gudangsQuery->where('kategori_gudang', 'PERSEDIAAN');
+        } elseif ($user->hasRole('admin_gudang_farmasi')) {
+            $gudangsQuery->where('kategori_gudang', 'FARMASI');
+        } elseif (!$user->hasRole('admin')) {
+            // Untuk role lain selain admin, hanya tampilkan gudang yang sesuai
+            // (bisa ditambahkan filter lebih lanjut jika diperlukan)
+        }
+        
+        $gudangs = $gudangsQuery->get();
         $pegawais = MasterPegawai::all();
         $satuans = MasterSatuan::all();
 
@@ -74,6 +117,8 @@ class DistribusiController extends Controller
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+        
         $validated = $request->validate([
             'id_permintaan' => 'required|exists:permintaan_barang,id_permintaan',
             'tanggal_distribusi' => 'required|date',
@@ -88,6 +133,30 @@ class DistribusiController extends Controller
             'detail.*.harga_satuan' => 'required|numeric|min:0',
             'detail.*.keterangan' => 'nullable|string',
         ]);
+        
+        // Validasi: Pastikan gudang asal sesuai dengan kategori admin gudang
+        if (!$user->hasRole('admin')) {
+            $gudangAsal = MasterGudang::find($validated['id_gudang_asal']);
+            
+            if ($gudangAsal) {
+                $allowed = false;
+                if ($user->hasRole('admin_gudang_aset') && $gudangAsal->kategori_gudang === 'ASET') {
+                    $allowed = true;
+                } elseif ($user->hasRole('admin_gudang_persediaan') && $gudangAsal->kategori_gudang === 'PERSEDIAAN') {
+                    $allowed = true;
+                } elseif ($user->hasRole('admin_gudang_farmasi') && $gudangAsal->kategori_gudang === 'FARMASI') {
+                    $allowed = true;
+                } elseif ($user->hasRole('admin_gudang')) {
+                    $allowed = true; // Admin gudang umum bisa akses semua
+                }
+                
+                if (!$allowed) {
+                    return redirect()->back()
+                        ->withInput()
+                        ->with('error', 'Anda tidak memiliki hak untuk melakukan distribusi dari gudang kategori ' . $gudangAsal->kategori_gudang . '.');
+                }
+            }
+        }
 
         DB::beginTransaction();
         try {
@@ -311,6 +380,45 @@ class DistribusiController extends Controller
 
                 $stockTujuan->last_updated = now();
                 $stockTujuan->save();
+
+                // Untuk ASET: Update id_gudang di inventory_item yang didistribusikan
+                if ($inventory->jenis_inventory === 'ASET') {
+                    // Ambil inventory_item yang masih di gudang asal dan belum didistribusikan
+                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                        ->where('id_gudang', $distribusi->id_gudang_asal)
+                        ->where('status_item', 'AKTIF')
+                        ->limit((int)$detail->qty_distribusi)
+                        ->get();
+
+                    // Update id_gudang ke gudang tujuan
+                    foreach ($inventoryItems as $item) {
+                        $item->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
+                    }
+                } else {
+                    // Untuk PERSEDIAAN/FARMASI: Buat inventory baru di gudang tujuan atau update id_gudang
+                    // Jika qty_distribusi sama dengan qty_input, pindahkan seluruh inventory
+                    // Jika tidak, buat inventory baru di gudang tujuan
+                    if ($detail->qty_distribusi >= $inventory->qty_input) {
+                        // Pindahkan seluruh inventory ke gudang tujuan
+                        $inventory->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
+                    } else {
+                        // Buat inventory baru di gudang tujuan dengan qty yang didistribusikan
+                        $newInventory = $inventory->replicate();
+                        $newInventory->id_gudang = $distribusi->id_gudang_tujuan;
+                        $newInventory->qty_input = $detail->qty_distribusi;
+                        $newInventory->total_harga = $detail->qty_distribusi * $inventory->harga_satuan;
+                        $newInventory->status_inventory = 'AKTIF';
+                        $newInventory->save();
+
+                        // Kurangi qty di inventory asal
+                        $inventory->qty_input -= $detail->qty_distribusi;
+                        $inventory->total_harga = $inventory->qty_input * $inventory->harga_satuan;
+                        if ($inventory->qty_input <= 0) {
+                            $inventory->status_inventory = 'HABIS';
+                        }
+                        $inventory->save();
+                    }
+                }
             }
 
             DB::commit();
@@ -322,6 +430,39 @@ class DistribusiController extends Controller
             \Log::error('Error mengirim distribusi: ' . $e->getMessage());
             return redirect()->route('transaction.distribusi.show', $id)
                 ->with('error', 'Terjadi kesalahan saat mengirim distribusi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * API: Get gudang tujuan berdasarkan permintaan
+     */
+    public function getGudangTujuanByPermintaan($permintaanId)
+    {
+        try {
+            $permintaan = PermintaanBarang::with('unitKerja')->findOrFail($permintaanId);
+            
+            // Cari gudang yang memiliki id_unit_kerja sama dengan unit kerja yang melakukan permintaan
+            // dan jenis_gudang = 'UNIT'
+            $gudangTujuan = MasterGudang::where('id_unit_kerja', $permintaan->id_unit_kerja)
+                ->where('jenis_gudang', 'UNIT')
+                ->get();
+            
+            return response()->json([
+                'success' => true,
+                'gudang' => $gudangTujuan->map(function($gudang) {
+                    return [
+                        'id_gudang' => $gudang->id_gudang,
+                        'nama_gudang' => $gudang->nama_gudang,
+                        'jenis_gudang' => $gudang->jenis_gudang,
+                        'kategori_gudang' => $gudang->kategori_gudang,
+                    ];
+                }),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data gudang tujuan: ' . $e->getMessage(),
+            ], 500);
         }
     }
 

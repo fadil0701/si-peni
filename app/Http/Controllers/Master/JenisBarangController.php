@@ -9,9 +9,10 @@ use App\Models\MasterKategoriBarang;
 
 class JenisBarangController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $jenisBarangs = MasterJenisBarang::with('kategoriBarang.kodeBarang')->latest()->paginate(15);
+        $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
+        $jenisBarangs = MasterJenisBarang::with('kategoriBarang.kodeBarang')->latest()->paginate($perPage)->appends($request->query());
         return view('master-data.jenis-barang.index', compact('jenisBarangs'));
     }
 
