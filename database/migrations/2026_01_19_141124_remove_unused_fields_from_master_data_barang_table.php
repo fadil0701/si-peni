@@ -12,7 +12,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('master_data_barang', function (Blueprint $table) {
-            $table->dropColumn(['spesifikasi', 'merk', 'tipe', 'tahun_produksi']);
+            // Check if columns exist before dropping
+            $columns = Schema::getColumnListing('master_data_barang');
+            $columnsToDrop = [];
+            
+            if (in_array('spesifikasi', $columns)) {
+                $columnsToDrop[] = 'spesifikasi';
+            }
+            if (in_array('merk', $columns)) {
+                $columnsToDrop[] = 'merk';
+            }
+            if (in_array('tipe', $columns)) {
+                $columnsToDrop[] = 'tipe';
+            }
+            if (in_array('tahun_produksi', $columns)) {
+                $columnsToDrop[] = 'tahun_produksi';
+            }
+            
+            if (!empty($columnsToDrop)) {
+                $table->dropColumn($columnsToDrop);
+            }
         });
     }
 

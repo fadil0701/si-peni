@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\ApprovalFlowDefinition;
 use App\Models\ApprovalLog;
 use App\Models\PermintaanBarang;
@@ -108,11 +109,25 @@ class ApprovalPermintaanController extends Controller
             $currentStep = null;
             $currentStatus = 'MENUNGGU';
             $maxCompletedStep = 0;
+            $rejectedApproval = null;
             
+            // PRIORITAS 1: Cek apakah ada yang ditolak - jika ada, status harus DITOLAK
             foreach ($group['approvals'] as $approval) {
-                $stepOrder = $approval->approvalFlow->step_order ?? 999;
-                
+                if ($approval->status === 'DITOLAK') {
+                    $rejectedApproval = $approval;
+                    $currentStatus = 'DITOLAK';
+                    $currentStep = $approval;
+                    break; // Setelah ditemukan DITOLAK, langsung keluar
+                }
+            }
+            
+            // Jika tidak ada yang ditolak, lanjutkan pengecekan normal
+            if (!$rejectedApproval) {
+                foreach ($group['approvals'] as $approval) {
+                    $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                    
                 // Jika status sudah diselesaikan (bukan MENUNGGU), update last completed step
+                // Catatan: DIDISPOSISIKAN dan DIPROSES juga dianggap sebagai completed
                 if (in_array($approval->status, ['DIKETAHUI', 'DIVERIFIKASI', 'DISETUJUI', 'DIDISPOSISIKAN', 'DIPROSES'])) {
                     if ($stepOrder > $maxCompletedStep) {
                         $maxCompletedStep = $stepOrder;
@@ -120,27 +135,36 @@ class ApprovalPermintaanController extends Controller
                     }
                 }
                 
-                // Jika status masih MENUNGGU, ini adalah current step
-                if ($approval->status === 'MENUNGGU' && !$currentStep) {
+                // Untuk step 5 (disposisi), jika status MENUNGGU, ini adalah current step
+                if ($stepOrder == 5 && $approval->status === 'MENUNGGU' && !$currentStep) {
                     $currentStep = $approval;
                     $currentStatus = 'MENUNGGU';
                 }
-            }
-            
-            // Jika ada yang ditolak, status adalah DITOLAK
-            foreach ($group['approvals'] as $approval) {
-                if ($approval->status === 'DITOLAK') {
-                    $currentStatus = 'DITOLAK';
-                    $currentStep = $approval;
-                    break;
+                    
+                    // Jika status masih MENUNGGU, ini adalah current step
+                    if ($approval->status === 'MENUNGGU' && !$currentStep) {
+                        $currentStep = $approval;
+                        $currentStatus = 'MENUNGGU';
+                    }
                 }
-            }
-            
-            // Jika tidak ada yang menunggu, gunakan approval terakhir dengan status terbaru
-            if (!$currentStep) {
-                $currentStep = $group['latest_approval'];
-                if ($currentStep) {
-                    $currentStatus = $currentStep->status;
+                
+                // Jika tidak ada yang menunggu, gunakan approval terakhir dengan status terbaru
+                if (!$currentStep) {
+                    $currentStep = $group['latest_approval'];
+                    if ($currentStep) {
+                        $currentStatus = $currentStep->status;
+                    }
+                }
+            } else {
+                // Jika ada yang ditolak, tetap hitung last completed step untuk display
+                foreach ($group['approvals'] as $approval) {
+                    $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                    if (in_array($approval->status, ['DIKETAHUI', 'DIVERIFIKASI', 'DISETUJUI', 'DIDISPOSISIKAN', 'DIPROSES'])) {
+                        if ($stepOrder > $maxCompletedStep) {
+                            $maxCompletedStep = $stepOrder;
+                            $lastCompletedStep = $stepOrder;
+                        }
+                    }
                 }
             }
             
@@ -151,7 +175,11 @@ class ApprovalPermintaanController extends Controller
         
         // Ambil data permintaan untuk setiap group
         $permintaanIds = array_keys($permintaanGroups);
-        $permintaans = PermintaanBarang::with(['unitKerja', 'pemohon', 'detailPermintaan.dataBarang'])
+        $permintaans = PermintaanBarang::with([
+            'unitKerja.gudang', // Load gudang unit melalui unit kerja
+            'pemohon.jabatan', // Load jabatan pemohon
+            'detailPermintaan.dataBarang'
+        ])
             ->whereIn('id_permintaan', $permintaanIds)
             ->get()
             ->keyBy('id_permintaan');
@@ -236,11 +264,38 @@ class ApprovalPermintaanController extends Controller
             ->orderBy('created_at')
             ->get();
         
+        // Cek apakah ada approval yang ditolak untuk permintaan ini
+        $rejectedApproval = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+            ->where('id_referensi', $approval->id_referensi)
+            ->where('status', 'DITOLAK')
+            ->first();
+        
+        // Jika ada yang ditolak, gunakan status DITOLAK untuk display
+        $displayStatus = $rejectedApproval ? 'DITOLAK' : $approval->status;
+        
         // Load current flow definition
         $currentFlow = $approval->approvalFlow;
         $nextFlow = $currentFlow ? $currentFlow->getNextStep() : null;
         
-        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow'));
+        // Cek apakah step sebelumnya sudah diverifikasi (untuk kepala_pusat - step 4)
+        $previousStepVerified = true;
+        $stepOrder = $currentFlow->step_order ?? 0;
+        // Untuk admin, previousStepVerified selalu true (bisa approve meski step sebelumnya belum diverifikasi)
+        if ($stepOrder == 4 && !$user->hasRole('admin')) {
+            // Untuk step 4 (kepala_pusat), cek apakah step 3 (kasubbag_tu) sudah diverifikasi
+            $step3Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('step_order', 3)
+                ->first();
+            if ($step3Flow) {
+                $step3Log = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                    ->where('id_referensi', $approval->id_referensi)
+                    ->where('id_approval_flow', $step3Flow->id)
+                    ->first();
+                $previousStepVerified = $step3Log && $step3Log->status === 'DIVERIFIKASI';
+            }
+        }
+        
+        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow', 'previousStepVerified', 'displayStatus', 'rejectedApproval'));
     }
 
     /**
@@ -430,8 +485,21 @@ class ApprovalPermintaanController extends Controller
      */
     public function approve(Request $request, $id)
     {
+        Log::info('Approval approve called', [
+            'approval_id' => $id,
+            'user_id' => Auth::id(),
+            'user_roles' => Auth::user()->roles->pluck('name')->toArray()
+        ]);
+        
         $approval = ApprovalLog::with(['approvalFlow'])->findOrFail($id);
         $user = Auth::user();
+        
+        Log::info('Approval data loaded', [
+            'approval_id' => $approval->id,
+            'status' => $approval->status,
+            'step_order' => $approval->approvalFlow->step_order ?? null,
+            'id_referensi' => $approval->id_referensi
+        ]);
         
         // Pastikan approvalFlow ter-load
         if (!$approval->relationLoaded('approvalFlow') || !$approval->approvalFlow) {
@@ -440,17 +508,30 @@ class ApprovalPermintaanController extends Controller
         
         // Validasi role
         if (!$user->hasRole('kepala_pusat') && !$user->hasRole('admin')) {
+            Log::warning('User tidak memiliki role untuk approve', [
+                'user_id' => $user->id,
+                'user_roles' => $user->roles->pluck('name')->toArray()
+            ]);
             abort(403, 'Anda tidak memiliki hak untuk menyetujui permintaan ini.');
         }
         
         // Validasi status
         if ($approval->status !== 'MENUNGGU') {
+            Log::warning('Approval sudah diproses', [
+                'approval_id' => $approval->id,
+                'status' => $approval->status
+            ]);
             return redirect()->route('transaction.approval.show', $id)
                 ->with('error', 'Approval ini sudah diproses.');
         }
         
         // Validasi flow step
         if ($approval->approvalFlow->step_order !== 4) {
+            Log::warning('Step approval tidak sesuai', [
+                'approval_id' => $approval->id,
+                'step_order' => $approval->approvalFlow->step_order,
+                'expected' => 4
+            ]);
             return redirect()->route('transaction.approval.show', $id)
                 ->with('error', 'Step approval tidak sesuai.');
         }
@@ -460,6 +541,7 @@ class ApprovalPermintaanController extends Controller
             ->where('step_order', 3)
             ->first();
         
+        $previousStepVerified = true;
         if ($previousStep) {
             $previousApprovalLog = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
                 ->where('id_referensi', $approval->id_referensi)
@@ -467,8 +549,13 @@ class ApprovalPermintaanController extends Controller
                 ->first();
             
             if (!$previousApprovalLog || $previousApprovalLog->status !== 'DIVERIFIKASI') {
-                return redirect()->route('transaction.approval.show', $id)
-                    ->with('error', 'Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum dapat disetujui.');
+                $previousStepVerified = false;
+                // Untuk admin, tetap bisa approve meski step sebelumnya belum diverifikasi
+                // Tapi untuk kepala_pusat, harus menunggu step sebelumnya diverifikasi
+                if (!$user->hasRole('admin')) {
+                    return redirect()->route('transaction.approval.show', $id)
+                        ->with('error', 'Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum dapat disetujui.');
+                }
             }
         }
         
@@ -486,55 +573,15 @@ class ApprovalPermintaanController extends Controller
                 'user_id' => $user->id,
             ]);
             
-            // Update status permintaan menjadi DISETUJUI
+            // Update status permintaan menjadi DISETUJUI_PIMPINAN (karena sudah disetujui oleh Kepala Pusat)
             $permintaan = PermintaanBarang::find($approval->id_referensi);
             if ($permintaan) {
-                $permintaan->update(['status_permintaan' => 'DISETUJUI']);
+                $permintaan->update(['status_permintaan' => 'DISETUJUI_PIMPINAN']);
             }
             
-            // Setelah disetujui oleh Kepala Pusat, buat approval log untuk Admin Gudang/Pengurus Barang
-            // untuk melakukan disposisi ke admin gudang kategori sesuai item permintaan
-            $adminGudangRole = Role::where('name', 'admin_gudang')->first();
-            if ($adminGudangRole) {
-                // Cari atau buat flow definition untuk step disposisi oleh admin gudang
-                $disposisiFlow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
-                    ->where('step_order', 4.5) // Step antara approve kepala pusat dan disposisi ke kategori
-                    ->where('role_id', $adminGudangRole->id)
-                    ->first();
-                
-                if (!$disposisiFlow) {
-                    $disposisiFlow = ApprovalFlowDefinition::create([
-                        'modul_approval' => 'PERMINTAAN_BARANG',
-                        'step_order' => 4.5,
-                        'role_id' => $adminGudangRole->id,
-                        'nama_step' => 'Disposisi ke Admin Gudang Kategori',
-                        'status' => 'MENUNGGU',
-                        'status_text' => 'Admin Gudang/Pengurus Barang melakukan disposisi ke admin gudang kategori',
-                        'is_required' => true,
-                        'can_reject' => false,
-                        'can_approve' => false,
-                    ]);
-                }
-                
-                // Buat approval log untuk admin gudang melakukan disposisi
-                $existingLog = ApprovalLog::where('modul_approval', $approval->modul_approval)
-                    ->where('id_referensi', $approval->id_referensi)
-                    ->where('id_approval_flow', $disposisiFlow->id)
-                    ->first();
-                
-                if (!$existingLog) {
-                    ApprovalLog::create([
-                        'modul_approval' => $approval->modul_approval,
-                        'id_referensi' => $approval->id_referensi,
-                        'id_approval_flow' => $disposisiFlow->id,
-                        'user_id' => null,
-                        'role_id' => $adminGudangRole->id,
-                        'status' => 'MENUNGGU',
-                        'catatan' => 'Menunggu disposisi oleh Admin Gudang/Pengurus Barang ke admin gudang kategori',
-                        'approved_at' => null,
-                    ]);
-                }
-            }
+            // Catatan: Approval log untuk disposisi TIDAK dibuat di sini
+            // Approval log untuk disposisi akan dibuat saat admin gudang melakukan disposisi
+            // di method disposisi(), sehingga tidak terjadi duplikasi
             
             DB::commit();
             
@@ -542,9 +589,14 @@ class ApprovalPermintaanController extends Controller
                 ->with('success', 'Permintaan berhasil disetujui.');
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Error approve approval: ' . $e->getMessage());
+            Log::error('Error approve approval', [
+                'approval_id' => $id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->route('transaction.approval.show', $id)
-                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+                ->with('error', 'Terjadi kesalahan saat menyetujui permintaan: ' . $e->getMessage());
         }
     }
 
@@ -633,14 +685,14 @@ class ApprovalPermintaanController extends Controller
         $approval = ApprovalLog::with('approvalFlow')->findOrFail($id);
         $user = Auth::user();
         
-        // Validasi role - Admin Gudang atau Admin yang bisa melakukan disposisi
-        if (!$user->hasRole('admin_gudang') && !$user->hasRole('admin')) {
+        // Validasi permission - Admin atau user dengan permission disposisi
+        if (!$user->hasRole('admin') && !\App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.disposisi')) {
             abort(403, 'Anda tidak memiliki hak untuk mendisposisikan permintaan ini.');
         }
         
         // Validasi bahwa permintaan sudah disetujui oleh Kepala Pusat
         $permintaan = PermintaanBarang::find($approval->id_referensi);
-        if (!$permintaan || $permintaan->status_permintaan !== 'DISETUJUI') {
+        if (!$permintaan || $permintaan->status_permintaan !== 'DISETUJUI_PIMPINAN') {
             return redirect()->route('transaction.approval.show', $id)
                 ->with('error', 'Permintaan harus disetujui oleh Kepala Pusat terlebih dahulu sebelum didisposisikan.');
         }
@@ -655,30 +707,38 @@ class ApprovalPermintaanController extends Controller
                 'user_id' => $user->id,
             ]);
             
-            // Tentukan kategori gudang yang terlibat berdasarkan jenis permintaan dan detail permintaan
-            $kategoriGudang = [];
+            // Hapus approval log untuk admin_gudang yang dibuat saat kepala pusat approve (jika ada)
+            // Karena nanti akan dibuat approval log untuk setiap kategori gudang
+            $adminGudangRole = Role::where('name', 'admin_gudang')->first();
+            if ($adminGudangRole) {
+                $adminGudangFlow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                    ->where('step_order', 5)
+                    ->where('role_id', $adminGudangRole->id)
+                    ->first();
+                
+                if ($adminGudangFlow) {
+                    ApprovalLog::where('modul_approval', $approval->modul_approval)
+                        ->where('id_referensi', $approval->id_referensi)
+                        ->where('id_approval_flow', $adminGudangFlow->id)
+                        ->where('status', 'MENUNGGU')
+                        ->delete();
+                }
+            }
             
-            // Cek dari jenis_permintaan (array JSON)
+            // Tentukan kategori gudang yang terlibat berdasarkan jenis_permintaan yang sudah dipilih user
+            // jenis_permintaan sudah berisi array: ["ASET", "PERSEDIAAN", "FARMASI"]
             $jenisPermintaan = is_array($permintaan->jenis_permintaan) 
                 ? $permintaan->jenis_permintaan 
                 : json_decode($permintaan->jenis_permintaan, true) ?? [];
             
-            // Jika ada "ASET" di jenis_permintaan, tambahkan kategori ASET
-            if (in_array('ASET', $jenisPermintaan)) {
-                $kategoriGudang[] = 'ASET';
-            }
+            // Langsung gunakan jenis_permintaan sebagai kategori gudang
+            // Filter hanya yang valid (ASET, PERSEDIAAN, FARMASI)
+            $kategoriGudang = array_filter($jenisPermintaan, function($kategori) {
+                return in_array($kategori, ['ASET', 'PERSEDIAAN', 'FARMASI']);
+            });
             
-            // Cek dari detail permintaan untuk menentukan PERSEDIAAN atau FARMASI
-            foreach ($permintaan->detailPermintaan as $detail) {
-                // Ambil jenis_inventory dari data_inventory yang terkait dengan data_barang ini
-                $dataInventory = DataInventory::where('id_data_barang', $detail->id_data_barang)
-                    ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI'])
-                    ->first();
-                
-                if ($dataInventory && !in_array($dataInventory->jenis_inventory, $kategoriGudang)) {
-                    $kategoriGudang[] = $dataInventory->jenis_inventory;
-                }
-            }
+            // Hapus duplikat dan re-index array
+            $kategoriGudang = array_values(array_unique($kategoriGudang));
             
             // Buat approval log untuk setiap kategori gudang yang terlibat
             foreach ($kategoriGudang as $kategori) {

@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
         ]);
+        // Pastikan permissions ter-load untuk setiap request
+        $middleware->web(append: [
+            \App\Http\Middleware\LoadUserPermissions::class,
+        ]);
     })
     ->withProviders([
         \App\Providers\AppServiceProvider::class,

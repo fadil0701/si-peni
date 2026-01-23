@@ -4,9 +4,31 @@
 <!-- Page Header -->
 <div class="mb-6 flex justify-between items-center">
     <div>
-        <h1 class="text-2xl font-bold text-gray-900">Proses Disposisi - {{ $kategoriGudang }}</h1>
-        <p class="mt-1 text-sm text-gray-600">Daftar disposisi yang perlu diproses untuk kategori {{ $kategoriGudang }}</p>
+        <h1 class="text-2xl font-bold text-gray-900">Proses Disposisi{{ $kategoriGudang ? ' - ' . $kategoriGudang : '' }}</h1>
+        <p class="mt-1 text-sm text-gray-600">
+            Daftar disposisi yang perlu diproses{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : ' (Semua Kategori)' }}
+        </p>
     </div>
+    @if($isAdmin || ($isViewOnly ?? false))
+    <div class="flex gap-2">
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'ASET']) }}" 
+           class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'ASET' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+            ASET
+        </a>
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'PERSEDIAAN']) }}" 
+           class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'PERSEDIAAN' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+            PERSEDIAAN
+        </a>
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'FARMASI']) }}" 
+           class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'FARMASI' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+            FARMASI
+        </a>
+        <a href="{{ route('transaction.draft-distribusi.index') }}" 
+           class="px-3 py-1.5 text-sm rounded-md {{ !$kategoriGudang ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+            Semua
+        </a>
+    </div>
+    @endif
 </div>
 
 <!-- Success/Error Messages -->
@@ -47,6 +69,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. Permintaan</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Kerja</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pemohon</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Permintaan</th>
@@ -64,6 +87,35 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ $permintaan ? $permintaan->no_permintaan : '#' . $approvalLog->id_referensi }}
                             </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            @php
+                                // Tentukan kategori dari role approval log
+                                $kategori = null;
+                                if ($approvalLog->approvalFlow && $approvalLog->approvalFlow->role) {
+                                    $roleName = $approvalLog->approvalFlow->role->name;
+                                    if ($roleName == 'admin_gudang_aset') {
+                                        $kategori = 'ASET';
+                                    } elseif ($roleName == 'admin_gudang_persediaan') {
+                                        $kategori = 'PERSEDIAAN';
+                                    } elseif ($roleName == 'admin_gudang_farmasi') {
+                                        $kategori = 'FARMASI';
+                                    }
+                                }
+                                $kategoriColor = match($kategori) {
+                                    'ASET' => 'bg-blue-100 text-blue-800',
+                                    'PERSEDIAAN' => 'bg-green-100 text-green-800',
+                                    'FARMASI' => 'bg-purple-100 text-purple-800',
+                                    default => 'bg-gray-100 text-gray-800',
+                                };
+                            @endphp
+                            @if($kategori)
+                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ $kategoriColor }}">
+                                    {{ $kategori }}
+                                </span>
+                            @else
+                                <span class="text-sm text-gray-500">-</span>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
@@ -91,18 +143,41 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            @if($approvalLog->status == 'MENUNGGU')
+                            @if($approvalLog->status == 'MENUNGGU' && !($isViewOnly ?? false))
+                                @php
+                                    // Tentukan kategori untuk URL
+                                    $kategoriParam = null;
+                                    if ($approvalLog->approvalFlow && $approvalLog->approvalFlow->role) {
+                                        $roleName = $approvalLog->approvalFlow->role->name;
+                                        if ($roleName == 'admin_gudang_aset') {
+                                            $kategoriParam = 'ASET';
+                                        } elseif ($roleName == 'admin_gudang_persediaan') {
+                                            $kategoriParam = 'PERSEDIAAN';
+                                        } elseif ($roleName == 'admin_gudang_farmasi') {
+                                            $kategoriParam = 'FARMASI';
+                                        }
+                                    }
+                                @endphp
                                 <a 
-                                    href="{{ route('transaction.draft-distribusi.create', $approvalLog->id) }}" 
-                                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    href="{{ route('transaction.draft-distribusi.create', ['approvalLogId' => $approvalLog->id]) . ($kategoriParam ? '?kategori=' . $kategoriParam : '') }}" 
+                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                    title="Proses"
                                 >
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
                                     Proses
                                 </a>
                             @else
                                 <a 
                                     href="{{ route('transaction.draft-distribusi.show', $approvalLog->id) }}" 
-                                    class="text-blue-600 hover:text-blue-900 transition-colors"
+                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 transition-colors"
+                                    title="Lihat Detail"
                                 >
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
                                     Lihat Detail
                                 </a>
                             @endif
@@ -110,7 +185,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center">
+                        <td colspan="7" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>

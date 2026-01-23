@@ -15,9 +15,18 @@ return new class extends Migration
         } elseif (DB::getDriverName() === 'pgsql') {
             DB::statement("ALTER TABLE approval_log DROP CONSTRAINT IF EXISTS approval_log_status_check");
             DB::statement("ALTER TABLE approval_log ADD CONSTRAINT approval_log_status_check CHECK (status IN ('MENUNGGU', 'DIKETAHUI', 'DIVERIFIKASI', 'DISETUJUI', 'DITOLAK', 'DIDISPOSISIKAN', 'DIPROSES'))");
-        } else {
-            // Untuk SQLite, tidak bisa modify enum, jadi kita skip atau gunakan cara lain
-            // SQLite tidak mendukung enum, jadi ini hanya untuk MySQL/PostgreSQL
+        } elseif (DB::getDriverName() === 'sqlite') {
+            // SQLite tidak mendukung enum, jadi kita perlu drop dan recreate constraint
+            // Atau cukup pastikan bahwa constraint tidak memblokir DIPROSES
+            // SQLite menggunakan CHECK constraint untuk validasi
+            try {
+                // Drop constraint lama jika ada
+                DB::statement("DROP INDEX IF EXISTS approval_log_status_check");
+            } catch (\Exception $e) {
+                // Ignore jika constraint tidak ada
+            }
+            // SQLite akan menggunakan CHECK constraint dari schema definition
+            // Pastikan model/validation mengizinkan DIPROSES
         }
     }
 

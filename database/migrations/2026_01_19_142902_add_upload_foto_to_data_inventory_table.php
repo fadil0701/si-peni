@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('data_inventory', function (Blueprint $table) {
+            // Check if column exists before adding
+            if (!Schema::hasColumn('data_inventory', 'upload_foto')) {
             $table->string('upload_foto', 255)->nullable()->after('status_inventory');
+            }
         });
     }
 

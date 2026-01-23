@@ -221,6 +221,7 @@ class DistribusiController extends Controller
             'gudangTujuan',
             'pegawaiPengirim',
             'detailDistribusi.inventory.dataBarang',
+            'detailDistribusi.inventory.gudang',
             'detailDistribusi.satuan'
         ])->findOrFail($id);
 
@@ -345,58 +346,58 @@ class DistribusiController extends Controller
             // Update status distribusi
             $distribusi->update(['status_distribusi' => 'DIKIRIM']);
 
-            // Update stock gudang asal (kurangi) dan tujuan (tambah)
+            // Update stock atau inventory_item berdasarkan jenis inventory
             foreach ($distribusi->detailDistribusi as $detail) {
                 $inventory = $detail->inventory;
                 
-                // Kurangi stock gudang asal
-                $stockAsal = \App\Models\DataStock::where('id_data_barang', $inventory->id_data_barang)
-                    ->where('id_gudang', $distribusi->id_gudang_asal)
-                    ->first();
-                
-                if ($stockAsal) {
-                    $stockAsal->qty_keluar += $detail->qty_distribusi;
-                    $stockAsal->qty_akhir -= $detail->qty_distribusi;
-                    $stockAsal->last_updated = now();
-                    $stockAsal->save();
-                }
-
-                // Tambah stock gudang tujuan
-                $stockTujuan = \App\Models\DataStock::firstOrNew([
-                    'id_data_barang' => $inventory->id_data_barang,
-                    'id_gudang' => $distribusi->id_gudang_tujuan,
-                ]);
-
-                if ($stockTujuan->exists) {
-                    $stockTujuan->qty_masuk += $detail->qty_distribusi;
-                    $stockTujuan->qty_akhir += $detail->qty_distribusi;
-                } else {
-                    $stockTujuan->qty_awal = 0;
-                    $stockTujuan->qty_masuk = $detail->qty_distribusi;
-                    $stockTujuan->qty_keluar = 0;
-                    $stockTujuan->qty_akhir = $detail->qty_distribusi;
-                    $stockTujuan->id_satuan = $detail->id_satuan;
-                }
-
-                $stockTujuan->last_updated = now();
-                $stockTujuan->save();
-
-                // Untuk ASET: Update id_gudang di inventory_item yang didistribusikan
                 if ($inventory->jenis_inventory === 'ASET') {
-                    // Ambil inventory_item yang masih di gudang asal dan belum didistribusikan
+                    // ASET: Update id_gudang di inventory_item (TIDAK update DataStock)
                     $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
                         ->where('id_gudang', $distribusi->id_gudang_asal)
                         ->where('status_item', 'AKTIF')
                         ->limit((int)$detail->qty_distribusi)
                         ->get();
-
+                    
                     // Update id_gudang ke gudang tujuan
                     foreach ($inventoryItems as $item) {
                         $item->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
                     }
-                } else {
-                    // Untuk PERSEDIAAN/FARMASI: Buat inventory baru di gudang tujuan atau update id_gudang
-                    // Jika qty_distribusi sama dengan qty_input, pindahkan seluruh inventory
+                } elseif (in_array($inventory->jenis_inventory, ['PERSEDIAAN', 'FARMASI'])) {
+                    // PERSEDIAAN/FARMASI: Update DataStock (TIDAK update InventoryItem)
+                    // Kurangi stock gudang asal
+                    $stockAsal = \App\Models\DataStock::where('id_data_barang', $inventory->id_data_barang)
+                        ->where('id_gudang', $distribusi->id_gudang_asal)
+                        ->first();
+                    
+                    if ($stockAsal) {
+                        $stockAsal->qty_keluar += $detail->qty_distribusi;
+                        $stockAsal->qty_akhir -= $detail->qty_distribusi;
+                        $stockAsal->last_updated = now();
+                        $stockAsal->save();
+                    }
+
+                    // Tambah stock gudang tujuan
+                    $stockTujuan = \App\Models\DataStock::firstOrNew([
+                        'id_data_barang' => $inventory->id_data_barang,
+                        'id_gudang' => $distribusi->id_gudang_tujuan,
+                    ]);
+
+                    if ($stockTujuan->exists) {
+                        $stockTujuan->qty_masuk += $detail->qty_distribusi;
+                        $stockTujuan->qty_akhir += $detail->qty_distribusi;
+                    } else {
+                        $stockTujuan->qty_awal = 0;
+                        $stockTujuan->qty_masuk = $detail->qty_distribusi;
+                        $stockTujuan->qty_keluar = 0;
+                        $stockTujuan->qty_akhir = $detail->qty_distribusi;
+                        $stockTujuan->id_satuan = $detail->id_satuan;
+                    }
+
+                    $stockTujuan->last_updated = now();
+                    $stockTujuan->save();
+                    
+                    // Untuk PERSEDIAAN/FARMASI: Update atau pindahkan inventory
+                    // Jika qty_distribusi sama dengan atau lebih besar dari qty_input, pindahkan seluruh inventory
                     // Jika tidak, buat inventory baru di gudang tujuan
                     if ($detail->qty_distribusi >= $inventory->qty_input) {
                         // Pindahkan seluruh inventory ke gudang tujuan
@@ -487,6 +488,7 @@ class DistribusiController extends Controller
                 'id_inventory' => $inv->id_inventory,
                 'nama_barang' => $inv->dataBarang->nama_barang ?? '-',
                 'kode_barang' => $inv->dataBarang->kode_data_barang ?? '-',
+                'jenis_inventory' => $inv->jenis_inventory,
                 'harga_satuan' => $inv->harga_satuan,
                 'id_satuan' => $inv->id_satuan,
                 'qty_available' => max(0, $qtyAvailable),

@@ -35,7 +35,7 @@ class CleanupTransactionData extends Command
     public function handle()
     {
         if (!$this->option('force')) {
-            if (!$this->confirm('Apakah Anda yakin ingin menghapus semua data transaksi (Permintaan, Approval, Distribusi, Draft Distribusi, dan Penerimaan)?')) {
+            if (!$this->confirm('Apakah Anda yakin ingin menghapus semua data transaksi (Permintaan, Approval, Distribusi, Draft Distribusi, Penerimaan, Retur, History Lokasi, dll)?')) {
                 $this->info('Operasi dibatalkan.');
                 return 0;
             }
@@ -44,78 +44,235 @@ class CleanupTransactionData extends Command
         $this->info('Memulai penghapusan data transaksi...');
         $this->newLine();
 
-        DB::beginTransaction();
+        // Nonaktifkan foreign key check untuk MySQL
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        
         try {
-            // 1. Hapus Detail Penerimaan Barang
+            $results = [];
+
+            // Urutan penghapusan berdasarkan foreign key dependencies
+            // Mulai dari tabel detail/child terlebih dahulu
+
+            // 1. Hapus Detail Retur Barang
+            $this->info('Menghapus Detail Retur Barang...');
+            $count = DB::table('detail_retur_barang')->count();
+            DB::table('detail_retur_barang')->truncate();
+            $results[] = ['Detail Retur Barang', $count];
+            $this->info("✓ {$count} detail retur barang dihapus.");
+
+            // 2. Hapus Retur Barang
+            $this->info('Menghapus Retur Barang...');
+            $count = DB::table('retur_barang')->count();
+            DB::table('retur_barang')->truncate();
+            $results[] = ['Retur Barang', $count];
+            $this->info("✓ {$count} retur barang dihapus.");
+
+            // 3. Hapus Detail Penerimaan Barang
             $this->info('Menghapus Detail Penerimaan Barang...');
-            $detailPenerimaanCount = DetailPenerimaanBarang::count();
+            $count = DetailPenerimaanBarang::count();
             DetailPenerimaanBarang::truncate();
-            $this->info("✓ {$detailPenerimaanCount} detail penerimaan barang dihapus.");
+            $results[] = ['Detail Penerimaan Barang', $count];
+            $this->info("✓ {$count} detail penerimaan barang dihapus.");
 
-            // 2. Hapus Penerimaan Barang
+            // 4. Hapus Penerimaan Barang
             $this->info('Menghapus Penerimaan Barang...');
-            $penerimaanCount = PenerimaanBarang::count();
+            $count = PenerimaanBarang::count();
             PenerimaanBarang::truncate();
-            $this->info("✓ {$penerimaanCount} penerimaan barang dihapus.");
+            $results[] = ['Penerimaan Barang', $count];
+            $this->info("✓ {$count} penerimaan barang dihapus.");
 
-            // 3. Hapus Detail Distribusi
+            // 5. Hapus History Lokasi
+            $this->info('Menghapus History Lokasi...');
+            $count = DB::table('history_lokasi')->count();
+            DB::table('history_lokasi')->truncate();
+            $results[] = ['History Lokasi', $count];
+            $this->info("✓ {$count} history lokasi dihapus.");
+
+            // 6. Hapus Detail Distribusi
             $this->info('Menghapus Detail Distribusi...');
-            $detailDistribusiCount = DetailDistribusi::count();
+            $count = DetailDistribusi::count();
             DetailDistribusi::truncate();
-            $this->info("✓ {$detailDistribusiCount} detail distribusi dihapus.");
+            $results[] = ['Detail Distribusi', $count];
+            $this->info("✓ {$count} detail distribusi dihapus.");
 
-            // 4. Hapus Draft Detail Distribusi
+            // 7. Hapus Draft Detail Distribusi
             $this->info('Menghapus Draft Detail Distribusi...');
-            $draftDetailCount = DraftDetailDistribusi::count();
+            $count = DraftDetailDistribusi::count();
             DraftDetailDistribusi::truncate();
-            $this->info("✓ {$draftDetailCount} draft detail distribusi dihapus.");
+            $results[] = ['Draft Detail Distribusi', $count];
+            $this->info("✓ {$count} draft detail distribusi dihapus.");
 
-            // 5. Hapus Transaksi Distribusi
+            // 8. Hapus Transaksi Distribusi
             $this->info('Menghapus Transaksi Distribusi...');
-            $distribusiCount = TransaksiDistribusi::count();
+            $count = TransaksiDistribusi::count();
             TransaksiDistribusi::truncate();
-            $this->info("✓ {$distribusiCount} transaksi distribusi dihapus.");
+            $results[] = ['Transaksi Distribusi', $count];
+            $this->info("✓ {$count} transaksi distribusi dihapus.");
 
-            // 6. Hapus Approval Log
+            // 9. Hapus Approval Log (harus sebelum approval_permintaan jika ada)
             $this->info('Menghapus Approval Log...');
-            $approvalLogCount = ApprovalLog::count();
+            $count = ApprovalLog::count();
             ApprovalLog::truncate();
-            $this->info("✓ {$approvalLogCount} approval log dihapus.");
+            $results[] = ['Approval Log', $count];
+            $this->info("✓ {$count} approval log dihapus.");
 
-            // 7. Hapus Detail Permintaan Barang
+            // 10. Hapus Approval Permintaan (tabel lama jika masih ada)
+            if (DB::getSchemaBuilder()->hasTable('approval_permintaan')) {
+                $this->info('Menghapus Approval Permintaan...');
+                $count = DB::table('approval_permintaan')->count();
+                DB::table('approval_permintaan')->truncate();
+                $results[] = ['Approval Permintaan', $count];
+                $this->info("✓ {$count} approval permintaan dihapus.");
+            }
+
+            // 11. Hapus Detail Permintaan Barang
             $this->info('Menghapus Detail Permintaan Barang...');
-            $detailPermintaanCount = DetailPermintaanBarang::count();
+            $count = DetailPermintaanBarang::count();
             DetailPermintaanBarang::truncate();
-            $this->info("✓ {$detailPermintaanCount} detail permintaan barang dihapus.");
+            $results[] = ['Detail Permintaan Barang', $count];
+            $this->info("✓ {$count} detail permintaan barang dihapus.");
 
-            // 8. Hapus Permintaan Barang
+            // 12. Hapus Permintaan Barang
             $this->info('Menghapus Permintaan Barang...');
-            $permintaanCount = PermintaanBarang::count();
+            $count = PermintaanBarang::count();
             PermintaanBarang::truncate();
-            $this->info("✓ {$permintaanCount} permintaan barang dihapus.");
+            $results[] = ['Permintaan Barang', $count];
+            $this->info("✓ {$count} permintaan barang dihapus.");
 
-            DB::commit();
+            // 13. Hapus Permintaan Pemeliharaan (jika ada)
+            if (DB::getSchemaBuilder()->hasTable('permintaan_pemeliharaan')) {
+                $this->info('Menghapus Permintaan Pemeliharaan...');
+                $count = DB::table('permintaan_pemeliharaan')->count();
+                DB::table('permintaan_pemeliharaan')->truncate();
+                $results[] = ['Permintaan Pemeliharaan', $count];
+                $this->info("✓ {$count} permintaan pemeliharaan dihapus.");
+            }
+
+            // 14. Hapus Riwayat Pemeliharaan (jika ada)
+            if (DB::getSchemaBuilder()->hasTable('riwayat_pemeliharaan')) {
+                $this->info('Menghapus Riwayat Pemeliharaan...');
+                $count = DB::table('riwayat_pemeliharaan')->count();
+                DB::table('riwayat_pemeliharaan')->truncate();
+                $results[] = ['Riwayat Pemeliharaan', $count];
+                $this->info("✓ {$count} riwayat pemeliharaan dihapus.");
+            }
+
+            // 15. Hapus Service Report (jika ada)
+            if (DB::getSchemaBuilder()->hasTable('service_report')) {
+                $this->info('Menghapus Service Report...');
+                $count = DB::table('service_report')->count();
+                DB::table('service_report')->truncate();
+                $results[] = ['Service Report', $count];
+                $this->info("✓ {$count} service report dihapus.");
+            }
+
+            // 16. Hapus Jadwal Maintenance (jika ada)
+            if (DB::getSchemaBuilder()->hasTable('jadwal_maintenance')) {
+                $this->info('Menghapus Jadwal Maintenance...');
+                $count = DB::table('jadwal_maintenance')->count();
+                DB::table('jadwal_maintenance')->truncate();
+                $results[] = ['Jadwal Maintenance', $count];
+                $this->info("✓ {$count} jadwal maintenance dihapus.");
+            }
+
+            // 17. Hapus Kalibrasi Aset (jika ada)
+            if (DB::getSchemaBuilder()->hasTable('kalibrasi_aset')) {
+                $this->info('Menghapus Kalibrasi Aset...');
+                $count = DB::table('kalibrasi_aset')->count();
+                DB::table('kalibrasi_aset')->truncate();
+                $results[] = ['Kalibrasi Aset', $count];
+                $this->info("✓ {$count} kalibrasi aset dihapus.");
+            }
+
+            // 18. Hapus Mutasi Aset
+            if (DB::getSchemaBuilder()->hasTable('mutasi_aset')) {
+                $this->info('Menghapus Mutasi Aset...');
+                $count = DB::table('mutasi_aset')->count();
+                DB::table('mutasi_aset')->truncate();
+                $results[] = ['Mutasi Aset', $count];
+                $this->info("✓ {$count} mutasi aset dihapus.");
+            }
+
+            // 19. Hapus Kartu Inventaris Ruangan
+            if (DB::getSchemaBuilder()->hasTable('kartu_inventaris_ruangan')) {
+                $this->info('Menghapus Kartu Inventaris Ruangan...');
+                $count = DB::table('kartu_inventaris_ruangan')->count();
+                DB::table('kartu_inventaris_ruangan')->truncate();
+                $results[] = ['Kartu Inventaris Ruangan', $count];
+                $this->info("✓ {$count} kartu inventaris ruangan dihapus.");
+            }
+
+            // 20. Hapus Register Aset
+            if (DB::getSchemaBuilder()->hasTable('register_aset')) {
+                $this->info('Menghapus Register Aset...');
+                $count = DB::table('register_aset')->count();
+                DB::table('register_aset')->truncate();
+                $results[] = ['Register Aset', $count];
+                $this->info("✓ {$count} register aset dihapus.");
+            }
+
+            // 21. Hapus Inventory Item
+            if (DB::getSchemaBuilder()->hasTable('inventory_item')) {
+                $this->info('Menghapus Inventory Item...');
+                $count = DB::table('inventory_item')->count();
+                DB::table('inventory_item')->truncate();
+                $results[] = ['Inventory Item', $count];
+                $this->info("✓ {$count} inventory item dihapus.");
+            }
+
+            // 22. Hapus Data Stock Opname
+            if (DB::getSchemaBuilder()->hasTable('data_stock_opname')) {
+                $this->info('Menghapus Data Stock Opname...');
+                $count = DB::table('data_stock_opname')->count();
+                DB::table('data_stock_opname')->truncate();
+                $results[] = ['Data Stock Opname', $count];
+                $this->info("✓ {$count} data stock opname dihapus.");
+            }
+
+            // 23. Reset Data Stock (set qty ke 0)
+            if (DB::getSchemaBuilder()->hasTable('data_stock')) {
+                $this->info('Reset Data Stock...');
+                $count = DB::table('data_stock')->count();
+                DB::table('data_stock')->update([
+                    'qty_awal' => 0,
+                    'qty_masuk' => 0,
+                    'qty_keluar' => 0,
+                    'qty_akhir' => 0,
+                    'last_updated' => now()
+                ]);
+                $results[] = ['Data Stock (Reset)', $count];
+                $this->info("✓ {$count} data stock di-reset.");
+            }
+
+            // 24. Reset Data Inventory (opsional - hanya jika user mau)
+            // Uncomment jika ingin menghapus data inventory juga
+            // if (DB::getSchemaBuilder()->hasTable('data_inventory')) {
+            //     $this->info('Menghapus Data Inventory...');
+            //     $count = DB::table('data_inventory')->count();
+            //     DB::table('data_inventory')->truncate();
+            //     $results[] = ['Data Inventory', $count];
+            //     $this->info("✓ {$count} data inventory dihapus.");
+            // }
+
+            // Aktifkan kembali foreign key check
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
             $this->newLine();
             $this->info('✓ Semua data transaksi berhasil dihapus!');
             $this->newLine();
             $this->table(
                 ['Tabel', 'Jumlah Data Dihapus'],
-                [
-                    ['Detail Penerimaan Barang', $detailPenerimaanCount],
-                    ['Penerimaan Barang', $penerimaanCount],
-                    ['Detail Distribusi', $detailDistribusiCount],
-                    ['Draft Detail Distribusi', $draftDetailCount],
-                    ['Transaksi Distribusi', $distribusiCount],
-                    ['Approval Log', $approvalLogCount],
-                    ['Detail Permintaan Barang', $detailPermintaanCount],
-                    ['Permintaan Barang', $permintaanCount],
-                ]
+                $results
             );
+
+            $totalDeleted = array_sum(array_column($results, 1));
+            $this->newLine();
+            $this->info("Total data yang dihapus: {$totalDeleted} records");
 
             return 0;
         } catch (\Exception $e) {
-            DB::rollBack();
+            // Aktifkan kembali foreign key check jika terjadi error
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
             $this->error('Terjadi kesalahan saat menghapus data: ' . $e->getMessage());
             $this->error('Stack trace: ' . $e->getTraceAsString());
             return 1;

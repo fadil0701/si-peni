@@ -55,10 +55,29 @@ class RoleController extends Controller
 
     public function edit($id)
     {
-        $role = Role::with('permissions')->findOrFail($id);
+        $role = Role::with(['permissions', 'users.modules'])->findOrFail($id);
+        
+        // Ambil modules dari semua user yang menggunakan role ini
+        $userModules = collect();
+        foreach ($role->users as $user) {
+            $userModules = $userModules->merge($user->modules->pluck('name'));
+        }
+        $userModules = $userModules->unique()->sort()->values();
+        
+        // Filter permissions berdasarkan modules user
+        if ($userModules->isNotEmpty()) {
+            $permissions = Permission::whereIn('module', $userModules)
+                ->orderBy('module')
+                ->orderBy('sort_order')
+                ->get()
+                ->groupBy('module');
+        } else {
+            // Jika tidak ada user atau user tidak punya modules, tampilkan semua permission
         $permissions = Permission::orderBy('module')->orderBy('sort_order')->get()->groupBy('module');
+        }
+        
         $rolePermissions = $role->permissions->pluck('id')->toArray();
-        return view('admin.roles.edit', compact('role', 'permissions', 'rolePermissions'));
+        return view('admin.roles.edit', compact('role', 'permissions', 'rolePermissions', 'userModules'));
     }
 
     public function update(Request $request, $id)

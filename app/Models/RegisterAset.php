@@ -47,4 +47,44 @@ class RegisterAset extends Model
     {
         return $this->hasMany(MutasiAset::class, 'id_register_aset', 'id_register_aset');
     }
+
+    /**
+     * Permintaan pemeliharaan untuk aset ini
+     */
+    public function permintaanPemeliharaan(): HasMany
+    {
+        return $this->hasMany(PermintaanPemeliharaan::class, 'id_register_aset', 'id_register_aset');
+    }
+
+    /**
+     * Jadwal maintenance untuk aset ini
+     */
+    public function jadwalMaintenance(): HasMany
+    {
+        return $this->hasMany(JadwalMaintenance::class, 'id_register_aset', 'id_register_aset');
+    }
+
+    /**
+     * Kalibrasi untuk aset ini
+     */
+    public function kalibrasi(): HasMany
+    {
+        return $this->hasMany(KalibrasiAset::class, 'id_register_aset', 'id_register_aset');
+    }
+
+    /**
+     * Service report untuk aset ini
+     */
+    public function serviceReport(): HasMany
+    {
+        return $this->hasMany(ServiceReport::class, 'id_register_aset', 'id_register_aset');
+    }
+
+    /**
+     * Riwayat pemeliharaan untuk aset ini
+     */
+    public function riwayatPemeliharaan(): HasMany
+    {
+        return $this->hasMany(RiwayatPemeliharaan::class, 'id_register_aset', 'id_register_aset');
+    }
 }

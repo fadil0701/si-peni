@@ -60,4 +60,9 @@ class TransaksiDistribusi extends Model
     {
         return $this->hasMany(PenerimaanBarang::class, 'id_distribusi', 'id_distribusi');
     }
+
+    public function returBarang(): HasMany
+    {
+        return $this->hasMany(ReturBarang::class, 'id_distribusi', 'id_distribusi');
+    }
 }

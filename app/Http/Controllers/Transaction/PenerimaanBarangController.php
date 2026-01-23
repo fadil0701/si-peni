@@ -194,6 +194,7 @@ class PenerimaanBarangController extends Controller
             'distribusi.gudangAsal',
             'distribusi.gudangTujuan',
             'distribusi.permintaan',
+            'distribusi.detailDistribusi.inventory', // Eager load detail distribusi untuk mendapatkan qty dikirim
             'unitKerja',
             'pegawaiPenerima',
             'detailPenerimaan.inventory.dataBarang',
@@ -206,6 +207,12 @@ class PenerimaanBarangController extends Controller
     public function edit($id)
     {
         $user = Auth::user();
+        
+        // Check permission untuk edit
+        if (!\App\Helpers\PermissionHelper::canAccess($user, 'transaction.penerimaan-barang.edit')) {
+            abort(403, 'Anda tidak memiliki izin untuk mengedit data penerimaan barang.');
+        }
+        
         $penerimaan = PenerimaanBarang::with('detailPenerimaan')->findOrFail($id);
         
         // Hanya bisa edit jika status DITERIMA (belum final)
@@ -247,6 +254,13 @@ class PenerimaanBarangController extends Controller
 
     public function update(Request $request, $id)
     {
+        $user = Auth::user();
+        
+        // Check permission untuk update
+        if (!\App\Helpers\PermissionHelper::canAccess($user, 'transaction.penerimaan-barang.update')) {
+            abort(403, 'Anda tidak memiliki izin untuk memperbarui data penerimaan barang.');
+        }
+        
         $penerimaan = PenerimaanBarang::findOrFail($id);
 
         $validated = $request->validate([
@@ -307,6 +321,13 @@ class PenerimaanBarangController extends Controller
 
     public function destroy($id)
     {
+        $user = Auth::user();
+        
+        // Check permission untuk menghapus
+        if (!\App\Helpers\PermissionHelper::canAccess($user, 'transaction.penerimaan-barang.destroy')) {
+            abort(403, 'Anda tidak memiliki izin untuk menghapus data penerimaan barang.');
+        }
+
         $penerimaan = PenerimaanBarang::findOrFail($id);
 
         DB::beginTransaction();

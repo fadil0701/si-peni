@@ -97,6 +97,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. Permintaan</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Kerja</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gudang Unit</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pemohon</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Step Approval</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -178,7 +179,32 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
+                                @if($permintaan->unitKerja && $permintaan->unitKerja->gudang)
+                                    @php
+                                        $gudangUnits = $permintaan->unitKerja->gudang->where('jenis_gudang', 'UNIT');
+                                    @endphp
+                                    @if($gudangUnits->count() > 0)
+                                        @foreach($gudangUnits as $gudang)
+                                            <span class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 mr-1">
+                                                {{ $gudang->nama_gudang }}
+                                            </span>
+                                        @endforeach
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                @else
+                                    <span class="text-gray-400">-</span>
+                                @endif
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">
                                 {{ $permintaan->pemohon->nama_pegawai ?? '-' }}
+                                @if($permintaan->pemohon && $permintaan->pemohon->jabatan)
+                                    <div class="text-xs text-gray-500">
+                                        ({{ $permintaan->pemohon->jabatan->nama_jabatan ?? '' }})
+                                    </div>
+                                @endif
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -203,8 +229,13 @@
                             @if($currentStep)
                                 <a 
                                     href="{{ route('transaction.approval.show', $currentStep->id) }}" 
-                                    class="text-blue-600 hover:text-blue-900 transition-colors"
+                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                    title="Detail"
                                 >
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
                                     Detail
                                 </a>
                             @else
@@ -214,7 +245,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center">
+                        <td colspan="8" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>

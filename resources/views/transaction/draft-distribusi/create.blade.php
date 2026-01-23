@@ -16,9 +16,48 @@
         <p class="mt-1 text-sm text-gray-600">No. Permintaan: {{ $approvalLog->permintaan->no_permintaan }}</p>
     </div>
     
+    <!-- Error Messages -->
+    @if($errors->any())
+        <div class="mx-6 mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Terjadi kesalahan saat menyimpan data:</h3>
+                    <div class="mt-2 text-sm text-red-700">
+                        <ul class="list-disc list-inside space-y-1">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="mx-6 mt-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
+                </div>
+            </div>
+        </div>
+    @endif
+    
     <form action="{{ route('transaction.draft-distribusi.store') }}" method="POST" class="p-6" id="formDraftDistribusi">
         @csrf
         <input type="hidden" name="id_permintaan" value="{{ $approvalLog->permintaan->id_permintaan }}">
+        <input type="hidden" name="kategori_gudang" value="{{ $kategoriGudang ?? 'ASET' }}" id="hiddenKategoriGudang">
         
         <div class="space-y-6">
             <!-- Informasi Permintaan -->
@@ -230,38 +269,33 @@
 <script>
 let itemIndex = 0;
 let inventoryData = {};
+const kategoriGudang = '{{ $kategoriGudang }}';
 
-// Load inventory berdasarkan gudang
+// Pre-populate inventory data dari controller
+@php
+    $inventoriesData = $inventories->map(function($inv) {
+        return [
+            'id_inventory' => $inv->id_inventory,
+            'id_gudang' => $inv->id_gudang,
+            'nama_barang' => ($inv->dataBarang->nama_barang ?? '-'),
+            'kode_barang' => ($inv->dataBarang->kode_data_barang ?? ''),
+            'jenis_inventory' => $inv->jenis_inventory,
+            'harga_satuan' => (float)($inv->harga_satuan ?? 0),
+            'id_satuan' => $inv->id_satuan,
+            'qty_input' => (float)($inv->qty_input ?? 0),
+        ];
+    })->values()->toArray();
+@endphp
+const inventoriesFromController = @json($inventoriesData);
+
+// Load inventory berdasarkan gudang (untuk backward compatibility)
 function loadInventoryByGudang(select) {
     const gudangId = select.value;
     const row = select.closest('.item-row');
     const inventorySelect = row.querySelector('.select-inventory');
     
-    if (!gudangId) {
-        inventorySelect.innerHTML = '<option value="">Pilih Inventory</option>';
-        return;
-    }
-    
-    fetch(`/api/gudang/${gudangId}/inventory`)
-        .then(response => response.json())
-        .then(data => {
-            inventorySelect.innerHTML = '<option value="">Pilih Inventory</option>';
-            data.inventory.forEach(inv => {
-                // Filter hanya inventory sesuai kategori
-                if (inv.jenis_inventory === '{{ $kategoriGudang }}') {
-                    const option = document.createElement('option');
-                    option.value = inv.id_inventory;
-                    const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
-                    option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_available}`;
-                    option.setAttribute('data-harga', inv.harga_satuan);
-                    option.setAttribute('data-satuan', inv.id_satuan);
-                    inventorySelect.appendChild(option);
-                }
-            });
-        })
-        .catch(error => {
-            console.error('Error loading inventory:', error);
-        });
+    // Gunakan fungsi filter yang baru
+    filterInventoryByGudang(inventorySelect, gudangId);
 }
 
 // Update harga satuan saat inventory dipilih
@@ -293,6 +327,75 @@ function calculateSubtotal(input) {
     const hargaInput = row.querySelector('.harga-satuan-input');
     
     // Subtotal akan dihitung di backend
+}
+
+// Pre-populate inventory untuk semua gudang sesuai kategori
+function populateInventoryForAllGudangs(inventorySelect) {
+    if (!inventorySelect) return;
+    
+    // Filter inventory sesuai kategori dari semua gudang
+    const allInventory = inventoriesFromController.filter(inv => 
+        inv.jenis_inventory === kategoriGudang
+    );
+    
+    console.log('Populating inventory for all gudangs, kategori:', kategoriGudang);
+    console.log('Available inventory:', allInventory.length, 'items');
+    
+    inventorySelect.innerHTML = '<option value="">Pilih Inventory</option>';
+    
+    if (allInventory.length > 0) {
+        allInventory.forEach(inv => {
+            const option = document.createElement('option');
+            option.value = inv.id_inventory;
+            const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
+            option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_input}`;
+            option.setAttribute('data-harga', inv.harga_satuan);
+            option.setAttribute('data-satuan', inv.id_satuan);
+            option.setAttribute('data-gudang', inv.id_gudang);
+            inventorySelect.appendChild(option);
+        });
+    } else {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Tidak ada inventory tersedia';
+        option.disabled = true;
+        inventorySelect.appendChild(option);
+    }
+}
+
+// Filter inventory berdasarkan gudang yang dipilih
+function filterInventoryByGudang(inventorySelect, gudangId) {
+    if (!inventorySelect || !gudangId) {
+        // Jika gudang tidak dipilih, tampilkan semua inventory
+        populateInventoryForAllGudangs(inventorySelect);
+        return;
+    }
+    
+    // Filter hanya inventory dari gudang yang dipilih
+    const filteredInventory = inventoriesFromController.filter(inv => 
+        inv.id_gudang == gudangId && inv.jenis_inventory === kategoriGudang
+    );
+    
+    inventorySelect.innerHTML = '<option value="">Pilih Inventory</option>';
+    
+    if (filteredInventory.length > 0) {
+        filteredInventory.forEach(inv => {
+            const option = document.createElement('option');
+            option.value = inv.id_inventory;
+            const kodeText = inv.kode_barang ? ` (${inv.kode_barang})` : '';
+            option.textContent = `${inv.nama_barang}${kodeText} - Stok: ${inv.qty_input}`;
+            option.setAttribute('data-harga', inv.harga_satuan);
+            option.setAttribute('data-satuan', inv.id_satuan);
+            option.setAttribute('data-gudang', inv.id_gudang);
+            inventorySelect.appendChild(option);
+        });
+    } else {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Tidak ada inventory tersedia untuk gudang ini';
+        option.disabled = true;
+        inventorySelect.appendChild(option);
+    }
 }
 
 // Tambah item
@@ -328,14 +431,24 @@ function addItemRow() {
         return;
     }
     
+    // Pre-populate inventory dengan semua inventory sesuai kategori
+    populateInventoryForAllGudangs(inventorySelect);
+    
     // Attach event handler untuk update harga satuan
     inventorySelect.addEventListener('change', function() {
         updateHargaSatuan(this);
+        
+        // Auto-select gudang berdasarkan inventory yang dipilih
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value && selectedOption.getAttribute('data-gudang')) {
+            const gudangId = selectedOption.getAttribute('data-gudang');
+            gudangSelect.value = gudangId;
+        }
     });
     
-    // Attach event handler untuk load inventory saat gudang dipilih
+    // Attach event handler untuk filter inventory saat gudang dipilih
     gudangSelect.addEventListener('change', function() {
-        loadInventoryByGudang(this);
+        filterInventoryByGudang(inventorySelect, this.value);
     });
     
     // Hapus item
@@ -367,11 +480,27 @@ document.addEventListener('DOMContentLoaded', function() {
         addItemRow();
     }
     
-    // Validasi form sebelum submit
+    // Pastikan kategori_gudang selalu ada sebelum submit
     const formDraftDistribusi = document.getElementById('formDraftDistribusi');
     if (formDraftDistribusi) {
+        // Pastikan hidden field kategori_gudang terisi
+        const hiddenKategoriField = document.getElementById('hiddenKategoriGudang');
+        if (hiddenKategoriField && !hiddenKategoriField.value) {
+            hiddenKategoriField.value = kategoriGudang || 'ASET';
+        }
+        
         formDraftDistribusi.addEventListener('submit', function(e) {
+            console.log('Form submit triggered');
+            
+            // Pastikan kategori_gudang terisi
+            const hiddenKategoriField = document.getElementById('hiddenKategoriGudang');
+            if (hiddenKategoriField && !hiddenKategoriField.value) {
+                hiddenKategoriField.value = kategoriGudang || 'ASET';
+            }
+            
             const detailRows = detailContainer.querySelectorAll('.item-row');
+            console.log('Detail rows found:', detailRows.length);
+            
             if (detailRows.length === 0) {
                 e.preventDefault();
                 alert('Minimal harus ada 1 item distribusi. Silakan klik tombol "Tambah Item" terlebih dahulu.');
@@ -387,6 +516,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const qtyDistribusi = row.querySelector('[name*="[qty_distribusi]"]');
                 const idSatuan = row.querySelector('[name*="[id_satuan]"]');
                 const hargaSatuan = row.querySelector('[name*="[harga_satuan]"]');
+                
+                console.log(`Validating row ${index + 1}:`, {
+                    inventory: idInventory?.value,
+                    gudang: idGudangAsal?.value,
+                    qty: qtyDistribusi?.value,
+                    satuan: idSatuan?.value,
+                    harga: hargaSatuan?.value
+                });
                 
                 if (!idInventory || !idInventory.value) {
                     isValid = false;
@@ -415,10 +552,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Mohon lengkapi semua field yang wajib diisi:\n' + emptyFields.join('\n'));
                 return false;
             }
+            
+            console.log('Validation passed, submitting form...');
         });
     }
 });
 </script>
 @endpush
 @endsection
+
 

@@ -29,7 +29,8 @@ class CompileDistribusiController extends Controller
         }
 
         // Ambil permintaan yang sudah memiliki draft detail dari semua kategori dan statusnya READY
-        $query = PermintaanBarang::where('status_permintaan', 'DISETUJUI')
+        // Setelah disposisi, status permintaan adalah DISETUJUI_PIMPINAN atau DISETUJUI
+        $query = PermintaanBarang::whereIn('status_permintaan', ['DISETUJUI', 'DISETUJUI_PIMPINAN'])
             ->whereHas('draftDetailDistribusi', function($q) {
                 $q->where('status', 'READY');
             })
@@ -186,12 +187,17 @@ class CompileDistribusiController extends Controller
 
             $noSbbk = sprintf('SBBK/%s/%04d', $tahun, $urut);
 
-            // Tentukan gudang asal (bisa dari draft detail pertama, atau bisa multiple)
-            // Untuk sekarang, kita ambil gudang asal dari draft detail pertama
-            // Jika ada multiple gudang asal, bisa di-handle berbeda
-            $gudangAsal = $draftDetails->first()->id_gudang_asal;
+            // Tentukan gudang asal - ambil yang paling banyak digunakan dari draft details
+            // Jika ada beberapa gudang asal, pilih yang paling banyak item-nya
+            $gudangAsalCounts = $draftDetails->groupBy('id_gudang_asal')->map->count();
+            $gudangAsal = $gudangAsalCounts->sortDesc()->keys()->first();
+            
+            // Jika tidak ada, fallback ke draft detail pertama
+            if (!$gudangAsal) {
+                $gudangAsal = $draftDetails->first()->id_gudang_asal;
+            }
 
-            // Create distribusi
+            // Create distribusi dengan status DIKIRIM (karena sudah di-compile dan siap dikirim)
             $distribusi = TransaksiDistribusi::create([
                 'no_sbbk' => $noSbbk,
                 'id_permintaan' => $validated['id_permintaan'],
@@ -199,7 +205,7 @@ class CompileDistribusiController extends Controller
                 'id_gudang_asal' => $gudangAsal,
                 'id_gudang_tujuan' => $validated['id_gudang_tujuan'],
                 'id_pegawai_pengirim' => $validated['id_pegawai_pengirim'],
-                'status_distribusi' => 'DRAFT',
+                'status_distribusi' => 'DIKIRIM', // Langsung DIKIRIM setelah compile
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
 
@@ -217,6 +223,83 @@ class CompileDistribusiController extends Controller
 
                 // Update status draft menjadi COMPILED
                 $draft->update(['status' => 'COMPILED']);
+            }
+
+            // Update stock atau inventory_item berdasarkan jenis inventory
+            // Karena status langsung DIKIRIM, langsung update stock/inventory_item
+            foreach ($distribusi->detailDistribusi as $detail) {
+                $inventory = $detail->inventory;
+                
+                if ($inventory->jenis_inventory === 'ASET') {
+                    // ASET: Update id_gudang di inventory_item (TIDAK update DataStock)
+                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                        ->where('id_gudang', $distribusi->id_gudang_asal)
+                        ->where('status_item', 'AKTIF')
+                        ->limit((int)$detail->qty_distribusi)
+                        ->get();
+                    
+                    // Update id_gudang ke gudang tujuan
+                    foreach ($inventoryItems as $item) {
+                        $item->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
+                    }
+                } elseif (in_array($inventory->jenis_inventory, ['PERSEDIAAN', 'FARMASI'])) {
+                    // PERSEDIAAN/FARMASI: Update DataStock (TIDAK update InventoryItem)
+                    // Kurangi stock gudang asal
+                    $stockAsal = \App\Models\DataStock::where('id_data_barang', $inventory->id_data_barang)
+                        ->where('id_gudang', $distribusi->id_gudang_asal)
+                        ->first();
+                    
+                    if ($stockAsal) {
+                        $stockAsal->qty_keluar += $detail->qty_distribusi;
+                        $stockAsal->qty_akhir -= $detail->qty_distribusi;
+                        $stockAsal->last_updated = now();
+                        $stockAsal->save();
+                    }
+
+                    // Tambah stock gudang tujuan
+                    $stockTujuan = \App\Models\DataStock::firstOrNew([
+                        'id_data_barang' => $inventory->id_data_barang,
+                        'id_gudang' => $distribusi->id_gudang_tujuan,
+                    ]);
+
+                    if ($stockTujuan->exists) {
+                        $stockTujuan->qty_masuk += $detail->qty_distribusi;
+                        $stockTujuan->qty_akhir += $detail->qty_distribusi;
+                    } else {
+                        $stockTujuan->qty_awal = 0;
+                        $stockTujuan->qty_masuk = $detail->qty_distribusi;
+                        $stockTujuan->qty_keluar = 0;
+                        $stockTujuan->qty_akhir = $detail->qty_distribusi;
+                        $stockTujuan->id_satuan = $detail->id_satuan;
+                    }
+
+                    $stockTujuan->last_updated = now();
+                    $stockTujuan->save();
+                    
+                    // Untuk PERSEDIAAN/FARMASI: Update atau pindahkan inventory
+                    // Jika qty_distribusi sama dengan atau lebih besar dari qty_input, pindahkan seluruh inventory
+                    // Jika tidak, buat inventory baru di gudang tujuan
+                    if ($detail->qty_distribusi >= $inventory->qty_input) {
+                        // Pindahkan seluruh inventory ke gudang tujuan
+                        $inventory->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
+                    } else {
+                        // Buat inventory baru di gudang tujuan dengan qty yang didistribusikan
+                        $newInventory = $inventory->replicate();
+                        $newInventory->id_gudang = $distribusi->id_gudang_tujuan;
+                        $newInventory->qty_input = $detail->qty_distribusi;
+                        $newInventory->total_harga = $detail->qty_distribusi * $inventory->harga_satuan;
+                        $newInventory->status_inventory = 'AKTIF';
+                        $newInventory->save();
+
+                        // Kurangi qty di inventory asal
+                        $inventory->qty_input -= $detail->qty_distribusi;
+                        $inventory->total_harga = $inventory->qty_input * $inventory->harga_satuan;
+                        if ($inventory->qty_input <= 0) {
+                            $inventory->status_inventory = 'HABIS';
+                        }
+                        $inventory->save();
+                    }
+                }
             }
 
             DB::commit();

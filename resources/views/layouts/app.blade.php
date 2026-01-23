@@ -29,57 +29,34 @@
                 <!-- Navigation -->
                 <nav class="flex-1 overflow-y-auto p-4">
                     @php
-                        // Pastikan user roles ter-load
+                        use App\Helpers\PermissionHelper;
+                        
+                        // Pastikan user roles ter-load dengan permissions
                         $currentUser = auth()->user();
-                        if ($currentUser && !$currentUser->relationLoaded('roles')) {
-                            $currentUser->load('roles');
+                        if ($currentUser) {
+                            // Load roles dengan permissions untuk memastikan permission ter-load
+                            if (!$currentUser->relationLoaded('roles')) {
+                                $currentUser->load('roles');
+                            }
+                            // Pastikan permissions ter-load untuk setiap role
+                            foreach ($currentUser->roles as $role) {
+                                if (!$role->relationLoaded('permissions')) {
+                                    $role->load('permissions');
+                                }
+                            }
                         }
                         
-                        // Check permissions untuk semua menu
-                        $canAccessMasterManajemen = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('admin_gudang')
-                        );
-                        $canAccessMasterData = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('admin_gudang')
-                        );
-                        $canAccessInventory = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('admin_gudang') ||
-                            $currentUser->hasRole('admin_gudang_aset') ||
-                            $currentUser->hasRole('admin_gudang_persediaan') ||
-                            $currentUser->hasRole('admin_gudang_farmasi') ||
-                            $currentUser->hasRole('kasubbag_tu') ||
-                            $currentUser->hasRole('kepala_unit') ||
-                            $currentUser->hasRole('pegawai')
-                        );
-                        $canAccessTransaksi = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('pegawai') ||
-                            $currentUser->hasRole('kepala_unit') ||
-                            $currentUser->hasRole('kasubbag_tu') ||
-                            $currentUser->hasRole('kepala_pusat') ||
-                            $currentUser->hasRole('admin_gudang') ||
-                            $currentUser->hasRole('admin_gudang_aset') ||
-                            $currentUser->hasRole('admin_gudang_persediaan') ||
-                            $currentUser->hasRole('admin_gudang_farmasi') ||
-                            $currentUser->hasRole('perencanaan') ||
-                            $currentUser->hasRole('pengadaan') ||
-                            $currentUser->hasRole('keuangan')
-                        );
-                        $canAccessAsset = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('admin_gudang') ||
-                            $currentUser->hasRole('kepala_unit') ||
-                            $currentUser->hasRole('pegawai')
-                        );
-                        $canAccessReports = auth()->check() && (
-                            $currentUser->hasRole('admin') || 
-                            $currentUser->hasRole('kepala_pusat') ||
-                            $currentUser->hasRole('admin_gudang') ||
-                            $currentUser->hasRole('kasubbag_tu')
-                        );
+                        // Get accessible menus untuk semua menu dan submenu
+                        $accessibleMenus = auth()->check() ? PermissionHelper::getAccessibleMenus($currentUser) : [];
+                        
+                        // Check permissions untuk menu utama berdasarkan accessibleMenus
+                        $canAccessMasterManajemen = isset($accessibleMenus['master-manajemen']);
+                        $canAccessMasterData = isset($accessibleMenus['master-data']);
+                        $canAccessInventory = isset($accessibleMenus['inventory']);
+                        $canAccessTransaksi = isset($accessibleMenus['transaksi']);
+        $canAccessAsset = isset($accessibleMenus['aset-kir']);
+        $canAccessMaintenance = isset($accessibleMenus['maintenance']);
+        $canAccessReports = isset($accessibleMenus['laporan']);
                     @endphp
                     <ul class="space-y-2">
                         <li>
@@ -148,13 +125,10 @@
                                 </svg>
                             </div>
                             <ul id="inventory-submenu" class="hidden pl-4 mt-2 space-y-1">
-                                @php
-                                    $user = $currentUser ?? auth()->user();
-                                @endphp
-                                @if($user->hasRole('admin') || $user->hasRole('admin_gudang') || $user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi') || $user->hasRole('kasubbag_tu') || $user->hasRole('kepala_unit') || $user->hasRole('pegawai'))
+                                @if(isset($accessibleMenus['inventory']['submenus']['data-stock']))
                                 <li><a href="{{ route('inventory.data-stock.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Data Stock</a></li>
                                 @endif
-                                @if($user->hasRole('admin') || $user->hasRole('admin_gudang') || $user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi') || $user->hasRole('kasubbag_tu') || $user->hasRole('kepala_unit') || $user->hasRole('pegawai'))
+                                @if(isset($accessibleMenus['inventory']['submenus']['data-inventory']))
                                 <li><a href="{{ route('inventory.data-inventory.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Data Inventory</a></li>
                                 @endif
                             </ul>
@@ -172,26 +146,26 @@
                                 </svg>
                             </div>
                            <ul id="transaksi-submenu" class="hidden pl-4 mt-2 space-y-1">
-                               @php
-                                   $user = $currentUser ?? auth()->user();
-                               @endphp
-                               @if($user->hasRole('admin') || $user->hasRole('pegawai') || $user->hasRole('kepala_unit') || $user->hasRole('kasubbag_tu') || $user->hasRole('kepala_pusat'))
+                               @if(isset($accessibleMenus['transaksi']['submenus']['permintaan-barang']))
                                <li><a href="{{ route('transaction.permintaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Barang</a></li>
                                @endif
-                               @if($user->hasRole('admin') || $user->hasRole('kepala_unit') || $user->hasRole('kasubbag_tu') || $user->hasRole('kepala_pusat') || $user->hasRole('admin_gudang') || $user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi') || $user->hasRole('perencanaan') || $user->hasRole('pengadaan') || $user->hasRole('keuangan'))
+                               @if(isset($accessibleMenus['transaksi']['submenus']['approval']))
                                <li><a href="{{ route('transaction.approval.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Persetujuan</a></li>
                                @endif
-                               @if($user->hasRole('admin') || $user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi'))
+                               @if(PermissionHelper::canAccess($currentUser, 'transaction.draft-distribusi.index'))
                                <li><a href="{{ route('transaction.draft-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Proses Disposisi</a></li>
                                @endif
-                               @if($user->hasRole('admin') || $user->hasRole('admin_gudang'))
+                               @if(PermissionHelper::canAccess($currentUser, 'transaction.compile-distribusi.index'))
                                <li><a href="{{ route('transaction.compile-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Compile SBBK</a></li>
                                @endif
-                               @if($user->hasRole('admin') || $user->hasRole('admin_gudang') || $user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi'))
+                               @if(isset($accessibleMenus['transaksi']['submenus']['distribusi']))
                                <li><a href="{{ route('transaction.distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Distribusi (SBBK)</a></li>
                                @endif
-                               @if($user->hasRole('admin') || $user->hasRole('admin_gudang') || $user->hasRole('pegawai') || $user->hasRole('kepala_unit'))
+                               @if(isset($accessibleMenus['transaksi']['submenus']['penerimaan-barang']))
                                <li><a href="{{ route('transaction.penerimaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Penerimaan Barang</a></li>
+                               @endif
+                               @if(isset($accessibleMenus['transaksi']['submenus']['retur']))
+                               <li><a href="{{ route('transaction.retur-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Retur Barang</a></li>
                                @endif
                            </ul>
                         </li>
@@ -206,6 +180,34 @@
                             </a>
                         </li>
                         @endif
+                        @if($canAccessMaintenance)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('maintenance')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                Pemeliharaan
+                                <svg id="maintenance-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="maintenance-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['maintenance']['submenus']['permintaan-pemeliharaan']))
+                                <li><a href="{{ route('maintenance.permintaan-pemeliharaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Pemeliharaan</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['maintenance']['submenus']['jadwal-maintenance']))
+                                <li><a href="{{ route('maintenance.jadwal-maintenance.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Jadwal Maintenance</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['maintenance']['submenus']['kalibrasi-aset']))
+                                <li><a href="{{ route('maintenance.kalibrasi-aset.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Kalibrasi Aset</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['maintenance']['submenus']['service-report']))
+                                <li><a href="{{ route('maintenance.service-report.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Service Report</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
                         @if($canAccessReports)
                         <li>
                             <a href="{{ route('reports.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800">
@@ -216,12 +218,7 @@
                             </a>
                         </li>
                         @endif
-                        @if(auth()->check())
-                            @php
-                                $currentUser = auth()->user();
-                                $hasAdminRole = $currentUser && method_exists($currentUser, 'hasRole') && $currentUser->hasRole('admin');
-                            @endphp
-                            @if($hasAdminRole)
+                        @if(auth()->check() && PermissionHelper::canAccess($currentUser, 'admin.*'))
                             <li>
                                 <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('admin')">
                                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +235,6 @@
                                     <li><a href="{{ route('admin.users.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Manajemen User</a></li>
                                 </ul>
                             </li>
-                            @endif
                         @endif
                     </ul>
                 </nav>

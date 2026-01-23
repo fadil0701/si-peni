@@ -54,4 +54,14 @@ class MasterGudang extends Model
     {
         return $this->hasMany(TransaksiDistribusi::class, 'id_gudang_tujuan', 'id_gudang');
     }
+
+    public function returAsal(): HasMany
+    {
+        return $this->hasMany(ReturBarang::class, 'id_gudang_asal', 'id_gudang');
+    }
+
+    public function returTujuan(): HasMany
+    {
+        return $this->hasMany(ReturBarang::class, 'id_gudang_tujuan', 'id_gudang');
+    }
 }

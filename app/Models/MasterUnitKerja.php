@@ -37,4 +37,19 @@ class MasterUnitKerja extends Model
     {
         return $this->hasMany(PermintaanBarang::class, 'id_unit_kerja', 'id_unit_kerja');
     }
+
+    public function penerimaanBarang(): HasMany
+    {
+        return $this->hasMany(PenerimaanBarang::class, 'id_unit_kerja', 'id_unit_kerja');
+    }
+
+    public function returBarang(): HasMany
+    {
+        return $this->hasMany(ReturBarang::class, 'id_unit_kerja', 'id_unit_kerja');
+    }
+
+    public function registerAsets(): HasMany
+    {
+        return $this->hasMany(RegisterAset::class, 'id_unit_kerja', 'id_unit_kerja');
+    }
 }

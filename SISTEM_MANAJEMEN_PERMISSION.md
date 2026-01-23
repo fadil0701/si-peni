@@ -222,3 +222,7 @@ php artisan db:seed --class=PermissionSeeder
 
 **Sistem sekarang mendukung manajemen permission secara dinamis melalui UI!**
 
+
+
+
+

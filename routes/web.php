@@ -24,6 +24,7 @@ use App\Http\Controllers\Inventory\DataInventoryController;
 use App\Http\Controllers\Transaction\DistribusiController;
 use App\Http\Controllers\Transaction\PermintaanBarangController;
 use App\Http\Controllers\Transaction\PenerimaanBarangController;
+use App\Http\Controllers\Transaction\ReturBarangController;
 use App\Http\Controllers\Asset\RegisterAsetController;
 use App\Http\Controllers\Planning\RkuController;
 use App\Http\Controllers\Procurement\PaketPengadaanController;
@@ -127,10 +128,10 @@ Route::middleware(['auth'])->group(function () {
         });
         
         // Draft Distribusi - Admin Gudang Kategori memproses disposisi
-        Route::prefix('draft-distribusi')->name('draft-distribusi.')->middleware(['role:admin,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi'])->group(function () {
+        Route::prefix('draft-distribusi')->name('draft-distribusi.')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,kepala_unit,kepala_pusat,kasubbag_tu'])->group(function () {
             Route::get('/', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'index'])->name('index');
-            Route::get('/create/{approvalLogId}', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'create'])->name('create');
-            Route::post('/', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'store'])->name('store');
+            Route::get('/create/{approvalLogId}', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'create'])->name('create')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
+            Route::post('/', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'store'])->name('store')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
             Route::get('/{id}', [\App\Http\Controllers\Transaction\DraftDistribusiController::class, 'show'])->name('show');
         });
         
@@ -141,9 +142,9 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [\App\Http\Controllers\Transaction\CompileDistribusiController::class, 'store'])->name('store');
         });
         
-        // Distribusi - Admin Gudang & Admin (termasuk admin gudang kategori)
-        Route::resource('distribusi', DistribusiController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
-        Route::post('distribusi/{id}/kirim', [DistribusiController::class, 'kirim'])->name('distribusi.kirim')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi']);
+        // Distribusi - Hanya untuk monitoring (read-only), SBBK dibuat melalui Compile Distribusi
+        Route::get('distribusi', [DistribusiController::class, 'index'])->name('distribusi.index')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,kepala_unit,kepala_pusat,kasubbag_tu']);
+        Route::get('distribusi/{id}', [DistribusiController::class, 'show'])->name('distribusi.show')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,kepala_unit,kepala_pusat,kasubbag_tu']);
         Route::get('distribusi/api/gudang-tujuan/{permintaanId}', [DistribusiController::class, 'getGudangTujuanByPermintaan'])->name('distribusi.api.gudang-tujuan');
         
         // Penerimaan - Admin Gudang (semua kategori), Pegawai, Kepala Unit, Admin
@@ -151,17 +152,30 @@ Route::middleware(['auth'])->group(function () {
         
         // Retur Barang - Admin Gudang (semua kategori), Pegawai, Kepala Unit, Admin
         // Route untuk return barang dari gudang unit ke gudang pusat
-        Route::prefix('retur')->name('retur.')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit'])->group(function () {
-            Route::get('/', function () {
-                return view('transaction.retur.index');
-            })->name('index');
-            // TODO: Implement retur controller
-        });
+        Route::resource('retur-barang', ReturBarangController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
+        Route::get('retur-barang/penerimaan/{id}/detail', [ReturBarangController::class, 'getPenerimaanDetail'])->name('retur-barang.penerimaan.detail')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
     });
     
     // Asset & KIR - Admin, Admin Gudang, Kepala Unit, Pegawai (untuk unit mereka sendiri)
     Route::prefix('asset')->name('asset.')->middleware(['role:admin,admin_gudang,kepala_unit,pegawai'])->group(function () {
         Route::resource('register-aset', RegisterAsetController::class);
+        Route::get('register-aset/unit-kerja/{unit_kerja}', [RegisterAsetController::class, 'showUnitKerja'])->name('register-aset.unit-kerja.show');
+    });
+    
+    // Maintenance & Pemeliharaan - Admin, Admin Gudang, Kepala Unit, Pegawai
+    Route::prefix('maintenance')->name('maintenance.')->middleware(['role:admin,admin_gudang,kepala_unit,pegawai'])->group(function () {
+        // Permintaan Pemeliharaan
+        Route::resource('permintaan-pemeliharaan', \App\Http\Controllers\Maintenance\PermintaanPemeliharaanController::class);
+        Route::post('permintaan-pemeliharaan/{id}/ajukan', [\App\Http\Controllers\Maintenance\PermintaanPemeliharaanController::class, 'ajukan'])->name('permintaan-pemeliharaan.ajukan');
+        
+        // Jadwal Maintenance
+        Route::resource('jadwal-maintenance', \App\Http\Controllers\Maintenance\JadwalMaintenanceController::class);
+        
+        // Kalibrasi Aset
+        Route::resource('kalibrasi-aset', \App\Http\Controllers\Maintenance\KalibrasiAsetController::class);
+        
+        // Service Report
+        Route::resource('service-report', \App\Http\Controllers\Maintenance\ServiceReportController::class);
     });
     
     // Planning - Admin only

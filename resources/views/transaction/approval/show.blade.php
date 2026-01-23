@@ -10,6 +10,57 @@
     </a>
 </div>
 
+{{-- Alert Messages --}}
+@if(session('success'))
+    <div class="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if(session('error'))
+    <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if($errors->any())
+    <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm font-medium text-red-800">Terjadi kesalahan:</p>
+                <ul class="mt-2 text-sm text-red-700 list-disc list-inside">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    </div>
+@endif
+
 @if($permintaan)
     <!-- Detail Permintaan -->
     <div class="bg-white shadow-sm rounded-lg border border-gray-200 mb-6">
@@ -188,9 +239,27 @@
         <p class="text-sm text-gray-600 mt-1">
             Step: <span class="font-semibold">{{ $currentFlow->nama_step ?? 'N/A' }}</span> | 
             Status: 
-            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $approval->status == 'MENUNGGU' ? 'bg-yellow-100 text-yellow-800' : ($approval->status == 'DISETUJUI' ? 'bg-green-100 text-green-800' : ($approval->status == 'DITOLAK' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800')) }}">
-                {{ $approval->status }}
+            @php
+                $statusToShow = $displayStatus ?? $approval->status;
+                $statusColor = match($statusToShow) {
+                    'MENUNGGU' => 'bg-yellow-100 text-yellow-800',
+                    'DIKETAHUI' => 'bg-blue-100 text-blue-800',
+                    'DIVERIFIKASI' => 'bg-purple-100 text-purple-800',
+                    'DISETUJUI' => 'bg-green-100 text-green-800',
+                    'DITOLAK' => 'bg-red-100 text-red-800',
+                    'DIDISPOSISIKAN' => 'bg-indigo-100 text-indigo-800',
+                    'DIPROSES' => 'bg-blue-100 text-blue-800',
+                    default => 'bg-gray-100 text-gray-800',
+                };
+            @endphp
+            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $statusColor }}">
+                {{ $statusToShow }}
             </span>
+            @if($rejectedApproval && $rejectedApproval->id != $approval->id)
+                <span class="ml-2 text-xs text-red-600">
+                    (Ditolak di step: {{ $rejectedApproval->approvalFlow->nama_step ?? 'Step ' . $rejectedApproval->approvalFlow->step_order }})
+                </span>
+            @endif
         </p>
     </div>
     
@@ -199,26 +268,11 @@
             @php
                 $user = auth()->user();
                 $stepOrder = $currentFlow->step_order ?? 0;
-                
-                // Cek apakah step sebelumnya sudah diverifikasi (untuk kepala_pusat)
-                $previousStepVerified = true;
-                if ($stepOrder == 4) {
-                    // Untuk step 4 (kepala_pusat), cek apakah step 3 (kasubbag_tu) sudah diverifikasi
-                    $step3Flow = \App\Models\ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
-                        ->where('step_order', 3)
-                        ->first();
-                    if ($step3Flow) {
-                        $step3Log = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
-                            ->where('id_referensi', $approval->id_referensi)
-                            ->where('id_approval_flow', $step3Flow->id)
-                            ->first();
-                        $previousStepVerified = $step3Log && $step3Log->status === 'DIVERIFIKASI';
-                    }
-                }
+                // $previousStepVerified sudah dihitung di controller dan dikirim ke view
             @endphp
             
             {{-- Kepala Unit - Mengetahui (Step 2) --}}
-            @if($stepOrder == 2 && ($user->hasRole('kepala_unit') || $user->hasRole('admin')))
+            @if($stepOrder == 2 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.mengetahui'))
                 <form method="POST" action="{{ route('transaction.approval.mengetahui', $approval->id) }}" class="space-y-4">
                     @csrf
                     <div>
@@ -243,7 +297,7 @@
                 </form>
             
             {{-- Kasubbag TU - Verifikasi/Kembalikan (Step 3) --}}
-            @elseif($stepOrder == 3 && ($user->hasRole('kasubbag_tu') || $user->hasRole('admin')))
+            @elseif($stepOrder == 3 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.verifikasi'))
                 <div class="space-y-4">
                     <form method="POST" action="{{ route('transaction.approval.verifikasi', $approval->id) }}" class="mb-4">
                         @csrf
@@ -301,14 +355,26 @@
                 </div>
             
             {{-- Kepala Pusat - Approve/Reject (Step 4) --}}
-            @elseif($stepOrder == 4 && ($user->hasRole('kepala_pusat') || $user->hasRole('admin')))
-                @if(!$previousStepVerified)
-                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+            @elseif($stepOrder == 4 && ($user->hasRole('admin') || $user->hasRole('kepala_pusat')))
+                @php
+                    $isAdmin = $user->hasRole('admin');
+                    $isKepalaPusat = $user->hasRole('kepala_pusat');
+                    // Untuk admin, selalu bisa approve meski step sebelumnya belum diverifikasi
+                    // Untuk kepala_pusat, harus menunggu step sebelumnya diverifikasi
+                    $showWarning = !$previousStepVerified && !$isAdmin;
+                    $showButtons = $isAdmin || $previousStepVerified;
+                @endphp
+                
+                @if($showWarning)
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
                         <p class="text-sm text-yellow-700">
                             <strong>Perhatian:</strong> Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum dapat disetujui atau ditolak.
                         </p>
                     </div>
-                @else
+                @endif
+                
+                {{-- Tombol approve/tolak selalu muncul untuk admin, atau untuk kepala_pusat jika previousStepVerified = true --}}
+                @if($showButtons)
                 <div class="space-y-4">
                     <form method="POST" action="{{ route('transaction.approval.approve', $approval->id) }}" class="mb-4">
                         @csrf
@@ -414,6 +480,61 @@
                     </div>
                 </div>
             </div>
+            
+            {{-- Tombol Disposisi - Muncul setelah approval disetujui oleh kepala pusat --}}
+            @php
+                $user = auth()->user();
+                
+                // Cek apakah approval sudah disetujui oleh kepala pusat (step 4)
+                $kepalaPusatApproval = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                    ->where('id_referensi', $approval->id_referensi)
+                    ->whereHas('approvalFlow', function($q) {
+                        $q->where('step_order', 4);
+                    })
+                    ->where('status', 'DISETUJUI')
+                    ->first();
+                
+                // Cek apakah sudah didisposisikan
+                $sudahDidisposisikan = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                    ->where('id_referensi', $approval->id_referensi)
+                    ->where('status', 'DIDISPOSISIKAN')
+                    ->exists();
+                
+                // Cek permission untuk disposisi
+                // Admin dan admin_gudang bisa melakukan disposisi
+                $canDisposisi = ($user->hasRole('admin') || $user->hasRole('admin_gudang')) ||
+                                \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.disposisi');
+            @endphp
+            
+            @if($kepalaPusatApproval && !$sudahDidisposisikan && $canDisposisi)
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Disposisi ke Admin Gudang Kategori</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Permintaan telah disetujui oleh Kepala Pusat. Silakan lakukan disposisi ke Admin Gudang sesuai kategori barang.
+                    </p>
+                    <form method="POST" action="{{ route('transaction.approval.disposisi', $approval->id) }}">
+                        @csrf
+                        <button 
+                            type="submit" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            onclick="return confirm('Apakah Anda yakin ingin melakukan disposisi permintaan ini?');"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                            Lakukan Disposisi
+                        </button>
+                    </form>
+                </div>
+            @elseif($sudahDidisposisikan)
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                        <p class="text-sm text-blue-700">
+                            <strong>Status:</strong> Permintaan telah didisposisikan ke Admin Gudang Kategori. Silakan lanjutkan ke menu "Proses Disposisi" untuk memproses lebih lanjut.
+                        </p>
+                    </div>
+                </div>
+            @endif
         @endif
     </div>
 </div>

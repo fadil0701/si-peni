@@ -30,24 +30,37 @@ class PermissionHelper
             // 2. PEGAWAI (PEMOHON) / ADMIN UNIT
             'pegawai' => [
                 'user.dashboard',
-                'user.assets.*',
-                'user.requests.*',
+                'user.assets.index',
+                'user.assets.show',
+                'user.requests.index',
+                'user.requests.show',
+                'user.requests.create',
+                'user.requests.store',
                 'transaction.permintaan-barang.create',
                 'transaction.permintaan-barang.store',
                 'transaction.permintaan-barang.index',
                 'transaction.permintaan-barang.show',
                 'transaction.permintaan-barang.edit',
-                'transaction.penerimaan-barang.*',
+                'transaction.penerimaan-barang.index',
+                'transaction.penerimaan-barang.show',
+                'transaction.penerimaan-barang.create',
+                'transaction.penerimaan-barang.store',
+                // Tidak termasuk edit, update, destroy, delete - harus di-checklist secara eksplisit
                 // Akses inventory untuk gudang unit
                 'inventory.data-stock.index', // Hanya untuk gudang unit
                 'inventory.data-inventory.index', // Hanya untuk gudang unit
                 'inventory.data-inventory.show', // Hanya untuk gudang unit
-                'transaction.retur.*', // Return ke gudang pusat
+                'transaction.retur-barang.index',
+                'transaction.retur-barang.show',
+                'transaction.retur-barang.create',
+                'transaction.retur-barang.store',
+                // Tidak termasuk edit, update, destroy, delete - harus di-checklist secara eksplisit
                 // Akses Aset & KIR untuk unit kerja mereka sendiri
                 'asset.register-aset.index', // View register aset unit mereka
                 'asset.register-aset.show', // View detail register aset unit mereka
                 'asset.register-aset.edit', // Update register aset unit mereka
                 'asset.register-aset.update', // Update register aset unit mereka
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
             ],
             
             // 3. KEPALA UNIT
@@ -61,13 +74,22 @@ class PermissionHelper
                 'inventory.data-stock.index', // Hanya untuk gudang unit
                 'inventory.data-inventory.index', // Hanya untuk gudang unit
                 'inventory.data-inventory.show', // Hanya untuk gudang unit
-                'transaction.penerimaan-barang.*',
-                'transaction.retur.*', // Return ke gudang pusat
+                'transaction.penerimaan-barang.index',
+                'transaction.penerimaan-barang.show',
+                'transaction.penerimaan-barang.create',
+                'transaction.penerimaan-barang.store',
+                // Tidak termasuk edit, update, destroy, delete - harus di-checklist secara eksplisit
+                'transaction.retur-barang.index',
+                'transaction.retur-barang.show',
+                'transaction.retur-barang.create',
+                'transaction.retur-barang.store',
+                // Tidak termasuk edit, update, destroy, delete - harus di-checklist secara eksplisit
                 // Akses Aset & KIR untuk unit kerja mereka sendiri
                 'asset.register-aset.index', // View register aset unit mereka
                 'asset.register-aset.show', // View detail register aset unit mereka
                 'asset.register-aset.edit', // Update register aset unit mereka
                 'asset.register-aset.update', // Update register aset unit mereka
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
             ],
             
             // 4. KASUBBAG TU (verifikasi)
@@ -79,7 +101,9 @@ class PermissionHelper
                 'transaction.approval.verifikasi', // Action khusus untuk verifikasi
                 'transaction.approval.kembalikan', // Bisa mengembalikan jika tidak lengkap
                 // Akses untuk monitoring dan laporan
-                'reports.*', // Bisa melihat semua laporan
+                'reports.index',
+                'reports.show',
+                // Tidak termasuk create, store, edit, update, destroy, delete - harus di-checklist secara eksplisit
                 // Akses untuk data inventory dan stock
                 'inventory.data-stock.index', // Bisa melihat data stock
                 'inventory.data-stock.show', // Bisa melihat detail stock
@@ -91,23 +115,62 @@ class PermissionHelper
             'kepala_pusat' => [
                 'transaction.permintaan-barang.index',
                 'transaction.permintaan-barang.show',
-                'transaction.approval.*',
-                'reports.*',
+                'transaction.approval.index',
+                'transaction.approval.show',
+                'transaction.approval.approve',
+                'transaction.approval.reject',
+                'transaction.approval.mengetahui',
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
+                'reports.index',
+                'reports.show',
+                // Tidak termasuk create, store, edit, update, destroy, delete - harus di-checklist secara eksplisit
             ],
             
             // 6. ADMIN GUDANG / PENGURUS BARANG
             'admin_gudang' => [
-                'inventory.*',
-                'transaction.distribusi.*',
-                'transaction.penerimaan-barang.*',
+                'inventory.data-stock.index',
+                'inventory.data-stock.show',
+                'inventory.data-stock.create',
+                'inventory.data-stock.store',
+                'inventory.data-stock.edit',
+                'inventory.data-stock.update',
+                'inventory.data-inventory.index',
+                'inventory.data-inventory.show',
+                'inventory.data-inventory.create',
+                'inventory.data-inventory.store',
+                'inventory.data-inventory.edit',
+                'inventory.data-inventory.update',
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
+                'transaction.distribusi.index',
+                'transaction.distribusi.show',
+                // Tidak termasuk create, store, edit, update, destroy, delete - harus di-checklist secara eksplisit
+                'transaction.penerimaan-barang.index',
+                'transaction.penerimaan-barang.show',
+                'transaction.penerimaan-barang.create',
+                'transaction.penerimaan-barang.store',
+                'transaction.penerimaan-barang.edit',
+                'transaction.penerimaan-barang.update',
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
                 'transaction.approval.index',
                 'transaction.approval.show',
                 'transaction.approval.disposisi', // Bisa melihat disposisi
-                'asset.register-aset.*',
+                'asset.register-aset.index',
+                'asset.register-aset.show',
+                'asset.register-aset.create',
+                'asset.register-aset.store',
+                'asset.register-aset.edit',
+                'asset.register-aset.update',
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
                 'reports.stock-gudang',
                 'master.gudang.index',
                 'master.gudang.show',
-                'master-data.data-barang.*',
+                'master-data.data-barang.index',
+                'master-data.data-barang.show',
+                'master-data.data-barang.create',
+                'master-data.data-barang.store',
+                'master-data.data-barang.edit',
+                'master-data.data-barang.update',
+                // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
             ],
             
             // 7. UNIT TERKAIT
@@ -132,6 +195,8 @@ class PermissionHelper
     /**
      * Check if user can access a route
      * Priority: Database permissions > Static permissions
+     * Mendukung wildcard permission dan mapping sederhana
+     * Mapping: create -> store, edit -> update
      */
     public static function canAccess(User $user, string $permission): bool
     {
@@ -145,7 +210,69 @@ class PermissionHelper
             return true;
         }
 
+        // Mapping permission yang disederhanakan
+        // store -> create, update -> edit, destroy -> delete
+        $parts = explode('.', $permission);
+        $action = count($parts) > 1 ? end($parts) : null;
+        $resourceName = count($parts) > 1 ? implode('.', array_slice($parts, 0, -1)) : null;
+        
+        if (count($parts) > 1) {
+            
+            // Jika permission adalah 'store', cek apakah user punya 'create'
+            if ($action === 'store') {
+                $createPermission = $resourceName . '.create';
+                if ($user->hasPermission($createPermission)) {
+                    return true;
+                }
+            }
+            
+            // Jika permission adalah 'update', cek apakah user punya 'edit'
+            if ($action === 'update') {
+                $editPermission = $resourceName . '.edit';
+                if ($user->hasPermission($editPermission)) {
+                    return true;
+                }
+            }
+            
+            // Jika permission adalah 'destroy', cek apakah user punya 'delete'
+            if ($action === 'destroy') {
+                $deletePermission = $resourceName . '.delete';
+                if ($user->hasPermission($deletePermission)) {
+                    return true;
+                }
+            }
+            
+            // Jika permission adalah 'delete', cek apakah user punya 'destroy'
+            if ($action === 'delete') {
+                $destroyPermission = $resourceName . '.destroy';
+                if ($user->hasPermission($destroyPermission)) {
+                    return true;
+                }
+            }
+        }
+
+        // Check wildcard permission di database
+        // Misalnya: jika user punya 'master-data.aset.*', maka bisa akses 'master-data.aset.create', 'master-data.aset.store', dll
+        // KECUALI untuk action sensitif seperti destroy dan delete - harus permission spesifik
+        $sensitiveActions = ['destroy', 'delete'];
+        $isSensitiveAction = $action && in_array($action, $sensitiveActions);
+        
+        if (count($parts) > 1 && !$isSensitiveAction) {
+            // Coba dengan wildcard untuk resource level
+            $resourceWildcard = implode('.', array_slice($parts, 0, -1)) . '.*';
+            if ($user->hasPermission($resourceWildcard)) {
+                return true;
+            }
+            
+            // Coba dengan wildcard untuk module level
+            $moduleWildcard = $parts[0] . '.*';
+            if ($user->hasPermission($moduleWildcard)) {
+                return true;
+            }
+        }
+
         // Fallback to static permissions (for backward compatibility)
+        // KECUALI untuk action sensitif seperti destroy dan delete - tidak boleh menggunakan wildcard
         $rolePermissions = self::getRolePermissions();
         $userRoles = $user->roles->pluck('name')->toArray();
 
@@ -163,7 +290,8 @@ class PermissionHelper
                 }
                 
                 // Wildcard match (e.g., 'inventory.*' matches 'inventory.data-stock.index')
-                if (str_ends_with($allowedPermission, '.*')) {
+                // TAPI tidak untuk action sensitif seperti destroy dan delete
+                if (str_ends_with($allowedPermission, '.*') && !$isSensitiveAction) {
                     $prefix = str_replace('.*', '', $allowedPermission);
                     if (str_starts_with($permission, $prefix . '.')) {
                         return true;
@@ -176,104 +304,153 @@ class PermissionHelper
     }
 
     /**
-     * Get accessible menu items for user
+     * Get accessible menu items for user based on permissions (not roles)
+     * Menu akan muncul jika user memiliki permission yang sesuai
+     * Menu juga difilter berdasarkan modules yang di-assign ke user
      */
     public static function getAccessibleMenus(User $user): array
     {
+        // Load user modules
+        if (!$user->relationLoaded('modules')) {
+            $user->load('modules');
+        }
+        
+        $userModules = $user->modules->pluck('name')->toArray();
+        
+        // Mapping route ke permission name
         $menus = [
-            'dashboard' => ['route' => 'user.dashboard', 'roles' => ['*']],
+            'dashboard' => [
+                'route' => 'user.dashboard', 
+                'permission' => 'user.dashboard' // Default permission untuk dashboard
+            ],
             'master-manajemen' => [
                 'route' => null,
-                'roles' => ['admin'],
+                'permission' => 'master-manajemen.*', // Menu muncul jika punya permission master-manajemen.*
                 'submenus' => [
-                    'master-pegawai' => ['route' => 'master-manajemen.master-pegawai.index', 'roles' => ['admin']],
-                    'master-jabatan' => ['route' => 'master-manajemen.master-jabatan.index', 'roles' => ['admin']],
-                    'unit-kerja' => ['route' => 'master.unit-kerja.index', 'roles' => ['admin']],
-                    'gudang' => ['route' => 'master.gudang.index', 'roles' => ['admin', 'admin_gudang']],
-                    'ruangan' => ['route' => 'master.ruangan.index', 'roles' => ['admin']],
-                    'program' => ['route' => 'master.program.index', 'roles' => ['admin']],
-                    'kegiatan' => ['route' => 'master.kegiatan.index', 'roles' => ['admin']],
-                    'sub-kegiatan' => ['route' => 'master.sub-kegiatan.index', 'roles' => ['admin']],
+                    'master-pegawai' => ['route' => 'master-manajemen.master-pegawai.index', 'permission' => 'master-manajemen.master-pegawai.index'],
+                    'master-jabatan' => ['route' => 'master-manajemen.master-jabatan.index', 'permission' => 'master-manajemen.master-jabatan.index'],
+                    'unit-kerja' => ['route' => 'master.unit-kerja.index', 'permission' => 'master.unit-kerja.index'],
+                    'gudang' => ['route' => 'master.gudang.index', 'permission' => 'master.gudang.index'],
+                    'ruangan' => ['route' => 'master.ruangan.index', 'permission' => 'master.ruangan.index'],
+                    'program' => ['route' => 'master.program.index', 'permission' => 'master.program.index'],
+                    'kegiatan' => ['route' => 'master.kegiatan.index', 'permission' => 'master.kegiatan.index'],
+                    'sub-kegiatan' => ['route' => 'master.sub-kegiatan.index', 'permission' => 'master.sub-kegiatan.index'],
                 ],
             ],
             'master-data' => [
                 'route' => null,
-                'roles' => ['admin', 'admin_gudang'],
+                'permission' => 'master-data.*',
                 'submenus' => [
-                    'aset' => ['route' => 'master-data.aset.index', 'roles' => ['admin']],
-                    'kode-barang' => ['route' => 'master-data.kode-barang.index', 'roles' => ['admin']],
-                    'kategori-barang' => ['route' => 'master-data.kategori-barang.index', 'roles' => ['admin']],
-                    'jenis-barang' => ['route' => 'master-data.jenis-barang.index', 'roles' => ['admin']],
-                    'subjenis-barang' => ['route' => 'master-data.subjenis-barang.index', 'roles' => ['admin']],
-                    'data-barang' => ['route' => 'master-data.data-barang.index', 'roles' => ['admin', 'admin_gudang']],
-                    'satuan' => ['route' => 'master-data.satuan.index', 'roles' => ['admin']],
-                    'sumber-anggaran' => ['route' => 'master-data.sumber-anggaran.index', 'roles' => ['admin']],
+                    'aset' => ['route' => 'master-data.aset.index', 'permission' => 'master-data.aset.index'],
+                    'kode-barang' => ['route' => 'master-data.kode-barang.index', 'permission' => 'master-data.kode-barang.index'],
+                    'kategori-barang' => ['route' => 'master-data.kategori-barang.index', 'permission' => 'master-data.kategori-barang.index'],
+                    'jenis-barang' => ['route' => 'master-data.jenis-barang.index', 'permission' => 'master-data.jenis-barang.index'],
+                    'subjenis-barang' => ['route' => 'master-data.subjenis-barang.index', 'permission' => 'master-data.subjenis-barang.index'],
+                    'data-barang' => ['route' => 'master-data.data-barang.index', 'permission' => 'master-data.data-barang.index'],
+                    'satuan' => ['route' => 'master-data.satuan.index', 'permission' => 'master-data.satuan.index'],
+                    'sumber-anggaran' => ['route' => 'master-data.sumber-anggaran.index', 'permission' => 'master-data.sumber-anggaran.index'],
                 ],
             ],
             'inventory' => [
                 'route' => null,
-                'roles' => ['admin', 'admin_gudang', 'kepala_unit', 'pegawai', 'kasubbag_tu'],
+                'permission' => 'inventory.*', // Menu muncul jika punya permission inventory.* atau salah satu submenu
                 'submenus' => [
-                    'data-stock' => ['route' => 'inventory.data-stock.index', 'roles' => ['admin', 'admin_gudang', 'kepala_unit', 'pegawai', 'kasubbag_tu']],
-                    'data-inventory' => ['route' => 'inventory.data-inventory.index', 'roles' => ['admin', 'admin_gudang', 'kepala_unit', 'pegawai', 'kasubbag_tu']],
+                    'data-stock' => ['route' => 'inventory.data-stock.index', 'permission' => 'inventory.data-stock.index'],
+                    'data-inventory' => ['route' => 'inventory.data-inventory.index', 'permission' => 'inventory.data-inventory.index'],
                 ],
             ],
             'transaksi' => [
                 'route' => null,
-                'roles' => ['admin', 'admin_gudang', 'admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi', 'kepala_pusat', 'kasubbag_tu', 'kepala_unit', 'pegawai', 'perencanaan', 'pengadaan', 'keuangan'],
+                'permission' => 'transaction.*',
                 'submenus' => [
-                    'permintaan-barang' => ['route' => 'transaction.permintaan-barang.index', 'roles' => ['admin', 'pegawai', 'kepala_unit', 'kasubbag_tu', 'kepala_pusat']],
-                    'approval' => ['route' => 'transaction.approval.index', 'roles' => ['admin', 'kepala_unit', 'kasubbag_tu', 'kepala_pusat', 'admin_gudang', 'admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi', 'perencanaan', 'pengadaan', 'keuangan']],
-                    'distribusi' => ['route' => 'transaction.distribusi.index', 'roles' => ['admin', 'admin_gudang', 'admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi']],
-                    'penerimaan-barang' => ['route' => 'transaction.penerimaan-barang.index', 'roles' => ['admin', 'admin_gudang', 'admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi', 'pegawai', 'kepala_unit']],
-                    'retur' => ['route' => 'transaction.retur.index', 'roles' => ['admin', 'admin_gudang', 'admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi', 'pegawai', 'kepala_unit']],
+                    'permintaan-barang' => ['route' => 'transaction.permintaan-barang.index', 'permission' => 'transaction.permintaan-barang.index'],
+                    'approval' => ['route' => 'transaction.approval.index', 'permission' => 'transaction.approval.index'],
+                    'distribusi' => ['route' => 'transaction.distribusi.index', 'permission' => 'transaction.distribusi.index'],
+                    'penerimaan-barang' => ['route' => 'transaction.penerimaan-barang.index', 'permission' => 'transaction.penerimaan-barang.index'],
+                    'retur' => ['route' => 'transaction.retur-barang.index', 'permission' => 'transaction.retur-barang.index'],
                 ],
             ],
-            'aset-kir' => ['route' => 'asset.register-aset.index', 'roles' => ['admin', 'admin_gudang', 'kepala_unit', 'pegawai']],
-            'laporan' => ['route' => 'reports.index', 'roles' => ['admin', 'kepala_pusat', 'admin_gudang', 'kasubbag_tu']],
+            'aset-kir' => [
+                'route' => 'asset.register-aset.index', 
+                'permission' => 'asset.register-aset.index'
+            ],
+            'maintenance' => [
+                'route' => null,
+                'permission' => 'maintenance.*',
+                'submenus' => [
+                    'permintaan-pemeliharaan' => ['route' => 'maintenance.permintaan-pemeliharaan.index', 'permission' => 'maintenance.permintaan-pemeliharaan.index'],
+                    'jadwal-maintenance' => ['route' => 'maintenance.jadwal-maintenance.index', 'permission' => 'maintenance.jadwal-maintenance.index'],
+                    'kalibrasi-aset' => ['route' => 'maintenance.kalibrasi-aset.index', 'permission' => 'maintenance.kalibrasi-aset.index'],
+                    'service-report' => ['route' => 'maintenance.service-report.index', 'permission' => 'maintenance.service-report.index'],
+                ],
+            ],
+            'laporan' => [
+                'route' => 'reports.index', 
+                'permission' => 'reports.index'
+            ],
             'admin' => [
                 'route' => null,
-                'roles' => ['admin'],
+                'permission' => 'admin.*',
                 'submenus' => [
-                    'roles' => ['route' => 'admin.roles.index', 'roles' => ['admin']],
-                    'users' => ['route' => 'admin.users.index', 'roles' => ['admin']],
+                    'roles' => ['route' => 'admin.roles.index', 'permission' => 'admin.roles.index'],
+                    'users' => ['route' => 'admin.users.index', 'permission' => 'admin.users.index'],
                 ],
             ],
         ];
 
-        // Filter menus berdasarkan role user
+        // Filter menus berdasarkan permission user (bukan role) dan modules user
         $accessibleMenus = [];
-        $userRoles = $user->roles->pluck('name')->toArray();
 
         foreach ($menus as $key => $menu) {
-            $allowedRoles = $menu['roles'] ?? [];
+            $requiredPermission = $menu['permission'] ?? null;
             
-            // Check if user has access
-            if (in_array('*', $allowedRoles) || 
-                !empty(array_intersect($userRoles, $allowedRoles)) ||
-                $user->hasRole('admin')) {
-                
-                $accessibleMenu = $menu;
-                
-                // Filter submenus if exists
-                if (isset($menu['submenus'])) {
-                    $accessibleSubmenus = [];
-                    foreach ($menu['submenus'] as $subKey => $submenu) {
-                        $subAllowedRoles = $submenu['roles'] ?? [];
-                        if (in_array('*', $subAllowedRoles) || 
-                            !empty(array_intersect($userRoles, $subAllowedRoles)) ||
-                            $user->hasRole('admin')) {
-                            $accessibleSubmenus[$subKey] = $submenu;
-                        }
+            // Cek apakah menu sesuai dengan modules user
+            // Mapping menu key ke module name
+            $menuModuleMap = [
+                'master-manajemen' => 'master-manajemen',
+                'master-data' => 'master-data',
+                'inventory' => 'inventory',
+                'transaksi' => 'transaction',
+                'aset-kir' => 'asset',
+                'maintenance' => 'maintenance',
+                'laporan' => 'reports',
+            ];
+            
+            $menuModule = $menuModuleMap[$key] ?? null;
+            
+            // Jika menu punya module mapping dan user tidak punya module tersebut, skip
+            if ($menuModule && !empty($userModules) && !in_array($menuModule, $userModules)) {
+                continue; // Skip menu jika user tidak punya module
+            }
+            
+            // Untuk menu dengan submenu, cek apakah ada submenu yang accessible
+            if (isset($menu['submenus'])) {
+                $accessibleSubmenus = [];
+                foreach ($menu['submenus'] as $subKey => $submenu) {
+                    $subPermission = $submenu['permission'] ?? null;
+                    if ($subPermission && self::canAccess($user, $subPermission)) {
+                        $accessibleSubmenus[$subKey] = $submenu;
                     }
-                    $accessibleMenu['submenus'] = $accessibleSubmenus;
                 }
                 
-                $accessibleMenus[$key] = $accessibleMenu;
+                // Menu parent muncul jika ada minimal 1 submenu yang accessible
+                // Atau jika user punya permission untuk menu parent (wildcard)
+                if (!empty($accessibleSubmenus) || ($requiredPermission && self::canAccess($user, $requiredPermission))) {
+                    $accessibleMenu = $menu;
+                    $accessibleMenu['submenus'] = $accessibleSubmenus;
+                    $accessibleMenus[$key] = $accessibleMenu;
+                }
+            } else {
+                // Menu tanpa submenu: cek permission langsung
+                // Dashboard selalu accessible untuk semua user yang login
+                if ($key === 'dashboard' || ($requiredPermission && self::canAccess($user, $requiredPermission))) {
+                    $accessibleMenus[$key] = $menu;
+                }
             }
         }
 
         return $accessibleMenus;
     }
 }
+
 

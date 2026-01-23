@@ -7,7 +7,11 @@
         <h1 class="text-2xl font-bold text-gray-900">Data Inventory</h1>
         <p class="mt-1 text-sm text-gray-600">Daftar semua data inventory barang dan aset</p>
     </div>
-    @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('admin_gudang'))
+    @php
+        use App\Helpers\PermissionHelper;
+        $user = auth()->user();
+    @endphp
+    @if(PermissionHelper::canAccess($user, 'inventory.data-inventory.create'))
     <a 
         href="{{ route('inventory.data-inventory.create') }}" 
         class="inline-flex items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -22,7 +26,7 @@
 
 <!-- Filters -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
-    <form method="GET" action="{{ route('inventory.data-inventory.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <form method="GET" action="{{ route('inventory.data-inventory.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div>
             <label for="jenis_inventory" class="block text-sm font-medium text-gray-700 mb-1">Jenis Inventory</label>
             <select 
@@ -51,6 +55,30 @@
                     </option>
                 @endforeach
             </select>
+        </div>
+
+        <div>
+            <label for="merk" class="block text-sm font-medium text-gray-700 mb-1">Merk</label>
+            <input 
+                type="text" 
+                id="merk" 
+                name="merk" 
+                value="{{ request('merk') }}"
+                placeholder="Cari merk..."
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div>
+            <label for="no_batch" class="block text-sm font-medium text-gray-700 mb-1">Nomor Batch</label>
+            <input 
+                type="text" 
+                id="no_batch" 
+                name="no_batch" 
+                value="{{ request('no_batch') }}"
+                placeholder="Cari nomor batch..."
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
         </div>
 
         <div class="sm:col-span-2">
@@ -99,6 +127,8 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merk</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Batch</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Satuan</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gudang</th>
@@ -129,6 +159,12 @@
                             <span class="px-2 py-1 text-xs font-medium rounded-full {{ $jenisColor }}">
                                 {{ $inventory->jenis_inventory }}
                             </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ $inventory->merk ?? '-' }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ $inventory->no_batch ?? '-' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {{ number_format($inventory->qty_input, 0, ',', '.') }} {{ $inventory->satuan->nama_satuan ?? '' }}
@@ -166,7 +202,7 @@
                                 >
                                     Edit
                                 </a>
-                                @if(auth()->user()->hasRole('admin') || auth()->user()->hasRole('admin_gudang'))
+                                @if(PermissionHelper::canAccess($user, 'inventory.data-inventory.destroy'))
                                 <form 
                                     action="{{ route('inventory.data-inventory.destroy', $inventory->id_inventory) }}" 
                                     method="POST" 
@@ -188,7 +224,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-12 text-center">
+                        <td colspan="10" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
@@ -210,9 +246,20 @@
 
 @push('scripts')
 <script>
+    // Auto submit form on filter change for selects
     document.querySelectorAll('#jenis_inventory, #gudang').forEach(select => {
         select.addEventListener('change', function() {
             this.form.submit();
+        });
+    });
+    
+    // Submit form on Enter key for text inputs
+    document.querySelectorAll('#merk, #no_batch, #search').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.form.submit();
+            }
         });
     });
 </script>

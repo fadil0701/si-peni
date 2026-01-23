@@ -23,8 +23,8 @@ return new class extends Migration
             $table->text('keterangan')->nullable();
             $table->timestamps();
             
-            // Index untuk query efisien
-            $table->index(['id_permintaan', 'kategori_gudang', 'status']);
+            // Index untuk query efisien (nama pendek untuk menghindari error MySQL)
+            $table->index(['id_permintaan', 'kategori_gudang', 'status'], 'idx_draft_detail_permintaan');
         });
     }
 

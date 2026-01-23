@@ -20,4 +20,9 @@ class MasterSatuan extends Model
     {
         return $this->hasMany(MasterDataBarang::class, 'id_satuan', 'id_satuan');
     }
+
+    public function detailReturBarang(): HasMany
+    {
+        return $this->hasMany(DetailReturBarang::class, 'id_satuan', 'id_satuan');
+    }
 }

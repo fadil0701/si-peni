@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\DataInventory;
 use App\Models\InventoryItem;
 use App\Models\DataStock;
+use App\Models\RegisterAset;
 use App\Models\MasterDataBarang;
 use App\Models\MasterGudang;
 use App\Models\MasterSumberAnggaran;
@@ -96,6 +97,14 @@ class DataInventoryController extends Controller
 
         if ($request->filled('gudang')) {
             $query->where('id_gudang', $request->gudang);
+        }
+
+        if ($request->filled('merk')) {
+            $query->where('merk', 'like', "%{$request->merk}%");
+        }
+
+        if ($request->filled('no_batch')) {
+            $query->where('no_batch', 'like', "%{$request->no_batch}%");
         }
 
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
@@ -224,13 +233,21 @@ class DataInventoryController extends Controller
             // Insert ke data_inventory
             $inventory = DataInventory::create($validated);
 
-            // Auto Register Aset jika jenis = ASET
+            // Logika berdasarkan jenis inventory:
+            // - ASET → masuk ke InventoryItem (untuk RegisterAset/KIR), TIDAK masuk ke DataStock
+            // - PERSEDIAAN/FARMASI → masuk ke DataStock, TIDAK masuk ke InventoryItem
+            
             if ($validated['jenis_inventory'] === 'ASET' && $validated['qty_input'] > 0) {
+                // ASET: Auto Register Aset (membuat InventoryItem)
                 $this->autoRegisterAset($inventory, $validated);
+                // ASET: Buat RegisterAset dari DataInventory
+                $this->createRegisterAset($inventory, $validated);
+                // ASET TIDAK masuk ke DataStock
+            } elseif (in_array($validated['jenis_inventory'], ['PERSEDIAAN', 'FARMASI'])) {
+                // PERSEDIAAN/FARMASI: Update atau create data_stock
+                $this->updateStock($inventory, $validated);
+                // PERSEDIAAN/FARMASI TIDAK masuk ke InventoryItem
             }
-
-            // Update atau create data_stock
-            $this->updateStock($inventory, $validated);
 
             DB::commit();
 
@@ -360,6 +377,42 @@ class DataInventoryController extends Controller
 
         $stock->last_updated = now();
         $stock->save();
+    }
+
+    private function createRegisterAset(DataInventory $inventory, array $data)
+    {
+        // Cek apakah RegisterAset sudah ada untuk inventory ini
+        $existingRegister = RegisterAset::where('id_inventory', $inventory->id_inventory)->first();
+        if ($existingRegister) {
+            return; // Sudah ada, tidak perlu dibuat lagi
+        }
+
+        $gudang = $inventory->gudang;
+        $unitKerja = $gudang->unitKerja ?? MasterUnitKerja::first();
+        
+        if (!$unitKerja) {
+            \Log::warning('Unit kerja tidak ditemukan untuk membuat RegisterAset', [
+                'id_inventory' => $inventory->id_inventory,
+                'id_gudang' => $inventory->id_gudang
+            ]);
+            return;
+        }
+
+        // Generate nomor register dari kode register pertama di InventoryItem
+        $firstInventoryItem = InventoryItem::where('id_inventory', $inventory->id_inventory)
+            ->orderBy('id_item')
+            ->first();
+        
+        $nomorRegister = $firstInventoryItem ? $firstInventoryItem->kode_register : 'REG-' . $inventory->id_inventory;
+
+        RegisterAset::create([
+            'id_inventory' => $inventory->id_inventory,
+            'id_unit_kerja' => $unitKerja->id_unit_kerja,
+            'nomor_register' => $nomorRegister,
+            'kondisi_aset' => 'BAIK',
+            'tanggal_perolehan' => $data['tanggal_perolehan'] ?? now(),
+            'status_aset' => 'AKTIF',
+        ]);
     }
 
     public function show($id)
@@ -584,7 +637,75 @@ class DataInventoryController extends Controller
             $validated['upload_dokumen'] = $request->file('upload_dokumen')->store('dokumen-inventory', 'public');
         }
 
-        $inventory->update($validated);
+        DB::beginTransaction();
+        try {
+            $oldJenis = $inventory->jenis_inventory;
+            $oldQty = $inventory->qty_input;
+            
+            $inventory->update($validated);
+            
+            // Jika jenis inventory berubah, perlu update DataStock dan InventoryItem
+            if ($oldJenis !== $validated['jenis_inventory']) {
+                // Hapus data lama berdasarkan jenis lama
+                if ($oldJenis === 'ASET') {
+                    // Jika sebelumnya ASET, hapus InventoryItem yang terkait
+                    // (Tidak dihapus, hanya update jika perlu)
+                } elseif (in_array($oldJenis, ['PERSEDIAAN', 'FARMASI'])) {
+                    // Jika sebelumnya PERSEDIAAN/FARMASI, kurangi DataStock
+                    $oldStock = \App\Models\DataStock::where('id_data_barang', $inventory->id_data_barang)
+                        ->where('id_gudang', $inventory->id_gudang)
+                        ->first();
+                    if ($oldStock) {
+                        $oldStock->qty_masuk -= $oldQty;
+                        $oldStock->qty_akhir -= $oldQty;
+                        if ($oldStock->qty_akhir <= 0) {
+                            $oldStock->delete();
+                        } else {
+                            $oldStock->save();
+                        }
+                    }
+                }
+                
+                // Buat data baru berdasarkan jenis baru
+                if ($validated['jenis_inventory'] === 'ASET' && $validated['qty_input'] > 0) {
+                    // ASET: Auto Register Aset (membuat InventoryItem)
+                    $this->autoRegisterAset($inventory, $validated);
+                    // ASET: Buat RegisterAset dari DataInventory
+                    $this->createRegisterAset($inventory, $validated);
+                } elseif (in_array($validated['jenis_inventory'], ['PERSEDIAAN', 'FARMASI'])) {
+                    // PERSEDIAAN/FARMASI: Update atau create data_stock
+                    $this->updateStock($inventory, $validated);
+                }
+            } else {
+                // Jika jenis tidak berubah, update sesuai jenis
+                if ($validated['jenis_inventory'] === 'ASET') {
+                    // Untuk ASET, update InventoryItem jika qty berubah
+                    // (Logika ini bisa dikembangkan lebih lanjut jika diperlukan)
+                } elseif (in_array($validated['jenis_inventory'], ['PERSEDIAAN', 'FARMASI'])) {
+                    // Update DataStock dengan selisih qty
+                    $stock = \App\Models\DataStock::where('id_data_barang', $inventory->id_data_barang)
+                        ->where('id_gudang', $inventory->id_gudang)
+                        ->first();
+                    
+                    if ($stock) {
+                        $selisihQty = $validated['qty_input'] - $oldQty;
+                        $stock->qty_masuk += $selisihQty;
+                        $stock->qty_akhir += $selisihQty;
+                        $stock->last_updated = now();
+                        $stock->save();
+                    } else {
+                        // Jika stock belum ada, buat baru
+                        $this->updateStock($inventory, $validated);
+                    }
+                }
+            }
+            
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error updating DataInventory: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Terjadi kesalahan saat memperbarui data: ' . $e->getMessage());
+        }
 
         return redirect()->route('inventory.data-inventory.index')
             ->with('success', 'Data Inventory berhasil diperbarui.');

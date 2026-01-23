@@ -17,6 +17,10 @@
             <p class="text-sm text-gray-600 mt-1">No. Penerimaan: <span class="font-semibold">{{ $penerimaan->no_penerimaan }}</span></p>
         </div>
         <div class="flex space-x-3">
+            @php
+                $user = auth()->user();
+            @endphp
+            @if(\App\Helpers\PermissionHelper::canAccess($user, 'transaction.penerimaan-barang.edit'))
             <a 
                 href="{{ route('transaction.penerimaan-barang.edit', $penerimaan->id_penerimaan) }}" 
                 class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -26,6 +30,7 @@
                 </svg>
                 Edit
             </a>
+            @endif
         </div>
     </div>
     
@@ -92,23 +97,39 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Dikirim</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Diterima</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @foreach($penerimaan->detailPenerimaan as $index => $detail)
+                            @forelse($penerimaan->detailPenerimaan as $index => $detail)
+                            @php
+                                // Cari detail distribusi yang sesuai berdasarkan id_inventory
+                                $detailDistribusi = $penerimaan->distribusi->detailDistribusi->firstWhere('id_inventory', $detail->id_inventory);
+                                $qtyDikirim = $detailDistribusi ? $detailDistribusi->qty_distribusi : 0;
+                                $qtyDiterima = $detail->qty_diterima ?? 0;
+                            @endphp
                             <tr>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">
                                     {{ $detail->inventory->dataBarang->nama_barang ?? '-' }}
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_diterima, 2, ',', '.') }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ number_format($qtyDikirim, 2, ',', '.') }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ number_format($qtyDiterima, 2, ',', '.') }}
+                                </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->keterangan ?? '-' }}</td>
                             </tr>
-                            @endforeach
+                            @empty
+                            <tr>
+                                <td colspan="6" class="px-4 py-3 text-sm text-center text-gray-500">Tidak ada data detail penerimaan</td>
+                            </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>

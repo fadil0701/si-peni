@@ -24,6 +24,12 @@ class LoginController extends Controller
         if (Auth::attempt($request->only('email', 'password'), $request->filled('remember'))) {
             $request->session()->regenerate();
 
+            // Pastikan roles dan permissions ter-load setelah login
+            $user = Auth::user();
+            if ($user) {
+                $user->load('roles.permissions');
+            }
+
             return redirect()->intended(route('user.dashboard'));
         }
 

@@ -20,7 +20,7 @@
 
 <!-- Filters -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
-    <form method="GET" action="{{ route('inventory.data-stock.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4 lg:grid-cols-5">
+    <form method="GET" action="{{ route('inventory.data-stock.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div>
             <label for="gudang" class="block text-sm font-medium text-gray-700 mb-1">Gudang</label>
             <select 
@@ -45,24 +45,36 @@
                 class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
                 <option value="">Semua Jenis</option>
-                <option value="ASET" {{ request('jenis') == 'ASET' ? 'selected' : '' }}>Aset</option>
                 <option value="PERSEDIAAN" {{ request('jenis') == 'PERSEDIAAN' ? 'selected' : '' }}>Persediaan</option>
                 <option value="FARMASI" {{ request('jenis') == 'FARMASI' ? 'selected' : '' }}>Farmasi</option>
             </select>
         </div>
 
         <div>
-            <label for="sub_kategori" class="block text-sm font-medium text-gray-700 mb-1">Sub Kategori</label>
-            <select 
-                id="sub_kategori" 
-                name="sub_kategori" 
+            <label for="merk" class="block text-sm font-medium text-gray-700 mb-1">Merk</label>
+            <input 
+                type="text" 
+                id="merk" 
+                name="merk" 
+                value="{{ request('merk') }}"
+                placeholder="Cari merk..."
                 class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
-                <option value="">Semua Kategori</option>
-            </select>
         </div>
 
-        <div class="sm:col-span-2 lg:col-span-2">
+        <div>
+            <label for="no_batch" class="block text-sm font-medium text-gray-700 mb-1">Nomor Batch</label>
+            <input 
+                type="text" 
+                id="no_batch" 
+                name="no_batch" 
+                value="{{ request('no_batch') }}"
+                placeholder="Cari nomor batch..."
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div class="sm:col-span-2">
             <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Cari</label>
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -90,6 +102,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Barang</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gudang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stok Tersedia</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
@@ -102,6 +115,16 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ $stock->dataBarang->nama_barang ?? '-' }}
                             </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ $stock->gudang->nama_gudang ?? '-' }}
+                            </div>
+                            @if($stock->gudang)
+                                <div class="text-xs text-gray-500">
+                                    {{ $stock->gudang->kategori_gudang ?? '' }}
+                                </div>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             @php
@@ -117,7 +140,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ number_format($stock->qty_akhir, 0, ',', '.') }}</div>
+                            <div class="text-sm font-semibold text-gray-900">{{ number_format($stock->qty_akhir, 0, ',', '.') }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">{{ $stock->satuan->nama_satuan ?? '-' }}</div>
@@ -125,7 +148,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-6 py-12 text-center">
+                        <td colspan="5" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
@@ -148,9 +171,19 @@
 @push('scripts')
 <script>
     // Auto submit form on filter change
-    document.querySelectorAll('#gudang, #jenis, #sub_kategori').forEach(select => {
+    document.querySelectorAll('#gudang, #jenis').forEach(select => {
         select.addEventListener('change', function() {
             this.form.submit();
+        });
+    });
+    
+    // Submit form on Enter key for text inputs
+    document.querySelectorAll('#merk, #no_batch, #search').forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.form.submit();
+            }
         });
     });
 </script>

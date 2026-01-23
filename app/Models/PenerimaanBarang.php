@@ -47,4 +47,9 @@ class PenerimaanBarang extends Model
     {
         return $this->hasMany(DetailPenerimaanBarang::class, 'id_penerimaan', 'id_penerimaan');
     }
+
+    public function returBarang(): HasMany
+    {
+        return $this->hasMany(ReturBarang::class, 'id_penerimaan', 'id_penerimaan');
+    }
 }

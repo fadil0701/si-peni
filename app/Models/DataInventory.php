@@ -83,6 +83,11 @@ class DataInventory extends Model
         return $this->hasMany(InventoryItem::class, 'id_inventory', 'id_inventory');
     }
 
+    public function registerAset(): HasMany
+    {
+        return $this->hasMany(RegisterAset::class, 'id_inventory', 'id_inventory');
+    }
+
     public function detailDistribusi(): HasMany
     {
         return $this->hasMany(DetailDistribusi::class, 'id_inventory', 'id_inventory');
@@ -93,9 +98,9 @@ class DataInventory extends Model
         return $this->hasMany(DetailPenerimaanBarang::class, 'id_inventory', 'id_inventory');
     }
 
-    public function registerAset(): HasMany
+    public function detailRetur(): HasMany
     {
-        return $this->hasMany(RegisterAset::class, 'id_inventory', 'id_inventory');
+        return $this->hasMany(DetailReturBarang::class, 'id_inventory', 'id_inventory');
     }
 
     public function historyLokasi(): HasMany

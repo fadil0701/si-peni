@@ -27,6 +27,11 @@ class DataStockController extends Controller
                     ->whereHas('gudang', function ($q) use ($pegawai) {
                         $q->where('jenis_gudang', 'UNIT')
                           ->where('id_unit_kerja', $pegawai->id_unit_kerja);
+                    })
+                    ->whereHas('dataBarang', function($q) {
+                        $q->whereHas('dataInventory', function($invQ) {
+                            $invQ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI']);
+                        });
                     });
             } else {
                 // Jika user tidak memiliki pegawai atau unit kerja, tidak tampilkan data
@@ -34,7 +39,14 @@ class DataStockController extends Controller
             }
         } else {
             // GUDANG PUSAT: Melihat SEMUA data stock (tidak ada filter)
-            $query = DataStock::with(['dataBarang', 'gudang', 'satuan']);
+            // Hanya tampilkan data stock untuk PERSEDIAAN dan FARMASI (bukan ASET)
+            // Filter berdasarkan data_inventory yang memiliki jenis PERSEDIAAN atau FARMASI
+            $query = DataStock::with(['dataBarang', 'gudang', 'satuan'])
+                ->whereHas('dataBarang', function($q) {
+                    $q->whereHas('dataInventory', function($invQ) {
+                        $invQ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI']);
+                    });
+                });
         }
 
         // Filters
@@ -61,8 +73,42 @@ class DataStockController extends Controller
             });
         }
 
+        if ($request->filled('merk')) {
+            $query->whereHas('dataBarang', function ($q) use ($request) {
+                $q->whereHas('dataInventory', function ($invQ) use ($request) {
+                    $invQ->where('merk', 'like', "%{$request->merk}%");
+                });
+            });
+        }
+
+        if ($request->filled('no_batch')) {
+            $query->whereHas('dataBarang', function ($q) use ($request) {
+                $q->whereHas('dataInventory', function ($invQ) use ($request) {
+                    $invQ->where('no_batch', 'like', "%{$request->no_batch}%");
+                });
+            });
+        }
+
+        if ($request->filled('jenis')) {
+            $query->whereHas('dataBarang', function ($q) use ($request) {
+                $q->whereHas('dataInventory', function ($invQ) use ($request) {
+                    $invQ->where('jenis_inventory', $request->jenis);
+                });
+            });
+        }
+
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
-        $stocks = $query->latest('last_updated')->paginate($perPage)->appends($request->query());
+        
+        // Sinkronkan DataStock dengan DataInventory untuk PERSEDIAAN/FARMASI
+        // Hitung total qty_input dari DataInventory per gudang per barang
+        $this->syncStockFromInventory();
+        
+        // Urutkan berdasarkan gudang, kemudian nama barang
+        $stocks = $query->orderBy('id_gudang')
+            ->orderBy('id_data_barang')
+            ->latest('last_updated')
+            ->paginate($perPage)
+            ->appends($request->query());
         
         // Filter gudang yang ditampilkan di dropdown berdasarkan role
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
@@ -79,6 +125,94 @@ class DataStockController extends Controller
         }
 
         return view('inventory.data-stock.index', compact('stocks', 'gudangs'));
+    }
+    
+    /**
+     * Sinkronkan DataStock dengan DataInventory untuk PERSEDIAAN/FARMASI
+     * Hitung total qty_input dari DataInventory per gudang per barang
+     * qty_akhir di DataStock = total qty_input dari semua DataInventory untuk barang dan gudang yang sama
+     */
+    private function syncStockFromInventory()
+    {
+        // Ambil semua inventory PERSEDIAAN/FARMASI yang aktif
+        $inventories = \App\Models\DataInventory::whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI'])
+            ->where('status_inventory', 'AKTIF')
+            ->with(['dataBarang', 'gudang', 'satuan'])
+            ->get();
+        
+        // Group by id_data_barang dan id_gudang, lalu sum qty_input
+        $stockData = $inventories->groupBy(function($inv) {
+            return $inv->id_data_barang . '_' . $inv->id_gudang;
+        })->map(function($group) {
+            $first = $group->first();
+            return [
+                'id_data_barang' => $first->id_data_barang,
+                'id_gudang' => $first->id_gudang,
+                'qty_total' => $group->sum('qty_input'),
+                'id_satuan' => $first->id_satuan,
+            ];
+        });
+        
+        // Update atau create DataStock
+        foreach ($stockData as $data) {
+            $stock = DataStock::firstOrNew([
+                'id_data_barang' => $data['id_data_barang'],
+                'id_gudang' => $data['id_gudang'],
+            ]);
+            
+            // Simpan qty_keluar yang sudah ada (dari distribusi sebelumnya)
+            $existingQtyKeluar = $stock->exists ? $stock->qty_keluar : 0;
+            
+            // qty_akhir = total qty_input dari semua inventory record untuk barang dan gudang ini
+            $stock->qty_akhir = $data['qty_total'];
+            
+            // Jika stock baru, set qty_awal dan qty_masuk
+            if (!$stock->exists) {
+                $stock->qty_awal = 0;
+                $stock->qty_masuk = $data['qty_total'];
+                $stock->qty_keluar = 0;
+                $stock->id_satuan = $data['id_satuan'];
+            } else {
+                // Jika stock sudah ada, update qty_masuk berdasarkan qty_akhir dan qty_keluar
+                // qty_masuk = qty_akhir + qty_keluar (karena qty_akhir = qty_masuk - qty_keluar)
+                $stock->qty_masuk = $stock->qty_akhir + $existingQtyKeluar;
+                // Pastikan qty_keluar tetap sama (tidak diubah)
+                $stock->qty_keluar = $existingQtyKeluar;
+            }
+            
+            $stock->last_updated = now();
+            $stock->save();
+        }
+        
+        // Hapus DataStock yang tidak memiliki inventory aktif untuk PERSEDIAAN/FARMASI
+        // Hanya hapus jika stock tersebut untuk PERSEDIAAN/FARMASI dan tidak ada di stockData
+        if ($stockData->count() > 0) {
+            $activeBarangGudang = $stockData->map(function($data) {
+                return $data['id_data_barang'] . '_' . $data['id_gudang'];
+            })->toArray();
+            
+            // Hapus stock yang tidak ada di stockData (tidak ada inventory aktif)
+            // Hanya untuk stock yang terkait dengan PERSEDIAAN/FARMASI
+            DataStock::whereHas('dataBarang', function($q) {
+                $q->whereHas('dataInventory', function($invQ) {
+                    $invQ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI']);
+                });
+            })->get()->each(function($stock) use ($activeBarangGudang) {
+                $key = $stock->id_data_barang . '_' . $stock->id_gudang;
+                if (!in_array($key, $activeBarangGudang)) {
+                    // Hanya hapus jika tidak ada inventory aktif untuk kombinasi barang dan gudang ini
+                    $hasActiveInventory = \App\Models\DataInventory::where('id_data_barang', $stock->id_data_barang)
+                        ->where('id_gudang', $stock->id_gudang)
+                        ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI'])
+                        ->where('status_inventory', 'AKTIF')
+                        ->exists();
+                    
+                    if (!$hasActiveInventory) {
+                        $stock->delete();
+                    }
+                }
+            });
+        }
     }
 }
 

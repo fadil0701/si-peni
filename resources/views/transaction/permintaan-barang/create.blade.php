@@ -126,40 +126,59 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             Jenis Permintaan <span class="text-red-500">*</span>
                         </label>
-                        <div class="space-y-2">
-                            <div class="flex items-center">
-                                <input 
-                                    type="checkbox" 
-                                    id="jenis_barang" 
-                                    name="jenis_permintaan[]" 
-                                    value="BARANG"
-                                    {{ in_array('BARANG', old('jenis_permintaan', [])) ? 'checked' : '' }}
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                >
-                                <label for="jenis_barang" class="ml-2 block text-sm text-gray-700">
-                                    Barang
-                                </label>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Tipe Permintaan</label>
+                                <div class="space-y-2">
+                                    <div class="flex items-center">
+                                        <input 
+                                            type="radio" 
+                                            id="tipe_rutin" 
+                                            name="tipe_permintaan" 
+                                            value="RUTIN"
+                                            {{ old('tipe_permintaan') == 'RUTIN' ? 'checked' : '' }}
+                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                            onchange="updateSubJenis()"
+                                        >
+                                        <label for="tipe_rutin" class="ml-2 block text-sm text-gray-700">
+                                            Rutin
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input 
+                                            type="radio" 
+                                            id="tipe_tahunan" 
+                                            name="tipe_permintaan" 
+                                            value="TAHUNAN"
+                                            {{ old('tipe_permintaan') == 'TAHUNAN' ? 'checked' : '' }}
+                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                            onchange="updateSubJenis()"
+                                        >
+                                        <label for="tipe_tahunan" class="ml-2 block text-sm text-gray-700">
+                                            Tahunan
+                                        </label>
+                                    </div>
+                                </div>
+                                @error('tipe_permintaan')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="flex items-center">
-                                <input 
-                                    type="checkbox" 
-                                    id="jenis_aset" 
-                                    name="jenis_permintaan[]" 
-                                    value="ASET"
-                                    {{ in_array('ASET', old('jenis_permintaan', [])) ? 'checked' : '' }}
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                >
-                                <label for="jenis_aset" class="ml-2 block text-sm text-gray-700">
-                                    Aset
+                            
+                            <div id="subJenisContainer" class="mt-4 {{ old('tipe_permintaan') ? '' : 'hidden' }}">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Sub Jenis Permintaan <span class="text-red-500">*</span>
                                 </label>
+                                <div id="subJenisOptions" class="space-y-2">
+                                    <!-- Sub jenis akan ditampilkan di sini via JavaScript -->
+                                </div>
+                                @error('jenis_permintaan')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                @error('jenis_permintaan.*')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
-                        @error('jenis_permintaan')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
-                        @error('jenis_permintaan.*')
-                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                        @enderror
                     </div>
 
                     <div class="sm:col-span-2">
@@ -515,15 +534,79 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     @endif
     
+    // Update sub jenis berdasarkan tipe permintaan yang dipilih
+    window.updateSubJenis = function() {
+        const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
+        const subJenisContainer = document.getElementById('subJenisContainer');
+        const subJenisOptions = document.getElementById('subJenisOptions');
+        
+        if (!tipePermintaan) {
+            subJenisContainer.classList.add('hidden');
+            subJenisOptions.innerHTML = '';
+            return;
+        }
+        
+        // Tampilkan container
+        subJenisContainer.classList.remove('hidden');
+        
+        // Sub jenis untuk RUTIN dan TAHUNAN sama: ASET, PERSEDIAAN, FARMASI
+        const subJenisList = [
+            { value: 'ASET', label: 'Aset' },
+            { value: 'PERSEDIAAN', label: 'Persediaan' },
+            { value: 'FARMASI', label: 'Farmasi' }
+        ];
+        
+        // Get old values untuk pre-select
+        const oldJenisPermintaan = @json(old('jenis_permintaan', []));
+        
+        let html = '';
+        subJenisList.forEach(subJenis => {
+            const isChecked = oldJenisPermintaan.includes(subJenis.value);
+            html += `
+                <div class="flex items-center">
+                    <input 
+                        type="checkbox" 
+                        id="subjenis_${subJenis.value.toLowerCase()}" 
+                        name="jenis_permintaan[]" 
+                        value="${subJenis.value}"
+                        ${isChecked ? 'checked' : ''}
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    >
+                    <label for="subjenis_${subJenis.value.toLowerCase()}" class="ml-2 block text-sm text-gray-700">
+                        ${subJenis.label}
+                    </label>
+                </div>
+            `;
+        });
+        
+        subJenisOptions.innerHTML = html;
+    };
+    
+    // Initialize sub jenis saat halaman dimuat
+    document.addEventListener('DOMContentLoaded', function() {
+        // Panggil updateSubJenis jika sudah ada tipe yang dipilih
+        const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
+        if (tipePermintaan) {
+            updateSubJenis();
+        }
+    });
+    
     // Form validation sebelum submit
     window.validateForm = function() {
         const form = document.getElementById('formPermintaan');
+        const tipePermintaan = form.querySelector('input[name="tipe_permintaan"]:checked');
         const jenisPermintaan = form.querySelectorAll('input[name="jenis_permintaan[]"]:checked');
         const detailItems = form.querySelectorAll('.item-row');
         
-        // Validasi jenis permintaan
+        // Validasi tipe permintaan
+        if (!tipePermintaan) {
+            alert('Tipe permintaan harus dipilih (Rutin atau Tahunan).');
+            return false;
+        }
+        
+        // Validasi jenis permintaan (sub jenis)
         if (jenisPermintaan.length === 0) {
-            alert('Jenis permintaan harus dipilih minimal satu.');
+            alert('Sub jenis permintaan harus dipilih minimal satu (Aset, Persediaan, atau Farmasi).');
             return false;
         }
         

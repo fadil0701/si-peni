@@ -19,6 +19,29 @@
         @csrf
         
         <div class="space-y-6">
+            <!-- Pilih Pegawai (Opsional) -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label for="pegawai_id" class="block text-sm font-medium text-blue-900 mb-2">
+                    Ambil Data dari Pegawai (Opsional)
+                </label>
+                <select 
+                    id="pegawai_id" 
+                    name="pegawai_id" 
+                    class="block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    onchange="fillFromPegawai()"
+                >
+                    <option value="">Pilih Pegawai (untuk auto-fill nama & email)</option>
+                    @foreach($pegawais as $pegawai)
+                        <option value="{{ $pegawai->id }}" data-nama="{{ $pegawai->nama_pegawai }}" data-email="{{ $pegawai->email_pegawai ?? '' }}">
+                            {{ $pegawai->nama_pegawai }} ({{ $pegawai->nip_pegawai }}){{ $pegawai->email_pegawai ? ' - ' . $pegawai->email_pegawai : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-2 text-xs text-blue-700">
+                    Pilih pegawai untuk mengisi otomatis nama dan email. Jika pegawai tidak memiliki email, email harus diisi manual.
+                </p>
+            </div>
+
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
@@ -109,6 +132,46 @@
                     @enderror
                 </div>
             </div>
+
+            <!-- Menu yang Dapat Diakses -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="block text-sm font-medium text-gray-700">
+                        Menu yang Dapat Diakses
+                    </label>
+                    <label class="flex items-center text-sm text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
+                        <input 
+                            type="checkbox" 
+                            id="select-all-modules"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        >
+                        <span class="ml-2">Pilih Semua</span>
+                    </label>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach($modules as $module)
+                        <label class="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-white cursor-pointer transition-colors">
+                            <input 
+                                type="checkbox" 
+                                name="modules[]" 
+                                value="{{ $module->name }}"
+                                {{ in_array($module->name, old('modules', [])) ? 'checked' : '' }}
+                                class="module-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            >
+                            <div class="ml-3 flex-1">
+                                <span class="text-sm font-medium text-gray-900">{{ $module->display_name }}</span>
+                                @if($module->description)
+                                    <p class="text-xs text-gray-500 mt-0.5">{{ Str::limit($module->description, 50) }}</p>
+                                @endif
+                            </div>
+                        </label>
+                    @endforeach
+                </div>
+                <p class="mt-3 text-xs text-gray-500">
+                    Pilih menu yang dapat diakses oleh user ini. Permission detail dapat diatur di <strong>Manajemen Role</strong>.
+                </p>
+            </div>
         </div>
 
         <div class="mt-8 flex justify-end space-x-3 border-t border-gray-200 pt-6">
@@ -127,5 +190,32 @@
         </div>
     </form>
 </div>
+
+@push('scripts')
+<script>
+function fillFromPegawai() {
+    const select = document.getElementById('pegawai_id');
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (selectedOption.value) {
+        const nama = selectedOption.getAttribute('data-nama');
+        const email = selectedOption.getAttribute('data-email');
+        
+        document.getElementById('name').value = nama || '';
+        if (email) {
+            document.getElementById('email').value = email;
+        }
+    }
+}
+
+// Select all modules
+document.getElementById('select-all-modules')?.addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.module-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+});
+</script>
+@endpush
 @endsection
 

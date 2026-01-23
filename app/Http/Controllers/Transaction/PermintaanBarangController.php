@@ -19,7 +19,10 @@ class PermintaanBarangController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = PermintaanBarang::with(['unitKerja', 'pemohon']);
+        $query = PermintaanBarang::with([
+            'unitKerja.gudang', // Load gudang unit melalui unit kerja
+            'pemohon.jabatan' // Load jabatan pemohon
+        ]);
 
         // Filter berdasarkan unit kerja user yang login untuk pegawai/kepala_unit
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
@@ -111,8 +114,9 @@ class PermintaanBarangController extends Controller
                 'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
                 'id_pemohon' => 'required|exists:master_pegawai,id',
                 'tanggal_permintaan' => 'required|date',
+                'tipe_permintaan' => 'required|in:RUTIN,TAHUNAN',
                 'jenis_permintaan' => 'required|array|min:1',
-                'jenis_permintaan.*' => 'required|in:BARANG,ASET',
+                'jenis_permintaan.*' => 'required|in:ASET,PERSEDIAAN,FARMASI',
                 'keterangan' => 'nullable|string',
                 'detail' => 'required|array|min:1',
                 'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
@@ -120,9 +124,12 @@ class PermintaanBarangController extends Controller
                 'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
                 'detail.*.keterangan' => 'nullable|string',
             ], [
-                'jenis_permintaan.required' => 'Jenis permintaan harus dipilih minimal satu.',
-                'jenis_permintaan.array' => 'Jenis permintaan harus berupa array.',
-                'jenis_permintaan.min' => 'Jenis permintaan harus dipilih minimal satu.',
+                'tipe_permintaan.required' => 'Tipe permintaan harus dipilih (Rutin atau Tahunan).',
+                'tipe_permintaan.in' => 'Tipe permintaan harus Rutin atau Tahunan.',
+                'jenis_permintaan.required' => 'Sub jenis permintaan harus dipilih minimal satu (Aset, Persediaan, atau Farmasi).',
+                'jenis_permintaan.array' => 'Sub jenis permintaan harus berupa array.',
+                'jenis_permintaan.min' => 'Sub jenis permintaan harus dipilih minimal satu.',
+                'jenis_permintaan.*.in' => 'Sub jenis permintaan harus Aset, Persediaan, atau Farmasi.',
                 'detail.required' => 'Detail permintaan harus diisi.',
                 'detail.array' => 'Detail permintaan harus berupa array.',
                 'detail.min' => 'Detail permintaan harus diisi minimal satu item.',
@@ -157,13 +164,15 @@ class PermintaanBarangController extends Controller
             $noPermintaan = sprintf('PMT/%s/%04d', $tahun, $urut);
 
             // Create permintaan
-            // Simpan jenis_permintaan sebagai JSON array
+            // Simpan jenis_permintaan sebagai JSON array yang berisi sub jenis (ASET, PERSEDIAAN, FARMASI)
+            // Tipe permintaan (RUTIN/TAHUNAN) disimpan di kolom terpisah
             $permintaan = PermintaanBarang::create([
                 'no_permintaan' => $noPermintaan,
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON
+                'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau TAHUNAN
+                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON: ["ASET", "PERSEDIAAN", "FARMASI"]
                 'status_permintaan' => 'DRAFT',
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);

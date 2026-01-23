@@ -75,6 +75,27 @@ class User extends Authenticatable
     }
 
     /**
+     * The modules that belong to the user
+     */
+    public function modules(): BelongsToMany
+    {
+        return $this->belongsToMany(Module::class, 'user_modules', 'user_id', 'module', 'id', 'name')
+            ->withTimestamps();
+    }
+
+    /**
+     * Check if user has access to a specific module
+     */
+    public function hasModule(string $moduleName): bool
+    {
+        if (!$this->relationLoaded('modules')) {
+            $this->load('modules');
+        }
+        
+        return $this->modules->contains('name', $moduleName);
+    }
+
+    /**
      * Check if user has a specific permission through their roles
      */
     public function hasPermission(string $permissionName): bool
@@ -84,31 +105,38 @@ class User extends Authenticatable
             return true;
         }
 
-        // Load roles with permissions if not already loaded
+        // Pastikan roles ter-load
         if (!$this->relationLoaded('roles')) {
-            $this->load('roles.permissions');
-        } else {
-            foreach ($this->roles as $role) {
-                if (!$role->relationLoaded('permissions')) {
-                    $role->load('permissions');
-                }
-            }
+            $this->load('roles');
         }
 
-        // Check if any role has this permission
-        foreach ($this->roles as $role) {
-            // Check exact permission
-            if ($role->permissions->contains('name', $permissionName)) {
-                return true;
-            }
+        // Jika tidak ada role, return false
+        if ($this->roles->isEmpty()) {
+            return false;
+        }
 
-            // Check wildcard permissions (e.g., 'inventory.*' matches 'inventory.data-stock.index')
-            foreach ($role->permissions as $permission) {
-                if (str_ends_with($permission->name, '.*')) {
-                    $prefix = str_replace('.*', '', $permission->name);
-                    if (str_starts_with($permissionName, $prefix . '.')) {
-                        return true;
-                    }
+        // Load permissions untuk semua roles sekaligus (lebih efisien)
+        $roleIds = $this->roles->pluck('id')->toArray();
+        
+        // Query langsung ke database untuk mendapatkan semua permission user
+        $userPermissions = \DB::table('permission_role')
+            ->whereIn('role_id', $roleIds)
+            ->join('permissions', 'permission_role.permission_id', '=', 'permissions.id')
+            ->pluck('permissions.name')
+            ->unique()
+            ->toArray();
+
+        // Check exact permission
+        if (in_array($permissionName, $userPermissions)) {
+            return true;
+        }
+
+        // Check wildcard permissions (e.g., 'inventory.*' matches 'inventory.data-stock.index')
+        foreach ($userPermissions as $permission) {
+            if (str_ends_with($permission, '.*')) {
+                $prefix = str_replace('.*', '', $permission);
+                if (str_starts_with($permissionName, $prefix . '.')) {
+                    return true;
                 }
             }
         }

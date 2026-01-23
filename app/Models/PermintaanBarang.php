@@ -17,6 +17,7 @@ class PermintaanBarang extends Model
         'id_unit_kerja',
         'id_pemohon',
         'tanggal_permintaan',
+        'tipe_permintaan',
         'jenis_permintaan',
         'status_permintaan',
         'keterangan',
