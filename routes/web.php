@@ -84,6 +84,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('data-stock', [DataStockController::class, 'index'])->name('data-stock.index');
         Route::resource('data-inventory', DataInventoryController::class);
         Route::resource('inventory-item', \App\Http\Controllers\Inventory\InventoryItemController::class);
+        
+        // Stock Adjustment
+        Route::resource('stock-adjustment', \App\Http\Controllers\Inventory\StockAdjustmentController::class);
+        Route::post('stock-adjustment/{id}/approve', [\App\Http\Controllers\Inventory\StockAdjustmentController::class, 'approve'])->name('stock-adjustment.approve');
+        Route::post('stock-adjustment/{id}/reject', [\App\Http\Controllers\Inventory\StockAdjustmentController::class, 'reject'])->name('stock-adjustment.reject');
+        Route::post('stock-adjustment/{id}/ajukan', [\App\Http\Controllers\Inventory\StockAdjustmentController::class, 'ajukan'])->name('stock-adjustment.ajukan');
     });
     
     // API Routes
@@ -96,6 +102,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/gudang/{id}/inventory', [\App\Http\Controllers\Transaction\DistribusiController::class, 'getInventoryByGudang'])->name('gudang.inventory');
         Route::get('/permintaan/{id}/detail', [\App\Http\Controllers\Transaction\DistribusiController::class, 'getPermintaanDetail'])->name('permintaan.detail');
         Route::get('/distribusi/{id}/detail', [\App\Http\Controllers\Transaction\PenerimaanBarangController::class, 'getDistribusiDetail'])->name('distribusi.detail');
+        Route::get('/stock/{id}', function ($id) {
+            $stock = \App\Models\DataStock::findOrFail($id);
+            return response()->json([
+                'qty_awal' => $stock->qty_awal,
+                'qty_masuk' => $stock->qty_masuk,
+                'qty_keluar' => $stock->qty_keluar,
+                'qty_akhir' => $stock->qty_akhir,
+            ]);
+        })->name('stock.detail');
     });
     
     // Transaction
@@ -154,12 +169,21 @@ Route::middleware(['auth'])->group(function () {
         // Route untuk return barang dari gudang unit ke gudang pusat
         Route::resource('retur-barang', ReturBarangController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
         Route::get('retur-barang/penerimaan/{id}/detail', [ReturBarangController::class, 'getPenerimaanDetail'])->name('retur-barang.penerimaan.detail')->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
+        Route::post('retur-barang/{id}/terima', [ReturBarangController::class, 'terima'])->name('retur-barang.terima')->middleware(['role:admin,admin_gudang']);
+        Route::post('retur-barang/{id}/tolak', [ReturBarangController::class, 'tolak'])->name('retur-barang.tolak')->middleware(['role:admin,admin_gudang']);
+        Route::post('retur-barang/{id}/ajukan', [ReturBarangController::class, 'ajukan'])->name('retur-barang.ajukan')->middleware(['role:admin,admin_gudang,pegawai,kepala_unit']);
     });
     
     // Asset & KIR - Admin, Admin Gudang, Kepala Unit, Pegawai (untuk unit mereka sendiri)
     Route::prefix('asset')->name('asset.')->middleware(['role:admin,admin_gudang,kepala_unit,pegawai'])->group(function () {
         Route::resource('register-aset', RegisterAsetController::class);
         Route::get('register-aset/unit-kerja/{unit_kerja}', [RegisterAsetController::class, 'showUnitKerja'])->name('register-aset.unit-kerja.show');
+        
+        // Kartu Inventaris Ruangan (KIR)
+        Route::resource('kartu-inventaris-ruangan', \App\Http\Controllers\Asset\KartuInventarisRuanganController::class);
+        
+        // Mutasi Aset
+        Route::resource('mutasi-aset', \App\Http\Controllers\Asset\MutasiAsetController::class);
     });
     
     // Maintenance & Pemeliharaan - Admin, Admin Gudang, Kepala Unit, Pegawai

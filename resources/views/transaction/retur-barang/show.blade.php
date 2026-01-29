@@ -17,7 +17,11 @@
             <p class="text-sm text-gray-600 mt-1">No. Retur: <span class="font-semibold">{{ $retur->no_retur }}</span></p>
         </div>
         <div class="flex space-x-3">
-            @if(in_array($retur->status_retur, ['DRAFT', 'DIAJUKAN']))
+            @php
+                use App\Helpers\PermissionHelper;
+                $user = auth()->user();
+            @endphp
+            @if(in_array($retur->status_retur, ['DRAFT', 'DIAJUKAN']) && PermissionHelper::canAccess($user, 'transaction.retur-barang.edit'))
                 <a 
                     href="{{ route('transaction.retur-barang.edit', $retur->id_retur) }}" 
                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
@@ -27,6 +31,38 @@
                     </svg>
                     Edit
                 </a>
+            @endif
+            @if($retur->status_retur == 'DRAFT' && PermissionHelper::canAccess($user, 'transaction.retur-barang.ajukan'))
+                <form action="{{ route('transaction.retur-barang.ajukan', $retur->id_retur) }}" method="POST" class="inline">
+                    @csrf
+                    <button 
+                        type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+                    >
+                        Ajukan
+                    </button>
+                </form>
+            @endif
+            @if($retur->status_retur == 'DIAJUKAN' && PermissionHelper::canAccess($user, 'transaction.retur-barang.terima'))
+                <form action="{{ route('transaction.retur-barang.terima', $retur->id_retur) }}" method="POST" class="inline">
+                    @csrf
+                    <button 
+                        type="submit" 
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                        onclick="return confirm('Apakah Anda yakin ingin menerima retur ini? Stock akan diupdate setelah retur diterima.')"
+                    >
+                        Terima Retur
+                    </button>
+                </form>
+            @endif
+            @if($retur->status_retur == 'DIAJUKAN' && PermissionHelper::canAccess($user, 'transaction.retur-barang.tolak'))
+                <button 
+                    type="button" 
+                    onclick="showRejectModal()"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+                >
+                    Tolak
+                </button>
             @endif
         </div>
     </div>
@@ -148,6 +184,58 @@
         </div>
     </div>
 </div>
+
+<!-- Reject Modal -->
+@if($retur->status_retur == 'DIAJUKAN')
+<div id="rejectModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Tolak Retur Barang</h3>
+            <form action="{{ route('transaction.retur-barang.tolak', $retur->id_retur) }}" method="POST">
+                @csrf
+                <div class="mb-4">
+                    <label for="keterangan_tolak" class="block text-sm font-medium text-gray-700 mb-2">
+                        Keterangan Penolakan <span class="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                        id="keterangan_tolak" 
+                        name="keterangan" 
+                        rows="4"
+                        required
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        placeholder="Alasan penolakan retur..."
+                    ></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button 
+                        type="button" 
+                        onclick="hideRejectModal()"
+                        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                        Batal
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                    >
+                        Tolak Retur
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showRejectModal() {
+        document.getElementById('rejectModal').classList.remove('hidden');
+    }
+    
+    function hideRejectModal() {
+        document.getElementById('rejectModal').classList.add('hidden');
+    }
+</script>
+@endif
 @endsection
 
 

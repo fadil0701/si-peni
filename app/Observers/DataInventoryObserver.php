@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\DataInventory;
 use App\Models\InventoryItem;
 use App\Models\DataStock;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DataInventoryObserver
 {
@@ -127,9 +128,40 @@ class DataInventoryObserver
      */
     protected function generateQRCode(string $kodeRegister): ?string
     {
-        // TODO: Implementasi QR Code generation menggunakan library seperti SimpleSoftwareIO/simple-qrcode
-        // Untuk sekarang, return kode_register sebagai placeholder
-        return $kodeRegister;
+        try {
+            // Buat struktur direktori berdasarkan kode register: unit/kode/tahun/
+            $pathParts = explode('/', $kodeRegister);
+            $baseDir = storage_path('app/public/qrcodes/inventory_item');
+            
+            // Buat direktori secara rekursif berdasarkan struktur path
+            $currentDir = $baseDir;
+            for ($i = 0; $i < count($pathParts) - 1; $i++) {
+                $currentDir .= DIRECTORY_SEPARATOR . $pathParts[$i];
+                if (!file_exists($currentDir)) {
+                    if (!mkdir($currentDir, 0755, true) && !is_dir($currentDir)) {
+                        \Log::error('QR Code directory tidak dapat dibuat: ' . $currentDir);
+                        return null;
+                    }
+                }
+            }
+            
+            // Nama file adalah bagian terakhir dari kode register
+            $qrCodeFileName = end($pathParts) . '.svg';
+            $qrCodePath = 'qrcodes/inventory_item/' . $kodeRegister . '.svg';
+            $fullPath = $currentDir . DIRECTORY_SEPARATOR . $qrCodeFileName;
+            
+            // Generate QR code and save to storage
+            QrCode::format('svg')->size(200)->generate($kodeRegister, $fullPath);
+            
+            return $qrCodePath;
+        } catch (\Exception $e) {
+            \Log::error('QR Code generation failed: ' . $e->getMessage(), [
+                'kode_register' => $kodeRegister,
+                'error' => $e->getMessage()
+            ]);
+            // Jika gagal generate QR code, return null
+            return null;
+        }
     }
 
     /**

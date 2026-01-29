@@ -230,8 +230,17 @@ class RegisterAsetController extends Controller
             abort(403, 'Unauthorized');
         }
         
-        // TODO: Implement create view
-        return view('asset.register-aset.create');
+        // Ambil inventory dengan jenis ASET yang belum memiliki register aset
+        $inventories = DataInventory::where('jenis_inventory', 'ASET')
+            ->whereDoesntHave('registerAset')
+            ->with(['dataBarang', 'gudang'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        // Ambil semua unit kerja
+        $unitKerjas = MasterUnitKerja::orderBy('nama_unit_kerja')->get();
+        
+        return view('asset.register-aset.create', compact('inventories', 'unitKerjas'));
     }
 
     /**
@@ -244,7 +253,33 @@ class RegisterAsetController extends Controller
             abort(403, 'Unauthorized');
         }
         
-        // TODO: Implement store logic
+        // Validasi input
+        $validated = $request->validate([
+            'id_inventory' => 'required|exists:data_inventory,id_inventory',
+            'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
+            'nomor_register' => 'required|string|max:100|unique:register_aset,nomor_register',
+            'kondisi_aset' => 'required|in:BAIK,RUSAK_RINGAN,RUSAK_BERAT',
+            'status_aset' => 'required|in:AKTIF,NONAKTIF',
+            'tanggal_perolehan' => 'required|date',
+        ]);
+        
+        // Cek apakah inventory adalah jenis ASET
+        $inventory = DataInventory::findOrFail($validated['id_inventory']);
+        if ($inventory->jenis_inventory !== 'ASET') {
+            return back()->withErrors(['id_inventory' => 'Inventory yang dipilih harus berjenis ASET'])->withInput();
+        }
+        
+        // Cek apakah sudah ada register aset untuk inventory ini
+        $existingRegister = RegisterAset::where('id_inventory', $validated['id_inventory'])->first();
+        if ($existingRegister) {
+            return back()->withErrors(['id_inventory' => 'Register aset untuk inventory ini sudah ada'])->withInput();
+        }
+        
+        // Buat register aset
+        $registerAset = RegisterAset::create($validated);
+        
+        return redirect()->route('asset.register-aset.show', $registerAset->id_register_aset)
+            ->with('success', 'Register aset berhasil dibuat.');
     }
 
     /**
@@ -323,13 +358,14 @@ class RegisterAsetController extends Controller
             }
         }
 
-        // TODO: Implement update logic
+        // Validasi input
         $validated = $request->validate([
             'kondisi_aset' => 'required|in:BAIK,RUSAK_RINGAN,RUSAK_BERAT',
             'status_aset' => 'required|in:AKTIF,NONAKTIF',
             'tanggal_perolehan' => 'nullable|date',
         ]);
 
+        // Update register aset
         $registerAset->update($validated);
 
         return redirect()->route('asset.register-aset.show', $registerAset->id_register_aset)

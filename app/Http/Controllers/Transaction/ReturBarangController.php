@@ -385,6 +385,187 @@ class ReturBarangController extends Controller
             'details' => $details,
         ]);
     }
+
+    /**
+     * Terima retur barang (untuk admin gudang pusat)
+     * Update stock saat retur diterima
+     */
+    public function terima(Request $request, $id)
+    {
+        // Hanya admin dan admin_gudang yang bisa terima retur
+        if (!Auth::user()->hasAnyRole(['admin', 'admin_gudang'])) {
+            abort(403, 'Unauthorized');
+        }
+        
+        $retur = ReturBarang::with(['detailRetur.inventory', 'gudangAsal', 'gudangTujuan'])->findOrFail($id);
+        
+        // Hanya bisa terima jika status DIAJUKAN
+        if ($retur->status_retur != 'DIAJUKAN') {
+            return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+                ->with('error', 'Hanya retur dengan status DIAJUKAN yang dapat diterima.');
+        }
+        
+        DB::beginTransaction();
+        try {
+            // Update status retur menjadi DITERIMA
+            $retur->update([
+                'status_retur' => 'DITERIMA',
+            ]);
+            
+            // Update stock untuk setiap detail retur
+            foreach ($retur->detailRetur as $detail) {
+                $inventory = $detail->inventory;
+                
+                if (in_array($inventory->jenis_inventory, ['PERSEDIAAN', 'FARMASI'])) {
+                    // Untuk PERSEDIAAN/FARMASI: Update DataStock
+                    
+                    // Kurangi stock di gudang asal (gudang unit)
+                    $stockAsal = DataStock::where('id_data_barang', $inventory->id_data_barang)
+                        ->where('id_gudang', $retur->id_gudang_asal)
+                        ->first();
+                    
+                    if ($stockAsal) {
+                        $stockAsal->qty_keluar += $detail->qty_retur;
+                        $stockAsal->qty_akhir -= $detail->qty_retur;
+                        $stockAsal->last_updated = now();
+                        $stockAsal->save();
+                    }
+                    
+                    // Tambah stock di gudang tujuan (gudang pusat)
+                    $stockTujuan = DataStock::firstOrNew([
+                        'id_data_barang' => $inventory->id_data_barang,
+                        'id_gudang' => $retur->id_gudang_tujuan,
+                    ]);
+                    
+                    if ($stockTujuan->exists) {
+                        $stockTujuan->qty_masuk += $detail->qty_retur;
+                        $stockTujuan->qty_akhir += $detail->qty_retur;
+                    } else {
+                        $stockTujuan->qty_awal = 0;
+                        $stockTujuan->qty_masuk = $detail->qty_retur;
+                        $stockTujuan->qty_keluar = 0;
+                        $stockTujuan->qty_akhir = $detail->qty_retur;
+                        $stockTujuan->id_satuan = $inventory->id_satuan;
+                    }
+                    
+                    $stockTujuan->last_updated = now();
+                    $stockTujuan->save();
+                    
+                    // Update atau pindahkan inventory ke gudang tujuan
+                    // Jika qty_retur sama dengan qty_input, pindahkan seluruh inventory
+                    // Jika tidak, buat inventory baru di gudang tujuan
+                    if ($detail->qty_retur >= $inventory->qty_input) {
+                        // Pindahkan seluruh inventory
+                        $inventory->update([
+                            'id_gudang' => $retur->id_gudang_tujuan,
+                        ]);
+                    } else {
+                        // Buat inventory baru di gudang tujuan dengan qty_retur
+                        DataInventory::create([
+                            'id_data_barang' => $inventory->id_data_barang,
+                            'id_gudang' => $retur->id_gudang_tujuan,
+                            'id_anggaran' => $inventory->id_anggaran,
+                            'id_sub_kegiatan' => $inventory->id_sub_kegiatan,
+                            'jenis_inventory' => $inventory->jenis_inventory,
+                            'tahun_anggaran' => $inventory->tahun_anggaran,
+                            'qty_input' => $detail->qty_retur,
+                            'id_satuan' => $inventory->id_satuan,
+                            'harga_satuan' => $inventory->harga_satuan,
+                            'total_harga' => $inventory->harga_satuan * $detail->qty_retur,
+                            'merk' => $inventory->merk,
+                            'tipe' => $inventory->tipe,
+                            'spesifikasi' => $inventory->spesifikasi,
+                            'tahun_produksi' => $inventory->tahun_produksi,
+                            'no_seri' => $inventory->no_seri,
+                            'no_batch' => $inventory->no_batch,
+                            'tanggal_kedaluwarsa' => $inventory->tanggal_kedaluwarsa,
+                            'status_inventory' => 'AKTIF',
+                            'created_by' => Auth::id(),
+                        ]);
+                        
+                        // Kurangi qty_input inventory asal
+                        $inventory->qty_input -= $detail->qty_retur;
+                        $inventory->total_harga = $inventory->harga_satuan * $inventory->qty_input;
+                        $inventory->save();
+                    }
+                } elseif ($inventory->jenis_inventory === 'ASET') {
+                    // Untuk ASET: Update InventoryItem (pindahkan ke gudang tujuan)
+                    // Ambil inventory items yang terkait dengan inventory ini di gudang asal
+                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                        ->where('id_gudang', $retur->id_gudang_asal)
+                        ->limit((int)$detail->qty_retur)
+                        ->get();
+                    
+                    foreach ($inventoryItems as $item) {
+                        $item->update([
+                            'id_gudang' => $retur->id_gudang_tujuan,
+                        ]);
+                    }
+                }
+            }
+            
+            DB::commit();
+            
+            return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+                ->with('success', 'Retur barang berhasil diterima dan stock telah diupdate.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error accepting retur barang: ' . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat menerima retur: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Tolak retur barang
+     */
+    public function tolak(Request $request, $id)
+    {
+        // Hanya admin dan admin_gudang yang bisa tolak retur
+        if (!Auth::user()->hasAnyRole(['admin', 'admin_gudang'])) {
+            abort(403, 'Unauthorized');
+        }
+        
+        $retur = ReturBarang::findOrFail($id);
+        
+        // Hanya bisa tolak jika status DIAJUKAN
+        if ($retur->status_retur != 'DIAJUKAN') {
+            return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+                ->with('error', 'Hanya retur dengan status DIAJUKAN yang dapat ditolak.');
+        }
+        
+        $validated = $request->validate([
+            'keterangan' => 'nullable|string|max:1000',
+        ]);
+        
+        $retur->update([
+            'status_retur' => 'DITOLAK',
+            'keterangan' => ($retur->keterangan ? $retur->keterangan . "\n\n" : '') . 'Ditolak: ' . ($validated['keterangan'] ?? 'Tidak ada keterangan'),
+        ]);
+        
+        return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+            ->with('success', 'Retur barang telah ditolak.');
+    }
+
+    /**
+     * Ajukan retur untuk approval
+     */
+    public function ajukan($id)
+    {
+        $retur = ReturBarang::findOrFail($id);
+        
+        // Hanya bisa ajukan jika status DRAFT
+        if ($retur->status_retur != 'DRAFT') {
+            return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+                ->with('error', 'Hanya retur dengan status DRAFT yang dapat diajukan.');
+        }
+        
+        $retur->update([
+            'status_retur' => 'DIAJUKAN',
+        ]);
+        
+        return redirect()->route('transaction.retur-barang.show', $retur->id_retur)
+            ->with('success', 'Retur barang berhasil diajukan untuk persetujuan.');
+    }
 }
 
 
