@@ -76,48 +76,82 @@
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                @forelse($kirs as $index => $kir)
+                @forelse($inventoryItems as $index => $item)
+                @php
+                    // Ambil RegisterAset yang memiliki ruangan dari inventory ini
+                    $registerAset = $item->inventory->registerAset->firstWhere('id_ruangan', '!=', null);
+                    $kir = null;
+                    $penanggungJawab = null;
+                    $tanggalPenempatan = null;
+                    $ruangan = null;
+                    
+                    if ($registerAset) {
+                        $kir = $registerAset->kartuInventarisRuangan->first();
+                        $ruangan = $registerAset->ruangan;
+                        
+                        if ($kir) {
+                            $penanggungJawab = $kir->penanggungJawab;
+                            $tanggalPenempatan = $kir->tanggal_penempatan;
+                        }
+                    }
+                @endphp
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $kirs->firstItem() + $index }}
+                        {{ $inventoryItems->firstItem() + $index }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {{ $kir->registerAset->nomor_register ?? '-' }}
+                        {{ $registerAset->nomor_register ?? $item->kode_register ?? '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $kir->registerAset->inventory->dataBarang->nama_barang ?? '-' }}
+                        {{ $item->inventory->dataBarang->nama_barang ?? '-' }}
+                        @if($item->no_seri)
+                            <span class="text-gray-500 text-xs block">No. Seri: {{ $item->no_seri }}</span>
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $kir->ruangan->nama_ruangan ?? '-' }}
-                        <span class="text-gray-500 text-xs block">{{ $kir->ruangan->unitKerja->nama_unit_kerja ?? '-' }}</span>
+                        @if($ruangan)
+                            {{ $ruangan->nama_ruangan ?? '-' }}
+                            <span class="text-gray-500 text-xs block">{{ $ruangan->unitKerja->nama_unit_kerja ?? '-' }}</span>
+                        @else
+                            <span class="text-gray-400">Belum ditempatkan</span>
+                            @if($item->gudang)
+                                <span class="text-gray-500 text-xs block">Gudang: {{ $item->gudang->nama_gudang ?? '-' }}</span>
+                            @endif
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $kir->penanggungJawab->nama_pegawai ?? '-' }}
+                        {{ $penanggungJawab->nama_pegawai ?? '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $kir->tanggal_penempatan ? $kir->tanggal_penempatan->format('d/m/Y') : '-' }}
+                        {{ $tanggalPenempatan ? $tanggalPenempatan->format('d/m/Y') : '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a 
-                            href="{{ route('asset.kartu-inventaris-ruangan.show', $kir->id_kir) }}" 
-                            class="text-blue-600 hover:text-blue-900 mr-3"
-                        >
-                            Detail
-                        </a>
-                        @if(PermissionHelper::canAccess($user, 'asset.kartu-inventaris-ruangan.edit'))
-                        <a 
-                            href="{{ route('asset.kartu-inventaris-ruangan.edit', $kir->id_kir) }}" 
-                            class="text-indigo-600 hover:text-indigo-900"
-                        >
-                            Edit
-                        </a>
+                        @if($kir)
+                            <a 
+                                href="{{ route('asset.kartu-inventaris-ruangan.show', $kir->id_kir) }}" 
+                                class="text-blue-600 hover:text-blue-900 mr-3"
+                            >
+                                Detail
+                            </a>
+                            @if(PermissionHelper::canAccess($user, 'asset.kartu-inventaris-ruangan.edit'))
+                            <a 
+                                href="{{ route('asset.kartu-inventaris-ruangan.edit', $kir->id_kir) }}" 
+                                class="text-indigo-600 hover:text-indigo-900"
+                            >
+                                Edit
+                            </a>
+                            @endif
+                        @elseif($registerAset && $registerAset->id_ruangan)
+                            <span class="text-gray-400 text-xs">Belum ada KIR</span>
+                        @else
+                            <span class="text-gray-400 text-xs">Belum ditempatkan</span>
                         @endif
                     </td>
                 </tr>
                 @empty
                 <tr>
                     <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
-                        Tidak ada data KIR
+                        Tidak ada data aset
                     </td>
                 </tr>
                 @endforelse
@@ -126,9 +160,9 @@
     </div>
     
     <!-- Pagination -->
-    @if($kirs->hasPages())
+    @if($inventoryItems->hasPages())
     <div class="px-6 py-4 border-t border-gray-200">
-        {{ $kirs->links() }}
+        {{ $inventoryItems->links() }}
     </div>
     @endif
 </div>

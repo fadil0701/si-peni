@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class InventoryItem extends Model
 {
@@ -46,7 +47,21 @@ class InventoryItem extends Model
 
     public function registerAset(): HasMany
     {
-        return $this->hasMany(RegisterAset::class, 'id_item', 'id_item');
+        // RegisterAset menggunakan id_inventory, jadi kita perlu relasi melalui inventory
+        return $this->hasMany(RegisterAset::class, 'id_inventory', 'id_inventory');
+    }
+
+    public function kartuInventarisRuangan()
+    {
+        // Relasi melalui RegisterAset jika ada, atau langsung jika ada id_ruangan
+        return $this->hasOneThrough(
+            KartuInventarisRuangan::class,
+            RegisterAset::class,
+            'id_item', // Foreign key on RegisterAset table
+            'id_register_aset', // Foreign key on KartuInventarisRuangan table
+            'id_item', // Local key on InventoryItem table
+            'id_register_aset' // Local key on RegisterAset table
+        );
     }
 
     public function pemeliharaanAset(): HasMany

@@ -76,6 +76,12 @@
                 <span class="text-sm font-semibold text-gray-900">{{ number_format($gudang->total_aset, 0, ',', '.') }}</span>
             </div>
             <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">KIB:</span>
+                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                    {{ number_format($gudang->kib_count ?? 0, 0, ',', '.') }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">KIR:</span>
                 <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                     {{ number_format($gudang->kir_count ?? 0, 0, ',', '.') }}

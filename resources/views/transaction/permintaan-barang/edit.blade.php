@@ -88,36 +88,88 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Jenis Permintaan <span class="text-red-500">*</span>
+                            Tipe Permintaan <span class="text-red-500">*</span>
                         </label>
-                        <div class="space-y-2">
+                        <div class="flex space-x-6">
+                            <div class="flex items-center">
+                                <input 
+                                    type="radio" 
+                                    id="tipe_rutin_edit" 
+                                    name="tipe_permintaan" 
+                                    value="RUTIN"
+                                    {{ old('tipe_permintaan', $permintaan->tipe_permintaan) == 'RUTIN' ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                    onchange="updateSubJenis()"
+                                >
+                                <label for="tipe_rutin_edit" class="ml-2 block text-sm text-gray-700">
+                                    Rutin
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input 
+                                    type="radio" 
+                                    id="tipe_cito_edit" 
+                                    name="tipe_permintaan" 
+                                    value="CITO"
+                                    {{ old('tipe_permintaan', $permintaan->tipe_permintaan) == 'CITO' ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                    onchange="updateSubJenis()"
+                                >
+                                <label for="tipe_cito_edit" class="ml-2 block text-sm text-gray-700">
+                                    CITO (Penting)
+                                </label>
+                            </div>
+                        </div>
+                        @error('tipe_permintaan')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div id="subJenisContainer" class="mt-4 {{ old('tipe_permintaan', $permintaan->tipe_permintaan) ? '' : 'hidden' }}">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Sub Jenis Permintaan <span class="text-red-500">*</span>
+                        </label>
+                        <div id="subJenisOptions" class="space-y-2">
                             @php
                                 $jenisPermintaan = old('jenis_permintaan', is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []));
                             @endphp
                             <div class="flex items-center">
                                 <input 
                                     type="checkbox" 
-                                    id="jenis_barang_edit" 
-                                    name="jenis_permintaan[]" 
-                                    value="BARANG"
-                                    {{ in_array('BARANG', $jenisPermintaan) ? 'checked' : '' }}
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                >
-                                <label for="jenis_barang_edit" class="ml-2 block text-sm text-gray-700">
-                                    Barang
-                                </label>
-                            </div>
-                            <div class="flex items-center">
-                                <input 
-                                    type="checkbox" 
-                                    id="jenis_aset_edit" 
+                                    id="subjenis_aset" 
                                     name="jenis_permintaan[]" 
                                     value="ASET"
                                     {{ in_array('ASET', $jenisPermintaan) ? 'checked' : '' }}
                                     class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                 >
-                                <label for="jenis_aset_edit" class="ml-2 block text-sm text-gray-700">
+                                <label for="subjenis_aset" class="ml-2 block text-sm text-gray-700">
                                     Aset
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="subjenis_persediaan" 
+                                    name="jenis_permintaan[]" 
+                                    value="PERSEDIAAN"
+                                    {{ in_array('PERSEDIAAN', $jenisPermintaan) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="subjenis_persediaan" class="ml-2 block text-sm text-gray-700">
+                                    Persediaan
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="subjenis_farmasi" 
+                                    name="jenis_permintaan[]" 
+                                    value="FARMASI"
+                                    {{ in_array('FARMASI', $jenisPermintaan) ? 'checked' : '' }}
+                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                >
+                                <label for="subjenis_farmasi" class="ml-2 block text-sm text-gray-700">
+                                    Farmasi
                                 </label>
                             </div>
                         </div>
@@ -389,6 +441,16 @@ function tambahItem() {
     }
 }
 
+// Update sub jenis berdasarkan tipe permintaan yang dipilih
+window.updateSubJenis = function() {
+    const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
+    const subJenisContainer = document.getElementById('subJenisContainer');
+    
+    if (!tipePermintaan || !subJenisContainer) return;
+    
+    subJenisContainer.classList.remove('hidden');
+};
+
 // Event listener untuk button tambah item
 document.addEventListener('DOMContentLoaded', function() {
     const btnTambahItem = document.getElementById('btnTambahItem');
@@ -418,6 +480,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Initialize sub jenis saat halaman dimuat
+    const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
+    if (tipePermintaan) {
+        updateSubJenis();
+    }
 });
 </script>
 @endpush

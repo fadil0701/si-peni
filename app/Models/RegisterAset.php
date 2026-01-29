@@ -15,6 +15,7 @@ class RegisterAset extends Model
     protected $fillable = [
         'id_inventory',
         'id_unit_kerja',
+        'id_ruangan',
         'nomor_register',
         'kondisi_aset',
         'tanggal_perolehan',
@@ -36,6 +37,11 @@ class RegisterAset extends Model
     public function unitKerja(): BelongsTo
     {
         return $this->belongsTo(MasterUnitKerja::class, 'id_unit_kerja', 'id_unit_kerja');
+    }
+
+    public function ruangan(): BelongsTo
+    {
+        return $this->belongsTo(MasterRuangan::class, 'id_ruangan', 'id_ruangan');
     }
 
     public function kartuInventarisRuangan(): HasMany

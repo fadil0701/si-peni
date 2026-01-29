@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DataStock extends Model
 {
@@ -44,5 +45,10 @@ class DataStock extends Model
     public function satuan(): BelongsTo
     {
         return $this->belongsTo(MasterSatuan::class, 'id_satuan', 'id_satuan');
+    }
+
+    public function stockAdjustments(): HasMany
+    {
+        return $this->hasMany(StockAdjustment::class, 'id_stock', 'id_stock');
     }
 }

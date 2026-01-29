@@ -147,15 +147,15 @@
                                     <div class="flex items-center">
                                         <input 
                                             type="radio" 
-                                            id="tipe_tahunan" 
+                                            id="tipe_cito" 
                                             name="tipe_permintaan" 
-                                            value="TAHUNAN"
-                                            {{ old('tipe_permintaan') == 'TAHUNAN' ? 'checked' : '' }}
+                                            value="CITO"
+                                            {{ old('tipe_permintaan') == 'CITO' ? 'checked' : '' }}
                                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                                             onchange="updateSubJenis()"
                                         >
-                                        <label for="tipe_tahunan" class="ml-2 block text-sm text-gray-700">
-                                            Tahunan
+                                        <label for="tipe_cito" class="ml-2 block text-sm text-gray-700">
+                                            CITO (Penting)
                                         </label>
                                     </div>
                                 </div>
@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Tampilkan container
         subJenisContainer.classList.remove('hidden');
         
-        // Sub jenis untuk RUTIN dan TAHUNAN sama: ASET, PERSEDIAAN, FARMASI
+        // Sub jenis untuk RUTIN dan CITO sama: ASET, PERSEDIAAN, FARMASI
         const subJenisList = [
             { value: 'ASET', label: 'Aset' },
             { value: 'PERSEDIAAN', label: 'Persediaan' },
@@ -600,7 +600,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Validasi tipe permintaan
         if (!tipePermintaan) {
-            alert('Tipe permintaan harus dipilih (Rutin atau Tahunan).');
+            alert('Tipe permintaan harus dipilih (Rutin atau CITO (Penting)).');
             return false;
         }
         

@@ -25,6 +25,7 @@ use App\Http\Controllers\Transaction\DistribusiController;
 use App\Http\Controllers\Transaction\PermintaanBarangController;
 use App\Http\Controllers\Transaction\PenerimaanBarangController;
 use App\Http\Controllers\Transaction\ReturBarangController;
+use App\Http\Controllers\Transaction\PemakaianBarangController;
 use App\Http\Controllers\Asset\RegisterAsetController;
 use App\Http\Controllers\Planning\RkuController;
 use App\Http\Controllers\Procurement\PaketPengadaanController;
@@ -172,6 +173,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('retur-barang/{id}/terima', [ReturBarangController::class, 'terima'])->name('retur-barang.terima')->middleware(['role:admin,admin_gudang']);
         Route::post('retur-barang/{id}/tolak', [ReturBarangController::class, 'tolak'])->name('retur-barang.tolak')->middleware(['role:admin,admin_gudang']);
         Route::post('retur-barang/{id}/ajukan', [ReturBarangController::class, 'ajukan'])->name('retur-barang.ajukan')->middleware(['role:admin,admin_gudang,pegawai,kepala_unit']);
+        
+        // Pemakaian Barang - Admin Gudang (semua kategori), Pegawai, Kepala Unit, Admin
+        Route::resource('pemakaian-barang', PemakaianBarangController::class)->middleware(['role:admin,admin_gudang,admin_gudang_aset,admin_gudang_persediaan,admin_gudang_farmasi,pegawai,kepala_unit']);
+        Route::post('pemakaian-barang/{id}/ajukan', [PemakaianBarangController::class, 'ajukan'])->name('pemakaian-barang.ajukan')->middleware(['role:admin,admin_gudang,pegawai,kepala_unit']);
+        Route::post('pemakaian-barang/{id}/approve', [PemakaianBarangController::class, 'approve'])->name('pemakaian-barang.approve')->middleware(['role:admin,kepala_unit']);
+        Route::post('pemakaian-barang/{id}/reject', [PemakaianBarangController::class, 'reject'])->name('pemakaian-barang.reject')->middleware(['role:admin,kepala_unit']);
     });
     
     // Asset & KIR - Admin, Admin Gudang, Kepala Unit, Pegawai (untuk unit mereka sendiri)

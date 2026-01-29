@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use App\Helpers\PermissionHelper;
+use App\Models\DataInventory;
+use App\Observers\DataInventoryObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register observers
+        DataInventory::observe(DataInventoryObserver::class);
+        
         // Share user roles and accessible menus with all views
         View::composer('*', function ($view) {
             if (auth()->check()) {

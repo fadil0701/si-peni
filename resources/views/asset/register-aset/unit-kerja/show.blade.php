@@ -87,7 +87,8 @@
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No Register</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Register</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Register</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merk</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gudang</th>
@@ -98,19 +99,108 @@
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                @forelse($registerAsets as $aset)
+                @forelse($inventoryItems as $index => $item)
+                @php
+                    // Ambil RegisterAset untuk InventoryItem ini dari map yang sudah di-preload
+                    // Gunakan registerAsetItemMap untuk mapping yang lebih tepat berdasarkan id_item
+                    $registerAset = null;
+                    if (isset($registerAsetItemMap[$item->id_item])) {
+                        // Mapping langsung berdasarkan id_item (lebih tepat)
+                        $registerAset = $registerAsetItemMap[$item->id_item];
+                    } elseif (isset($registerAsetsMap[$item->id_inventory])) {
+                        // Fallback: ambil RegisterAset pertama yang sesuai dengan unit kerja
+                        $unitKerjaId = isset($gudangUnitForView) && $gudangUnitForView->unitKerja ? $gudangUnitForView->unitKerja->id_unit_kerja : null;
+                        if ($unitKerjaId) {
+                            $registerAset = $registerAsetsMap[$item->id_inventory]->firstWhere('id_unit_kerja', $unitKerjaId);
+                        } else {
+                            // Untuk gudang pusat, ambil RegisterAset pertama jika ada
+                            $registerAset = $registerAsetsMap[$item->id_inventory]->first();
+                        }
+                    }
+                    
+                    // Tentukan badge KIB/KIR berdasarkan RegisterAset
+                    $isKIB = false;
+                    $isKIR = false;
+                    
+                    if ($registerAset) {
+                        if ($registerAset->id_ruangan) {
+                            $isKIR = true; // Punya ruangan = KIR
+                        } else {
+                            $isKIB = true; // Tidak punya ruangan = KIB
+                        }
+                    } else {
+                        // Fallback: jika tidak ada RegisterAset, cek berdasarkan lokasi InventoryItem
+                        $currentGudang = $item->gudang ?? null;
+                        if ($currentGudang) {
+                            if ($currentGudang->jenis_gudang == 'PUSAT') {
+                                $isKIB = true;
+                            } elseif ($currentGudang->jenis_gudang == 'UNIT') {
+                                $isKIR = true;
+                            }
+                        } elseif ($item->id_ruangan) {
+                            $isKIR = true;
+                        }
+                    }
+                @endphp
                 <tr class="hover:bg-gray-50">
+                    <!-- Kode Register (selalu ada, dari InventoryItem) -->
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {{ $aset->nomor_register }}
+                        {{ $item->kode_register ?? '-' }}
+                        @if(!$registerAset)
+                            <span class="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800" title="Belum di-register">
+                                Belum Register
+                            </span>
+                        @endif
+                    </td>
+                    
+                    <!-- Nomor Register (hanya jika sudah di-register) -->
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        @if($registerAset)
+                            <span class="font-medium text-blue-600">{{ $registerAset->nomor_register ?? '-' }}</span>
+                        @else
+                            <span class="text-gray-400 italic">-</span>
+                        @endif
+                    </td>
+                    
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ $item->inventory->dataBarang->nama_barang ?? '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $aset->inventory->dataBarang->nama_barang ?? '-' }}
+                        {{ $item->inventory->merk ?? '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $aset->inventory->merk ?? '-' }}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {{ $aset->inventory->gudang->nama_gudang ?? '-' }}
+                        @if($registerAset && $registerAset->unitKerja)
+                            {{-- Jika sudah di-register ke unit kerja, tampilkan gudang unit kerja --}}
+                            @php
+                                // Cari gudang unit untuk unit kerja ini
+                                $gudangUnitKerja = null;
+                                if ($registerAset->unitKerja && $registerAset->unitKerja->relationLoaded('gudang')) {
+                                    $gudangUnitKerja = $registerAset->unitKerja->gudang->where('jenis_gudang', 'UNIT')
+                                        ->where('kategori_gudang', 'ASET')
+                                        ->first();
+                                }
+                                if (!$gudangUnitKerja) {
+                                    $gudangUnitKerja = \App\Models\MasterGudang::where('id_unit_kerja', $registerAset->unitKerja->id_unit_kerja)
+                                        ->where('jenis_gudang', 'UNIT')
+                                        ->where('kategori_gudang', 'ASET')
+                                        ->first();
+                                }
+                            @endphp
+                            @if($gudangUnitKerja)
+                                {{ $gudangUnitKerja->nama_gudang }}
+                            @else
+                                {{ $registerAset->unitKerja->nama_unit_kerja ?? '-' }}
+                            @endif
+                        @elseif(isset($gudangUnitForView) && $gudangUnitForView)
+                            {{-- Fallback: gunakan gudang unit dari context --}}
+                            {{ $gudangUnitForView->nama_gudang ?? '-' }}
+                        @elseif($item->gudang)
+                            {{ $item->gudang->nama_gudang ?? '-' }}
+                        @elseif($item->inventory && $item->inventory->gudang)
+                            {{ $item->inventory->gudang->nama_gudang ?? '-' }}
+                        @else
+                            -
+                        @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         @php
@@ -119,28 +209,28 @@
                                 'RUSAK_RINGAN' => 'bg-yellow-100 text-yellow-800',
                                 'RUSAK_BERAT' => 'bg-red-100 text-red-800',
                             ];
-                            $color = $kondisiColors[$aset->kondisi_aset] ?? 'bg-gray-100 text-gray-800';
+                            $kondisi = $item->kondisi_item ?? 'BAIK';
+                            $color = $kondisiColors[$kondisi] ?? 'bg-gray-100 text-gray-800';
                         @endphp
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $color }}">
-                            {{ str_replace('_', ' ', $aset->kondisi_aset) }}
+                            {{ str_replace('_', ' ', $kondisi) }}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        @if($aset->status_aset == 'AKTIF')
+                        @php
+                            $status = $item->status_item ?? 'AKTIF';
+                        @endphp
+                        @if($status == 'AKTIF')
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                 AKTIF
                             </span>
                         @else
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                NONAKTIF
+                                {{ $status }}
                             </span>
                         @endif
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        @php
-                            $isKIB = $aset->inventory->gudang->jenis_gudang == 'PUSAT';
-                            $isKIR = $aset->inventory->gudang->jenis_gudang == 'UNIT';
-                        @endphp
                         @if($isKIB)
                             <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                                 KIB
@@ -157,27 +247,31 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div class="flex justify-end space-x-2">
-                            <a 
-                                href="{{ route('asset.register-aset.show', $aset->id_register_aset) }}" 
-                                class="text-blue-600 hover:text-blue-900"
-                            >
-                                Detail
-                            </a>
-                            @if(PermissionHelper::canAccess($user, 'asset.register-aset.edit'))
-                            <a 
-                                href="{{ route('asset.register-aset.edit', $aset->id_register_aset) }}" 
-                                class="text-indigo-600 hover:text-indigo-900"
-                            >
-                                Edit
-                            </a>
+                            @if($registerAset)
+                                <a 
+                                    href="{{ route('asset.register-aset.show', $registerAset->id_register_aset) }}" 
+                                    class="text-blue-600 hover:text-blue-900"
+                                >
+                                    Detail
+                                </a>
+                                @if(PermissionHelper::canAccess($user, 'asset.register-aset.edit'))
+                                <a 
+                                    href="{{ route('asset.register-aset.edit', $registerAset->id_register_aset) }}" 
+                                    class="text-indigo-600 hover:text-indigo-900"
+                                >
+                                    Edit
+                                </a>
+                                @endif
+                            @else
+                                <span class="text-gray-400 text-xs">-</span>
                             @endif
                         </div>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">
-                        Tidak ada data register aset.
+                    <td colspan="9" class="px-6 py-4 text-center text-sm text-gray-500">
+                        Tidak ada data aset.
                     </td>
                 </tr>
                 @endforelse
@@ -186,9 +280,9 @@
     </div>
 
     <!-- Pagination -->
-    @if($registerAsets->hasPages())
+    @if($inventoryItems->hasPages())
     <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-        {{ $registerAsets->links() }}
+        {{ $inventoryItems->links() }}
     </div>
     @endif
 </div>

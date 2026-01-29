@@ -85,15 +85,60 @@
                     @enderror
                 </div>
 
+                <div>
+                    <label for="id_ruangan" class="block text-sm font-medium text-gray-700 mb-2">
+                        Ruangan
+                    </label>
+                    <select 
+                        id="id_ruangan" 
+                        name="id_ruangan" 
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('id_ruangan') border-red-500 @enderror"
+                    >
+                        <option value="">Pilih Ruangan (Opsional)</option>
+                        @foreach($ruangans ?? [] as $ruangan)
+                            <option value="{{ $ruangan->id_ruangan }}" {{ old('id_ruangan', $registerAset->id_ruangan) == $ruangan->id_ruangan ? 'selected' : '' }}>
+                                {{ $ruangan->nama_ruangan }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('id_ruangan')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    <p class="mt-1 text-xs text-gray-500">Pilih ruangan tempat aset ditempatkan (jika ada)</p>
+                </div>
+
+                <div>
+                    <label for="id_penanggung_jawab" class="block text-sm font-medium text-gray-700 mb-2">
+                        Penanggung Jawab
+                    </label>
+                    <select 
+                        id="id_penanggung_jawab" 
+                        name="id_penanggung_jawab" 
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('id_penanggung_jawab') border-red-500 @enderror"
+                    >
+                        <option value="">Pilih Penanggung Jawab (Opsional)</option>
+                        @foreach($pegawais ?? [] as $pegawai)
+                            <option value="{{ $pegawai->id }}" {{ old('id_penanggung_jawab', $kir->id_penanggung_jawab ?? null) == $pegawai->id ? 'selected' : '' }}>
+                                {{ $pegawai->nama_pegawai }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('id_penanggung_jawab')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    <p class="mt-1 text-xs text-gray-500">Pilih penanggung jawab aset (jika sudah ditempatkan di ruangan)</p>
+                </div>
+
                 <div class="sm:col-span-2">
                     <label for="tanggal_perolehan" class="block text-sm font-medium text-gray-700 mb-2">
-                        Tanggal Perolehan
+                        Tanggal Perolehan <span class="text-red-500">*</span>
                     </label>
                     <input 
                         type="date" 
                         id="tanggal_perolehan" 
                         name="tanggal_perolehan" 
                         value="{{ old('tanggal_perolehan', $registerAset->tanggal_perolehan ? $registerAset->tanggal_perolehan->format('Y-m-d') : '') }}"
+                        required
                         class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('tanggal_perolehan') border-red-500 @enderror"
                     >
                     @error('tanggal_perolehan')

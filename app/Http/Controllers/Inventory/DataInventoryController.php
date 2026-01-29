@@ -234,14 +234,16 @@ class DataInventoryController extends Controller
             $inventory = DataInventory::create($validated);
 
             // Logika berdasarkan jenis inventory:
-            // - ASET → masuk ke InventoryItem (untuk RegisterAset/KIR), TIDAK masuk ke DataStock
+            // - ASET → masuk ke InventoryItem (untuk RegisterAset/KIR) via Observer, TIDAK masuk ke DataStock
             // - PERSEDIAAN/FARMASI → masuk ke DataStock, TIDAK masuk ke InventoryItem
+            // 
+            // CATATAN: Pembuatan InventoryItem untuk ASET dilakukan oleh DataInventoryObserver
+            // yang otomatis dipanggil saat DataInventory::create() berhasil
             
-            if ($validated['jenis_inventory'] === 'ASET' && $validated['qty_input'] > 0) {
-                // ASET: Auto Register Aset (membuat InventoryItem)
-                $this->autoRegisterAset($inventory, $validated);
-                // ASET: Buat RegisterAset dari DataInventory
-                $this->createRegisterAset($inventory, $validated);
+            if ($validated['jenis_inventory'] === 'ASET') {
+                // ASET: InventoryItem akan dibuat otomatis oleh DataInventoryObserver
+                // CATATAN: RegisterAset TIDAK dibuat otomatis di sini
+                // RegisterAset dibuat secara manual oleh user melalui form "Tambah Register Aset"
                 // ASET TIDAK masuk ke DataStock
             } elseif (in_array($validated['jenis_inventory'], ['PERSEDIAAN', 'FARMASI'])) {
                 // PERSEDIAAN/FARMASI: Update atau create data_stock
@@ -269,93 +271,8 @@ class DataInventoryController extends Controller
         }
     }
 
-    private function autoRegisterAset(DataInventory $inventory, array $data)
-    {
-        $dataBarang = $inventory->dataBarang;
-        $gudang = $inventory->gudang;
-        $unitKerja = $gudang->unitKerja ?? MasterUnitKerja::first();
-        
-        // Generate kode register base - ambil dari hierarki barang
-        $kodeBarang = 'UNK';
-        try {
-            if ($dataBarang && $dataBarang->subjenisBarang) {
-                $subjenis = $dataBarang->subjenisBarang;
-                if ($subjenis->jenisBarang && $subjenis->jenisBarang->kategoriBarang) {
-                    $kategori = $subjenis->jenisBarang->kategoriBarang;
-                    if ($kategori->kodeBarang) {
-                        $kodeBarang = $kategori->kodeBarang->kode_barang;
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // Fallback jika relasi tidak lengkap
-            $kodeBarang = 'UNK';
-        }
-        
-        $tahun = $data['tahun_anggaran'];
-        $unitCode = $unitKerja ? $unitKerja->kode_unit_kerja : 'UNIT';
-
-        // Get max urut untuk tahun dan kode barang ini
-        $existingRegisters = InventoryItem::where('kode_register', 'like', "{$unitCode}/{$kodeBarang}/{$tahun}/%")
-            ->get()
-            ->map(function ($item) {
-                $parts = explode('/', $item->kode_register);
-                return isset($parts[3]) ? (int)$parts[3] : 0;
-            });
-        
-        $maxUrut = $existingRegisters->max() ?? 0;
-
-        // Loop untuk setiap qty
-        for ($i = 1; $i <= $data['qty_input']; $i++) {
-            $urut = $maxUrut + $i;
-            $kodeRegister = sprintf('%s/%s/%s/%04d', $unitCode, $kodeBarang, $tahun, $urut);
-
-            // Generate QR Code
-            // Buat struktur direktori berdasarkan kode register: unit/kode/tahun/
-            $pathParts = explode('/', $kodeRegister);
-            $baseDir = storage_path('app/public/qrcodes/inventory_item');
-            
-            // Buat direktori secara rekursif berdasarkan struktur path
-            $currentDir = $baseDir;
-            for ($j = 0; $j < count($pathParts) - 1; $j++) {
-                $currentDir .= DIRECTORY_SEPARATOR . $pathParts[$j];
-                if (!file_exists($currentDir)) {
-                    if (!mkdir($currentDir, 0755, true) && !is_dir($currentDir)) {
-                        throw new \RuntimeException('Directory tidak dapat dibuat: ' . $currentDir);
-                    }
-                }
-            }
-            
-            // Nama file adalah bagian terakhir dari kode register
-            $qrCodeFileName = end($pathParts) . '.svg';
-            $qrCodePath = 'qrcodes/inventory_item/' . $kodeRegister . '.svg';
-            $fullPath = $currentDir . DIRECTORY_SEPARATOR . $qrCodeFileName;
-            
-            // Generate QR code and save to storage
-            try {
-                QrCode::format('svg')->size(200)->generate($kodeRegister, $fullPath);
-            } catch (\Exception $e) {
-                \Log::error('QR Code generation failed: ' . $e->getMessage(), [
-                    'kode_register' => $kodeRegister,
-                    'full_path' => $fullPath,
-                    'error' => $e->getMessage()
-                ]);
-                // Jika gagal generate QR code, set path ke null atau empty
-                $qrCodePath = null;
-            }
-
-            InventoryItem::create([
-                'id_inventory' => $inventory->id_inventory,
-                'kode_register' => $kodeRegister,
-                'no_seri' => $data['no_seri'] ?? null,
-                'kondisi_item' => 'BAIK',
-                'status_item' => 'AKTIF',
-                'id_gudang' => $inventory->id_gudang,
-                'id_ruangan' => null,
-                'qr_code' => $qrCodePath,
-            ]);
-        }
-    }
+    // Method autoRegisterAset telah dipindahkan ke DataInventoryObserver
+    // untuk menghindari duplikasi pembuatan InventoryItem
 
     private function updateStock(DataInventory $inventory, array $data)
     {
@@ -667,11 +584,12 @@ class DataInventoryController extends Controller
                 }
                 
                 // Buat data baru berdasarkan jenis baru
-                if ($validated['jenis_inventory'] === 'ASET' && $validated['qty_input'] > 0) {
-                    // ASET: Auto Register Aset (membuat InventoryItem)
-                    $this->autoRegisterAset($inventory, $validated);
-                    // ASET: Buat RegisterAset dari DataInventory
-                    $this->createRegisterAset($inventory, $validated);
+                // CATATAN: Pembuatan InventoryItem untuk ASET dilakukan oleh DataInventoryObserver
+                // yang otomatis dipanggil saat DataInventory::update() berhasil
+                if ($validated['jenis_inventory'] === 'ASET') {
+                    // ASET: InventoryItem akan dibuat otomatis oleh DataInventoryObserver jika qty_input > 0
+                    // CATATAN: RegisterAset TIDAK dibuat otomatis di sini
+                    // RegisterAset dibuat secara manual oleh user melalui form "Tambah Register Aset"
                 } elseif (in_array($validated['jenis_inventory'], ['PERSEDIAAN', 'FARMASI'])) {
                     // PERSEDIAAN/FARMASI: Update atau create data_stock
                     $this->updateStock($inventory, $validated);

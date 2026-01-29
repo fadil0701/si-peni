@@ -160,6 +160,9 @@ class PenerimaanBarangController extends Controller
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
 
+            // Load distribusi dengan relasi
+            $distribusi = TransaksiDistribusi::with('gudangTujuan')->find($validated['id_distribusi']);
+            
             // Create detail penerimaan
             foreach ($validated['detail'] as $detail) {
                 DetailPenerimaanBarang::create([
@@ -173,8 +176,10 @@ class PenerimaanBarangController extends Controller
 
             // Update status distribusi menjadi SELESAI jika diterima
             if ($validated['status_penerimaan'] === 'DITERIMA') {
-                $distribusi = TransaksiDistribusi::find($validated['id_distribusi']);
                 $distribusi->update(['status_distribusi' => 'SELESAI']);
+                
+                // AUTO CREATE REGISTER ASET untuk ASET yang diterima
+                $this->autoCreateRegisterAset($penerimaan, $distribusi, $validated);
             }
 
             DB::commit();
@@ -302,8 +307,14 @@ class PenerimaanBarangController extends Controller
             }
 
             // Update status distribusi
+            $oldStatus = $penerimaan->status_penerimaan;
             if ($validated['status_penerimaan'] === 'DITERIMA') {
                 $penerimaan->distribusi->update(['status_distribusi' => 'SELESAI']);
+                
+                // Jika status berubah dari DITOLAK ke DITERIMA, auto-create RegisterAset
+                if ($oldStatus !== 'DITERIMA') {
+                    $this->autoCreateRegisterAset($penerimaan, $penerimaan->distribusi, $validated);
+                }
             } else {
                 $penerimaan->distribusi->update(['status_distribusi' => 'DIKIRIM']);
             }
@@ -378,5 +389,102 @@ class PenerimaanBarangController extends Controller
             ],
             'details' => $details,
         ]);
+    }
+
+    /**
+     * Auto create RegisterAset saat penerimaan ASET dikonfirmasi
+     */
+    protected function autoCreateRegisterAset($penerimaan, $distribusi, $validated)
+    {
+        $gudangTujuan = $distribusi->gudangTujuan;
+        $unitKerjaId = $gudangTujuan->id_unit_kerja ?? null;
+        
+        if (!$unitKerjaId) {
+            \Log::warning('Gudang tujuan tidak memiliki unit kerja untuk auto-create RegisterAset', [
+                'distribusi_id' => $distribusi->id_distribusi,
+                'gudang_tujuan_id' => $distribusi->id_gudang_tujuan
+            ]);
+            return;
+        }
+
+        foreach ($validated['detail'] as $detail) {
+            $inventory = \App\Models\DataInventory::find($detail['id_inventory']);
+            
+            // Hanya untuk ASET
+            if (!$inventory || $inventory->jenis_inventory !== 'ASET') {
+                continue;
+            }
+
+            // Ambil InventoryItem yang masih di gudang asal dan belum punya RegisterAset
+            $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $detail['id_inventory'])
+                ->where('id_gudang', $distribusi->id_gudang_asal)
+                ->whereDoesntHave('registerAset')
+                ->limit((int)$detail['qty_diterima'])
+                ->get();
+
+            foreach ($inventoryItems as $item) {
+                // Update lokasi fisik InventoryItem ke gudang tujuan
+                $item->update(['id_gudang' => $distribusi->id_gudang_tujuan]);
+
+                // Generate nomor register dengan format baru: ID_UNIT_KERJA/ID_RUANGAN/URUT atau ID_UNIT_KERJA/URUT
+                $nomorRegister = $this->generateNomorRegisterForPenerimaan(
+                    $unitKerjaId,
+                    null, // Ruangan null saat auto-create, bisa diisi nanti via edit
+                    $validated['tanggal_penerimaan']
+                );
+
+                // Buat RegisterAset otomatis
+                \App\Models\RegisterAset::create([
+                    'id_inventory' => $detail['id_inventory'],
+                    'id_unit_kerja' => $unitKerjaId,
+                    'id_ruangan' => null, // Bisa diisi nanti via edit
+                    'nomor_register' => $nomorRegister,
+                    'kondisi_aset' => $item->kondisi_item ?? 'BAIK',
+                    'status_aset' => $item->status_item === 'AKTIF' ? 'AKTIF' : 'NONAKTIF',
+                    'tanggal_perolehan' => $validated['tanggal_penerimaan'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Generate nomor register otomatis untuk penerimaan barang
+     * Format: [ID_UNIT_KERJA]/[ID_RUANGAN]/[URUT]
+     * Jika tidak ada ruangan: [ID_UNIT_KERJA]/[URUT]
+     */
+    protected function generateNomorRegisterForPenerimaan($idUnitKerja, $idRuangan = null, $tanggalPenerimaan = null)
+    {
+        $tahun = $tanggalPenerimaan ? date('Y', strtotime($tanggalPenerimaan)) : date('Y');
+        
+        // Format baru: ID_UNIT_KERJA/ID_RUANGAN/URUT atau ID_UNIT_KERJA/URUT
+        if ($idRuangan) {
+            $prefix = sprintf('%03d/%03d', $idUnitKerja, $idRuangan);
+        } else {
+            $prefix = sprintf('%03d', $idUnitKerja);
+        }
+        
+        // Cari nomor urut terakhir untuk kombinasi unit kerja + ruangan + tahun ini
+        $lastRegister = \App\Models\RegisterAset::where('id_unit_kerja', $idUnitKerja)
+            ->where(function($q) use ($idRuangan) {
+                if ($idRuangan) {
+                    $q->where('id_ruangan', $idRuangan);
+                } else {
+                    $q->whereNull('id_ruangan');
+                }
+            })
+            ->whereYear('tanggal_perolehan', $tahun)
+            ->where('nomor_register', 'like', $prefix . '/%')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(nomor_register, "/", -1) AS UNSIGNED) DESC')
+            ->first();
+        
+        $urut = 1;
+        if ($lastRegister) {
+            // Extract nomor urut dari nomor register terakhir
+            $parts = explode('/', $lastRegister->nomor_register);
+            $lastUrut = (int)end($parts);
+            $urut = $lastUrut + 1;
+        }
+        
+        return sprintf('%s/%04d', $prefix, $urut);
     }
 }

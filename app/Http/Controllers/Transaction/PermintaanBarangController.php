@@ -114,7 +114,7 @@ class PermintaanBarangController extends Controller
                 'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
                 'id_pemohon' => 'required|exists:master_pegawai,id',
                 'tanggal_permintaan' => 'required|date',
-                'tipe_permintaan' => 'required|in:RUTIN,TAHUNAN',
+                'tipe_permintaan' => 'required|in:RUTIN,CITO',
                 'jenis_permintaan' => 'required|array|min:1',
                 'jenis_permintaan.*' => 'required|in:ASET,PERSEDIAAN,FARMASI',
                 'keterangan' => 'nullable|string',
@@ -124,8 +124,8 @@ class PermintaanBarangController extends Controller
                 'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
                 'detail.*.keterangan' => 'nullable|string',
             ], [
-                'tipe_permintaan.required' => 'Tipe permintaan harus dipilih (Rutin atau Tahunan).',
-                'tipe_permintaan.in' => 'Tipe permintaan harus Rutin atau Tahunan.',
+                'tipe_permintaan.required' => 'Tipe permintaan harus dipilih (Rutin atau CITO (Penting)).',
+                'tipe_permintaan.in' => 'Tipe permintaan harus Rutin atau CITO (Penting).',
                 'jenis_permintaan.required' => 'Sub jenis permintaan harus dipilih minimal satu (Aset, Persediaan, atau Farmasi).',
                 'jenis_permintaan.array' => 'Sub jenis permintaan harus berupa array.',
                 'jenis_permintaan.min' => 'Sub jenis permintaan harus dipilih minimal satu.',
@@ -171,7 +171,7 @@ class PermintaanBarangController extends Controller
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau TAHUNAN
+                'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau CITO
                 'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON: ["ASET", "PERSEDIAAN", "FARMASI"]
                 'status_permintaan' => 'DRAFT',
                 'keterangan' => $validated['keterangan'] ?? null,
@@ -256,8 +256,9 @@ class PermintaanBarangController extends Controller
             'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
             'id_pemohon' => 'required|exists:master_pegawai,id',
             'tanggal_permintaan' => 'required|date',
+            'tipe_permintaan' => 'required|in:RUTIN,CITO',
             'jenis_permintaan' => 'required|array|min:1',
-            'jenis_permintaan.*' => 'required|in:BARANG,ASET',
+            'jenis_permintaan.*' => 'required|in:ASET,PERSEDIAAN,FARMASI',
             'keterangan' => 'nullable|string',
             'detail' => 'required|array|min:1',
             'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
@@ -274,6 +275,7 @@ class PermintaanBarangController extends Controller
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
+                'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau CITO
                 'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
