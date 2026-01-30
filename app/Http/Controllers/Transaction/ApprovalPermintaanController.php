@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Log;
 use App\Models\ApprovalFlowDefinition;
 use App\Models\ApprovalLog;
 use App\Models\PermintaanBarang;
+use App\Models\DetailPermintaanBarang;
 use App\Models\MasterPegawai;
 use App\Models\Role;
 use App\Models\DataInventory;
+use App\Models\DataStock;
 
 class ApprovalPermintaanController extends Controller
 {
@@ -257,6 +259,15 @@ class ApprovalPermintaanController extends Controller
             abort(404, 'Permintaan tidak ditemukan.');
         }
         
+        // Get stock data for each detail
+        $stockData = [];
+        foreach ($permintaan->detailPermintaan as $detail) {
+            $stockData[$detail->id_detail_permintaan] = [
+                'total' => DataStock::getTotalStock($detail->id_data_barang),
+                'per_gudang' => DataStock::getStockPerGudang($detail->id_data_barang),
+            ];
+        }
+        
         // Load approval history
         $approvalHistory = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
             ->where('id_referensi', $approval->id_referensi)
@@ -295,7 +306,7 @@ class ApprovalPermintaanController extends Controller
             }
         }
         
-        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow', 'previousStepVerified', 'displayStatus', 'rejectedApproval'));
+        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow', 'previousStepVerified', 'displayStatus', 'rejectedApproval', 'stockData'));
     }
 
     /**
@@ -387,10 +398,44 @@ class ApprovalPermintaanController extends Controller
         
         $validated = $request->validate([
             'catatan' => 'nullable|string',
+            'koreksi_qty' => 'nullable|array',
+            'koreksi_qty.*' => 'nullable|numeric|min:0.01',
         ]);
+        
+        // Load permintaan untuk validasi stock
+        $permintaan = PermintaanBarang::with('detailPermintaan')->find($approval->id_referensi);
+        
+        // Validasi koreksi qty jika ada
+        if (isset($validated['koreksi_qty']) && is_array($validated['koreksi_qty'])) {
+            foreach ($validated['koreksi_qty'] as $detailId => $qtyBaru) {
+                if ($qtyBaru !== null) {
+                    $detail = $permintaan->detailPermintaan->find($detailId);
+                    if ($detail) {
+                        $totalStock = DataStock::getTotalStock($detail->id_data_barang);
+                        if ($qtyBaru > $totalStock) {
+                            return back()->withInput()->withErrors([
+                                "koreksi_qty.{$detailId}" => "Jumlah yang dikoreksi ({$qtyBaru}) melebihi stock tersedia ({$totalStock})."
+                            ]);
+                        }
+                    }
+                }
+            }
+        }
         
         DB::beginTransaction();
         try {
+            // Update qty jika ada koreksi
+            if (isset($validated['koreksi_qty']) && is_array($validated['koreksi_qty'])) {
+                foreach ($validated['koreksi_qty'] as $detailId => $qtyBaru) {
+                    if ($qtyBaru !== null) {
+                        $detail = DetailPermintaanBarang::find($detailId);
+                        if ($detail && $detail->id_permintaan == $permintaan->id_permintaan) {
+                            $detail->update(['qty_diminta' => $qtyBaru]);
+                        }
+                    }
+                }
+            }
+            
             // Update approval log
             $approval->update([
                 'status' => 'DIVERIFIKASI',

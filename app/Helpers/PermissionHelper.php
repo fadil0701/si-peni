@@ -359,15 +359,35 @@ class PermissionHelper
                     'data-inventory' => ['route' => 'inventory.data-inventory.index', 'permission' => 'inventory.data-inventory.index'],
                 ],
             ],
-            'transaksi' => [
+            'permintaan' => [
                 'route' => null,
-                'permission' => 'transaction.*',
+                'permission' => null,
                 'submenus' => [
                     'permintaan-barang' => ['route' => 'transaction.permintaan-barang.index', 'permission' => 'transaction.permintaan-barang.index'],
-                    'approval' => ['route' => 'transaction.approval.index', 'permission' => 'transaction.approval.index'],
+                    'permintaan-pemeliharaan' => ['route' => 'maintenance.permintaan-pemeliharaan.index', 'permission' => 'maintenance.permintaan-pemeliharaan.index'],
+                    'permintaan-pengadaan-barang' => ['route' => 'planning.rku.index', 'permission' => 'planning.rku.index'],
+                ],
+            ],
+            'approval' => [
+                'route' => null,
+                'permission' => null,
+                'submenus' => [
+                    'approval-permintaan-barang' => ['route' => 'transaction.approval.index', 'permission' => 'transaction.approval.index'],
+                    // Note: Route untuk approval pemeliharaan dan pengadaan belum dibuat, menggunakan route sementara
+                    'approval-permintaan-pemeliharaan' => ['route' => 'maintenance.permintaan-pemeliharaan.index', 'permission' => 'maintenance.permintaan-pemeliharaan.index'],
+                    'approval-permintaan-pengadaan-barang' => ['route' => 'planning.rku.index', 'permission' => 'planning.rku.index'],
+                ],
+            ],
+            'pengurus-barang' => [
+                'route' => null,
+                'permission' => null,
+                'submenus' => [
+                    'proses-disposisi' => ['route' => 'transaction.draft-distribusi.index', 'permission' => 'transaction.draft-distribusi.index'],
+                    'compile-sbbk' => ['route' => 'transaction.compile-distribusi.index', 'permission' => 'transaction.compile-distribusi.index'],
                     'distribusi' => ['route' => 'transaction.distribusi.index', 'permission' => 'transaction.distribusi.index'],
                     'penerimaan-barang' => ['route' => 'transaction.penerimaan-barang.index', 'permission' => 'transaction.penerimaan-barang.index'],
-                    'retur' => ['route' => 'transaction.retur-barang.index', 'permission' => 'transaction.retur-barang.index'],
+                    'retur-barang' => ['route' => 'transaction.retur-barang.index', 'permission' => 'transaction.retur-barang.index'],
+                    'pemakaian-barang' => ['route' => 'transaction.pemakaian-barang.index', 'permission' => 'transaction.pemakaian-barang.index'],
                 ],
             ],
             'aset-kir' => [
@@ -378,7 +398,6 @@ class PermissionHelper
                 'route' => null,
                 'permission' => 'maintenance.*',
                 'submenus' => [
-                    'permintaan-pemeliharaan' => ['route' => 'maintenance.permintaan-pemeliharaan.index', 'permission' => 'maintenance.permintaan-pemeliharaan.index'],
                     'jadwal-maintenance' => ['route' => 'maintenance.jadwal-maintenance.index', 'permission' => 'maintenance.jadwal-maintenance.index'],
                     'kalibrasi-aset' => ['route' => 'maintenance.kalibrasi-aset.index', 'permission' => 'maintenance.kalibrasi-aset.index'],
                     'service-report' => ['route' => 'maintenance.service-report.index', 'permission' => 'maintenance.service-report.index'],
@@ -410,7 +429,9 @@ class PermissionHelper
                 'master-manajemen' => 'master-manajemen',
                 'master-data' => 'master-data',
                 'inventory' => 'inventory',
-                'transaksi' => 'transaction',
+                'permintaan' => null,
+                'approval' => null,
+                'pengurus-barang' => null,
                 'aset-kir' => 'asset',
                 'maintenance' => 'maintenance',
                 'laporan' => 'reports',

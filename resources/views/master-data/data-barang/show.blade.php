@@ -60,10 +60,7 @@
                     <div class="sm:col-span-2">
                         <dt class="text-sm font-medium text-gray-500 mb-1">Foto Barang</dt>
                         <dd class="text-sm text-gray-900">
-                            <img src="{{ $dataBarang->upload_foto ? asset('storage/' . $dataBarang->upload_foto) : $dataBarang->foto_barang }}" 
-                                 alt="Foto Barang" 
-                                 class="h-48 w-auto rounded-md border border-gray-300 shadow-sm"
-                                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect width=\'200\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'14\'%3EFoto tidak ditemukan%3C/text%3E%3C/svg%3E';">
+                            <img src="{{ $dataBarang->upload_foto ? asset('storage/' . $dataBarang->upload_foto) : $dataBarang->foto_barang }}" alt="Foto Barang" class="h-48 w-auto rounded-md border border-gray-300 shadow-sm">
                         </dd>
                     </div>
                     @endif

@@ -51,4 +51,31 @@ class DataStock extends Model
     {
         return $this->hasMany(StockAdjustment::class, 'id_stock', 'id_stock');
     }
+
+    /**
+     * Get total stock available for a barang across all gudang
+     */
+    public static function getTotalStock($idDataBarang): float
+    {
+        return self::where('id_data_barang', $idDataBarang)
+            ->sum('qty_akhir') ?? 0;
+    }
+
+    /**
+     * Get stock per gudang for a barang
+     */
+    public static function getStockPerGudang($idDataBarang): \Illuminate\Support\Collection
+    {
+        return self::where('id_data_barang', $idDataBarang)
+            ->with('gudang', 'satuan')
+            ->get()
+            ->map(function($stock) {
+                return [
+                    'id_gudang' => $stock->id_gudang,
+                    'nama_gudang' => $stock->gudang->nama_gudang ?? '-',
+                    'qty_akhir' => $stock->qty_akhir,
+                    'satuan' => $stock->satuan->nama_satuan ?? '-',
+                ];
+            });
+    }
 }

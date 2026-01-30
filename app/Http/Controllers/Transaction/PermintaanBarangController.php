@@ -11,6 +11,10 @@ use App\Models\MasterUnitKerja;
 use App\Models\MasterPegawai;
 use App\Models\MasterDataBarang;
 use App\Models\MasterSatuan;
+use App\Models\DataStock;
+use App\Models\DataInventory;
+use App\Models\RegisterAset;
+use App\Models\InventoryItem;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
@@ -94,10 +98,74 @@ class PermintaanBarangController extends Controller
             $pegawais = MasterPegawai::all();
         }
         
+        // Ambil semua data barang untuk dropdown
         $dataBarangs = MasterDataBarang::with(['subjenisBarang', 'satuan'])->get();
         $satuans = MasterSatuan::all();
 
-        return view('transaction.permintaan-barang.create', compact('unitKerjas', 'pegawais', 'dataBarangs', 'satuans'));
+        // Get inventory data untuk aset (belum didistribusikan, kondisi baik)
+        // Aset yang belum didistribusikan adalah yang belum punya RegisterAset dengan id_unit_kerja
+        // Kondisi baik: InventoryItem dengan kondisi_item = 'BAIK' atau belum punya RegisterAset
+        $inventoryAsetIds = DataInventory::where('jenis_inventory', 'ASET')
+            ->where('status_inventory', 'AKTIF')
+            ->where(function($q) {
+                // Belum punya RegisterAset dengan id_unit_kerja (belum didistribusikan)
+                $q->whereDoesntHave('registerAset', function($subQ) {
+                    $subQ->whereNotNull('id_unit_kerja');
+                })
+                // ATAU punya RegisterAset tapi belum punya id_unit_kerja (masih di gudang pusat)
+                ->orWhereHas('registerAset', function($subQ) {
+                    $subQ->whereNull('id_unit_kerja')
+                         ->where('kondisi_aset', 'BAIK');
+                });
+            })
+            ->whereHas('inventoryItems', function($q) {
+                // Pastikan ada InventoryItem dengan kondisi baik dan status aktif
+                $q->where(function($subQ) {
+                    $subQ->where('kondisi_item', 'BAIK')
+                         ->orWhereNull('kondisi_item'); // Jika belum ada kondisi, anggap baik
+                })
+                ->where('status_item', 'AKTIF');
+            })
+            ->pluck('id_data_barang')
+            ->unique()
+            ->toArray();
+
+        // Get stock data untuk persediaan dan farmasi
+        // Untuk PERSEDIAAN dan FARMASI, ambil langsung dari DataInventory
+        // Stock akan dicek saat validasi di store method
+        $stockPersediaanIds = DataInventory::where('jenis_inventory', 'PERSEDIAAN')
+            ->where('status_inventory', 'AKTIF')
+            ->pluck('id_data_barang')
+            ->unique()
+            ->toArray();
+
+        // Barang yang memiliki inventory farmasi
+        // Ambil langsung dari DataInventory dengan jenis FARMASI yang aktif
+        $stockFarmasiIds = DataInventory::where('jenis_inventory', 'FARMASI')
+            ->where('status_inventory', 'AKTIF')
+            ->pluck('id_data_barang')
+            ->unique()
+            ->toArray();
+
+        // Get stock data for each barang
+        $stockData = [];
+        foreach ($dataBarangs as $barang) {
+            $stockData[$barang->id_data_barang] = [
+                'total' => DataStock::getTotalStock($barang->id_data_barang),
+                'per_gudang' => DataStock::getStockPerGudang($barang->id_data_barang),
+            ];
+        }
+
+        return view('transaction.permintaan-barang.create', compact(
+            'unitKerjas', 
+            'pegawais', 
+            'dataBarangs', 
+            'satuans', 
+            'stockData',
+            'inventoryAsetIds',
+            'stockPersediaanIds',
+            'stockFarmasiIds'
+        ));
     }
 
     public function store(Request $request)
@@ -145,6 +213,20 @@ class PermintaanBarangController extends Controller
                 'request' => $request->all(),
             ]);
             return back()->withInput()->withErrors($e->errors());
+        }
+
+        // Validasi stock tersedia untuk setiap detail
+        $stockErrors = [];
+        foreach ($validated['detail'] as $index => $detail) {
+            $totalStock = DataStock::getTotalStock($detail['id_data_barang']);
+            if ($detail['qty_diminta'] > $totalStock) {
+                $dataBarang = MasterDataBarang::find($detail['id_data_barang']);
+                $stockErrors["detail.{$index}.qty_diminta"] = "Jumlah yang diminta ({$detail['qty_diminta']}) melebihi stock tersedia ({$totalStock}) untuk barang {$dataBarang->nama_barang}.";
+            }
+        }
+
+        if (!empty($stockErrors)) {
+            return back()->withInput()->withErrors($stockErrors);
         }
 
         DB::beginTransaction();

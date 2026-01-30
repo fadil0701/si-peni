@@ -136,7 +136,7 @@
                                             id="tipe_rutin" 
                                             name="tipe_permintaan" 
                                             value="RUTIN"
-                                            {{ old('tipe_permintaan') == 'RUTIN' ? 'checked' : '' }}
+                                            {{ old('tipe_permintaan', 'RUTIN') == 'RUTIN' ? 'checked' : '' }}
                                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                                             onchange="updateSubJenis()"
                                         >
@@ -164,7 +164,7 @@
                                 @enderror
                             </div>
                             
-                            <div id="subJenisContainer" class="mt-4 {{ old('tipe_permintaan') ? '' : 'hidden' }}">
+                            <div id="subJenisContainer" class="mt-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                     Sub Jenis Permintaan <span class="text-red-500">*</span>
                                 </label>
@@ -216,7 +216,7 @@
                         @foreach(old('detail') as $index => $detail)
                             <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                                    <div class="sm:col-span-5">
+                                    <div class="sm:col-span-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
                                             Data Barang <span class="text-red-500">*</span>
                                         </label>
@@ -239,7 +239,7 @@
                                         @enderror
                                     </div>
 
-                                    <div class="sm:col-span-2">
+                                    <div class="sm:col-span-1">
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
                                             Qty <span class="text-red-500">*</span>
                                         </label>
@@ -251,21 +251,22 @@
                                             step="0.01"
                                             value="{{ old('detail.'.$index.'.qty_diminta') }}"
                                             placeholder="0"
-                                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.qty_diminta') border-red-500 @enderror"
+                                            max=""
+                                            class="qty-input block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.qty_diminta') border-red-500 @enderror"
                                         >
                                         @error('detail.'.$index.'.qty_diminta')
                                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                         @enderror
                                     </div>
 
-                                    <div class="sm:col-span-2">
+                                    <div class="sm:col-span-1">
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
                                             Satuan <span class="text-red-500">*</span>
                                         </label>
                                         <select 
                                             name="detail[{{ $index }}][id_satuan]" 
                                             required
-                                            class="select-satuan block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.id_satuan') border-red-500 @enderror"
+                                            class="select-satuan block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('detail.'.$index.'.id_satuan') border-red-500 @enderror"
                                         >
                                             <option value="">Pilih Satuan</option>
                                             @foreach($satuans as $satuan)
@@ -277,7 +278,16 @@
                                         @enderror
                                     </div>
 
-                                    <div class="sm:col-span-2">
+                                    <div class="sm:col-span-1">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            Stock Tersedia
+                                        </label>
+                                        <div class="stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center">
+                                            -
+                                        </div>
+                                    </div>
+
+                                    <div class="sm:col-span-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
                                         <input 
                                             type="text" 
@@ -291,9 +301,12 @@
                                     <div class="sm:col-span-1 flex items-end">
                                         <button 
                                             type="button" 
-                                            class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                            class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                                            title="Hapus Item"
                                         >
-                                            Hapus
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
@@ -329,7 +342,7 @@
 <template id="itemTemplate">
     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div class="sm:col-span-5">
+            <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Data Barang <span class="text-red-500">*</span>
                 </label>
@@ -347,7 +360,7 @@
                 </select>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Qty <span class="text-red-500">*</span>
                 </label>
@@ -358,18 +371,19 @@
                     min="0.01"
                     step="0.01"
                     placeholder="0"
-                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    max=""
+                    class="qty-input block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Satuan <span class="text-red-500">*</span>
                 </label>
                 <select 
                     name="detail[INDEX][id_satuan]" 
                     required
-                    class="select-satuan block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    class="select-satuan block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                     <option value="">Pilih Satuan</option>
                     @foreach($satuans as $satuan)
@@ -378,7 +392,16 @@
                 </select>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Stock Tersedia
+                </label>
+                <div class="stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center">
+                    -
+                </div>
+            </div>
+
+            <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
                 <input 
                     type="text" 
@@ -391,9 +414,12 @@
             <div class="sm:col-span-1 flex items-end">
                 <button 
                     type="button" 
-                    class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                    title="Hapus Item"
                 >
-                    Hapus
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                 </button>
             </div>
         </div>
@@ -403,8 +429,91 @@
 @push('scripts')
 <script>
 let itemIndex = {{ old('detail') ? count(old('detail')) : 0 }};
+const stockData = @json($stockData ?? []);
+const inventoryAsetIds = @json(array_map('intval', $inventoryAsetIds ?? []));
+const stockPersediaanIds = @json(array_map('intval', $stockPersediaanIds ?? []));
+const stockFarmasiIds = @json(array_map('intval', $stockFarmasiIds ?? []));
 
-// Fungsi untuk menambahkan item baru
+// Debug: log data yang diterima
+console.log('=== Filter Data Barang Debug ===');
+console.log('inventoryAsetIds:', inventoryAsetIds);
+console.log('stockFarmasiIds:', stockFarmasiIds);
+console.log('stockPersediaanIds:', stockPersediaanIds);
+
+// Fungsi untuk filter dropdown berdasarkan sub jenis permintaan
+function filterDataBarangByJenisPermintaan() {
+    const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked'))
+        .map(cb => cb.value);
+    
+    // Debug: log data yang tersedia
+    console.log('Checked jenis:', checkedJenis);
+    console.log('inventoryAsetIds:', inventoryAsetIds);
+    console.log('stockFarmasiIds:', stockFarmasiIds);
+    console.log('stockPersediaanIds:', stockPersediaanIds);
+    
+    const allSelects = document.querySelectorAll('.select-data-barang');
+    
+    allSelects.forEach(select => {
+        const currentValue = select.value;
+        const options = Array.from(select.options);
+        let visibleCount = 0;
+        
+        // Tampilkan/sembunyikan options berdasarkan jenis permintaan
+        options.forEach(option => {
+            if (option.value === '') {
+                option.style.display = '';
+                return;
+            }
+            
+            const barangId = parseInt(option.value);
+            let shouldShow = false;
+            
+            // Convert arrays to numbers untuk comparison yang lebih akurat
+            const inventoryAsetIdsNum = inventoryAsetIds.map(id => parseInt(id));
+            const stockFarmasiIdsNum = stockFarmasiIds.map(id => parseInt(id));
+            const stockPersediaanIdsNum = stockPersediaanIds.map(id => parseInt(id));
+            
+            if (checkedJenis.length === 0) {
+                // Jika belum ada yang dipilih, sembunyikan semua
+                shouldShow = false;
+            } else if (checkedJenis.includes('ASET') && checkedJenis.includes('FARMASI')) {
+                // Jika ASET dan FARMASI dipilih: tampilkan inventory aset + stock farmasi
+                const isAset = inventoryAsetIdsNum.includes(barangId);
+                const isFarmasi = stockFarmasiIdsNum.includes(barangId);
+                shouldShow = isAset || isFarmasi;
+                if (shouldShow) {
+                    console.log(`Barang ${barangId} (${option.textContent}): ASET=${isAset}, FARMASI=${isFarmasi}`);
+                }
+            } else if (checkedJenis.includes('ASET') && checkedJenis.includes('PERSEDIAAN')) {
+                // Jika ASET dan PERSEDIAAN dipilih: tampilkan inventory aset + stock persediaan
+                shouldShow = inventoryAsetIdsNum.includes(barangId) || stockPersediaanIdsNum.includes(barangId);
+            } else if (checkedJenis.includes('ASET')) {
+                // Jika hanya ASET: tampilkan hanya inventory aset
+                shouldShow = inventoryAsetIdsNum.includes(barangId);
+            } else if (checkedJenis.includes('FARMASI')) {
+                // Jika hanya FARMASI: tampilkan hanya stock farmasi
+                shouldShow = stockFarmasiIdsNum.includes(barangId);
+            } else if (checkedJenis.includes('PERSEDIAAN')) {
+                // Jika hanya PERSEDIAAN: tampilkan hanya stock persediaan
+                shouldShow = stockPersediaanIdsNum.includes(barangId);
+            }
+            
+            option.style.display = shouldShow ? '' : 'none';
+            if (shouldShow) visibleCount++;
+        });
+        
+        console.log(`Total visible options: ${visibleCount}`);
+        
+        // Jika option yang dipilih sekarang disembunyikan, reset ke kosong
+        if (currentValue && !options.find(opt => opt.value === currentValue && opt.style.display !== 'none')) {
+            select.value = '';
+            // Trigger change untuk update stock info
+            select.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+    // Fungsi untuk menambahkan item baru
 function tambahItem() {
     const template = document.getElementById('itemTemplate');
     const container = document.getElementById('detailContainer');
@@ -427,16 +536,46 @@ function tambahItem() {
     container.appendChild(finalItem);
     itemIndex++;
     
-    // Auto-set satuan ketika data barang dipilih
+    // Filter dropdown untuk item baru
+    filterDataBarangByJenisPermintaan();
+    
+    // Auto-set satuan dan tampilkan stock ketika data barang dipilih
     const selectBarang = finalItem.querySelector('.select-data-barang');
     const selectSatuan = finalItem.querySelector('.select-satuan');
+    const qtyInput = finalItem.querySelector('.qty-input');
+    const stockDisplay = finalItem.querySelector('.stock-display');
     
     if (selectBarang && selectSatuan) {
         selectBarang.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             const satuanId = selectedOption.getAttribute('data-satuan');
+            const barangId = this.value;
+            
             if (satuanId) {
                 selectSatuan.value = satuanId;
+            }
+            
+            // Tampilkan stock tersedia di kolom terpisah
+            if (barangId && stockData[barangId]) {
+                const totalStock = stockData[barangId].total;
+                if (stockDisplay) {
+                    stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
+                    stockDisplay.className = totalStock > 0 
+                        ? 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-green-50 text-sm font-semibold text-green-700 text-center' 
+                        : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
+                }
+                if (qtyInput) {
+                    qtyInput.setAttribute('max', totalStock);
+                    if (parseFloat(qtyInput.value) > totalStock) {
+                        qtyInput.value = totalStock;
+                    }
+                }
+            } else {
+                if (stockDisplay) {
+                    stockDisplay.textContent = '-';
+                    stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
+                }
+                if (qtyInput) qtyInput.removeAttribute('max');
             }
         });
     }
@@ -467,18 +606,76 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Auto-set satuan untuk item yang sudah ada
+    // Auto-set satuan dan tampilkan stock untuk item yang sudah ada
     document.querySelectorAll('.select-data-barang').forEach(select => {
         select.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             const satuanId = selectedOption.getAttribute('data-satuan');
+            const barangId = this.value;
             const row = this.closest('.item-row');
             const selectSatuan = row.querySelector('.select-satuan');
+            const qtyInput = row.querySelector('.qty-input');
+            const stockDisplay = row.querySelector('.stock-display');
+            
             if (satuanId && selectSatuan) {
                 selectSatuan.value = satuanId;
             }
+            
+            // Tampilkan stock tersedia di kolom terpisah
+            if (barangId && stockData[barangId]) {
+                const totalStock = stockData[barangId].total;
+                if (stockDisplay) {
+                    stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
+                    stockDisplay.className = totalStock > 0 
+                        ? 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-green-50 text-sm font-semibold text-green-700 text-center' 
+                        : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
+                }
+                if (qtyInput) {
+                    qtyInput.setAttribute('max', totalStock);
+                    if (parseFloat(qtyInput.value) > totalStock) {
+                        qtyInput.value = totalStock;
+                    }
+                }
+            } else {
+                if (stockDisplay) {
+                    stockDisplay.textContent = '-';
+                    stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
+                }
+                if (qtyInput) qtyInput.removeAttribute('max');
+            }
         });
+        
+        // Trigger change untuk item yang sudah terpilih (untuk menampilkan stock)
+        if (select.value) {
+            // Delay sedikit untuk memastikan DOM sudah ready
+            setTimeout(() => {
+                select.dispatchEvent(new Event('change'));
+            }, 100);
+        }
     });
+    
+    // Helper function untuk format number
+    function number_format(number, decimals, dec_point, thousands_sep) {
+        number = (number + '').replace(/[^0-9+\-Ee.]/g, '');
+        const n = !isFinite(+number) ? 0 : +number;
+        const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
+        const sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
+        const dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
+        let s = '';
+        const toFixedFix = function(n, prec) {
+            const k = Math.pow(10, prec);
+            return '' + Math.round(n * k) / k;
+        };
+        s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
+        if (s[0].length > 3) {
+            s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+        }
+        if ((s[1] || '').length < prec) {
+            s[1] = s[1] || '';
+            s[1] += new Array(prec - s[1].length + 1).join('0');
+        }
+        return s.join(dec);
+    }
     
     // Tambah item pertama jika belum ada (hanya jika tidak ada old input)
     const container = document.getElementById('detailContainer');
@@ -540,6 +737,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const subJenisContainer = document.getElementById('subJenisContainer');
         const subJenisOptions = document.getElementById('subJenisOptions');
         
+        if (!subJenisContainer || !subJenisOptions) {
+            console.error('subJenisContainer atau subJenisOptions tidak ditemukan');
+            return;
+        }
+        
         if (!tipePermintaan) {
             subJenisContainer.classList.add('hidden');
             subJenisOptions.innerHTML = '';
@@ -548,6 +750,22 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Tampilkan container
         subJenisContainer.classList.remove('hidden');
+        
+        // Cek apakah sudah ada checkbox (dari old input atau render sebelumnya)
+        const existingCheckboxes = subJenisOptions.querySelectorAll('input[type="checkbox"][name="jenis_permintaan[]"]');
+        if (existingCheckboxes.length > 0) {
+            // Jika sudah ada, hanya setup event listener
+            setTimeout(() => {
+                existingCheckboxes.forEach(cb => {
+                    // Hapus listener lama jika ada
+                    const newCb = cb.cloneNode(true);
+                    cb.parentNode.replaceChild(newCb, cb);
+                    newCb.addEventListener('change', filterDataBarangByJenisPermintaan);
+                });
+                filterDataBarangByJenisPermintaan();
+            }, 50);
+            return;
+        }
         
         // Sub jenis untuk RUTIN dan CITO sama: ASET, PERSEDIAAN, FARMASI
         const subJenisList = [
@@ -580,15 +798,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         subJenisOptions.innerHTML = html;
+        
+        // Setup event listener untuk checkbox sub jenis
+        setTimeout(() => {
+            document.querySelectorAll('input[name="jenis_permintaan[]"]').forEach(cb => {
+                cb.addEventListener('change', filterDataBarangByJenisPermintaan);
+            });
+            // Filter awal setelah sub jenis di-render
+            filterDataBarangByJenisPermintaan();
+        }, 100);
     };
     
-    // Initialize sub jenis saat halaman dimuat
-    document.addEventListener('DOMContentLoaded', function() {
-        // Panggil updateSubJenis jika sudah ada tipe yang dipilih
-        const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
-        if (tipePermintaan) {
-            updateSubJenis();
+    // Setup event listener untuk checkbox sub jenis yang sudah ada (dari old input)
+    // Panggil updateSubJenis segera saat script dimuat (tidak perlu menunggu DOMContentLoaded)
+    // Karena "Rutin" sudah checked secara default, sub jenis akan langsung muncul
+    setTimeout(function() {
+        if (typeof window.updateSubJenis === 'function') {
+            window.updateSubJenis();
         }
+    }, 50);
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Pastikan updateSubJenis dipanggil saat DOM ready
+        setTimeout(function() {
+            if (typeof window.updateSubJenis === 'function') {
+                window.updateSubJenis();
+                
+                // Setup event listener untuk checkbox sub jenis setelah di-render
+                setTimeout(function() {
+                    document.querySelectorAll('input[name="jenis_permintaan[]"]').forEach(cb => {
+                        // Hapus listener lama jika ada untuk menghindari duplikasi
+                        const newCb = cb.cloneNode(true);
+                        cb.parentNode.replaceChild(newCb, cb);
+                        newCb.addEventListener('change', filterDataBarangByJenisPermintaan);
+                    });
+                    // Filter dropdown berdasarkan old input jika ada
+                    const oldJenis = @json(old('jenis_permintaan', []));
+                    if (oldJenis.length > 0) {
+                        filterDataBarangByJenisPermintaan();
+                    }
+                }, 150);
+            }
+        }, 100);
     });
     
     // Form validation sebelum submit

@@ -219,10 +219,7 @@
                         @if($dataInventory->upload_foto)
                             <div class="mb-2">
                                 <p class="text-sm text-gray-600 mb-2">Foto saat ini:</p>
-                                <img src="{{ asset('storage/' . $dataInventory->upload_foto) }}" 
-                                     alt="Foto Inventory" 
-                                     class="h-32 w-auto rounded-md border border-gray-300"
-                                     onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect width=\'200\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%239ca3af\' font-family=\'sans-serif\' font-size=\'14\'%3EFoto tidak ditemukan%3C/text%3E%3C/svg%3E';">
+                                <img src="{{ asset('storage/' . $dataInventory->upload_foto) }}" alt="Foto Inventory" class="h-32 w-auto rounded-md border border-gray-300">
                             </div>
                         @endif
                         <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">

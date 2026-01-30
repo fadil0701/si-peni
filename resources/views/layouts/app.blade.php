@@ -53,10 +53,12 @@
                         $canAccessMasterManajemen = isset($accessibleMenus['master-manajemen']);
                         $canAccessMasterData = isset($accessibleMenus['master-data']);
                         $canAccessInventory = isset($accessibleMenus['inventory']);
-                        $canAccessTransaksi = isset($accessibleMenus['transaksi']);
-        $canAccessAsset = isset($accessibleMenus['aset-kir']);
-        $canAccessMaintenance = isset($accessibleMenus['maintenance']);
-        $canAccessReports = isset($accessibleMenus['laporan']);
+                        $canAccessPermintaan = isset($accessibleMenus['permintaan']);
+                        $canAccessApproval = isset($accessibleMenus['approval']);
+                        $canAccessPengurusBarang = isset($accessibleMenus['pengurus-barang']);
+                        $canAccessAsset = isset($accessibleMenus['aset-kir']);
+                        $canAccessMaintenance = isset($accessibleMenus['maintenance']);
+                        $canAccessReports = isset($accessibleMenus['laporan']);
                     @endphp
                     <ul class="space-y-2">
                         <li>
@@ -134,40 +136,85 @@
                             </ul>
                         </li>
                         @endif
-                        @if($canAccessTransaksi)
+                        @if($canAccessPermintaan)
                         <li>
-                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('transaksi')">
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('permintaan')">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                                 </svg>
-                                Transaksi
-                                <svg id="transaksi-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                Permintaan
+                                <svg id="permintaan-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                                 </svg>
                             </div>
-                           <ul id="transaksi-submenu" class="hidden pl-4 mt-2 space-y-1">
-                               @if(isset($accessibleMenus['transaksi']['submenus']['permintaan-barang']))
-                               <li><a href="{{ route('transaction.permintaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Barang</a></li>
-                               @endif
-                               @if(isset($accessibleMenus['transaksi']['submenus']['approval']))
-                               <li><a href="{{ route('transaction.approval.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Persetujuan</a></li>
-                               @endif
-                               @if(PermissionHelper::canAccess($currentUser, 'transaction.draft-distribusi.index'))
-                               <li><a href="{{ route('transaction.draft-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Proses Disposisi</a></li>
-                               @endif
-                               @if(PermissionHelper::canAccess($currentUser, 'transaction.compile-distribusi.index'))
-                               <li><a href="{{ route('transaction.compile-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Compile SBBK</a></li>
-                               @endif
-                               @if(isset($accessibleMenus['transaksi']['submenus']['distribusi']))
-                               <li><a href="{{ route('transaction.distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Distribusi (SBBK)</a></li>
-                               @endif
-                               @if(isset($accessibleMenus['transaksi']['submenus']['penerimaan-barang']))
-                               <li><a href="{{ route('transaction.penerimaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Penerimaan Barang</a></li>
-                               @endif
-                               @if(isset($accessibleMenus['transaksi']['submenus']['retur']))
-                               <li><a href="{{ route('transaction.retur-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Retur Barang</a></li>
-                               @endif
-                           </ul>
+                            <ul id="permintaan-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['permintaan']['submenus']['permintaan-barang']))
+                                <li><a href="{{ route('transaction.permintaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Barang</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['permintaan']['submenus']['permintaan-pemeliharaan']))
+                                <li><a href="{{ route('maintenance.permintaan-pemeliharaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Pemeliharaan</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['permintaan']['submenus']['permintaan-pengadaan-barang']))
+                                <li><a href="{{ route('planning.rku.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Pengadaan Barang</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
+                        @if($canAccessApproval)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('approval')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Approval
+                                <svg id="approval-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="approval-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['approval']['submenus']['approval-permintaan-barang']))
+                                <li><a href="{{ route('transaction.approval.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Approval Permintaan Barang</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['approval']['submenus']['approval-permintaan-pemeliharaan']))
+                                <li><a href="{{ route('maintenance.permintaan-pemeliharaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Approval Permintaan Pemeliharaan</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['approval']['submenus']['approval-permintaan-pengadaan-barang']))
+                                <li><a href="{{ route('planning.rku.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Approval Permintaan Pengadaan Barang</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
+                        @if($canAccessPengurusBarang)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('pengurus-barang')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Pengurus Barang
+                                <svg id="pengurus-barang-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="pengurus-barang-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['proses-disposisi']))
+                                <li><a href="{{ route('transaction.draft-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Daftar Permintaan Barang</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['compile-sbbk']))
+                                <li><a href="{{ route('transaction.compile-distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">SBBK</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['distribusi']))
+                                <li><a href="{{ route('transaction.distribusi.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Distribusi</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['penerimaan-barang']))
+                                <li><a href="{{ route('transaction.penerimaan-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Penerimaan Barang</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['retur-barang']))
+                                <li><a href="{{ route('transaction.retur-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Retur Barang</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['pengurus-barang']['submenus']['pemakaian-barang']))
+                                <li><a href="{{ route('transaction.pemakaian-barang.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Pemakaian Barang</a></li>
+                                @endif
+                            </ul>
                         </li>
                         @endif
                         @if($canAccessAsset)
@@ -193,9 +240,6 @@
                                 </svg>
                             </div>
                             <ul id="maintenance-submenu" class="hidden pl-4 mt-2 space-y-1">
-                                @if(isset($accessibleMenus['maintenance']['submenus']['permintaan-pemeliharaan']))
-                                <li><a href="{{ route('maintenance.permintaan-pemeliharaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Permintaan Pemeliharaan</a></li>
-                                @endif
                                 @if(isset($accessibleMenus['maintenance']['submenus']['jadwal-maintenance']))
                                 <li><a href="{{ route('maintenance.jadwal-maintenance.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Jadwal Maintenance</a></li>
                                 @endif

@@ -62,6 +62,17 @@
 @endif
 
 @if($permintaan)
+    @php
+        $user = auth()->user();
+        $stepOrder = $currentFlow->step_order ?? 0;
+        $canKoreksi = ($stepOrder == 3 && ($user->hasRole('kasubbag_tu') || $user->hasRole('admin')) && $approval->status === 'MENUNGGU');
+    @endphp
+    
+    @if($canKoreksi)
+    <form method="POST" action="{{ route('transaction.approval.verifikasi', $approval->id) }}" id="formVerifikasi">
+        @csrf
+    @endif
+    
     <!-- Detail Permintaan -->
     <div class="bg-white shadow-sm rounded-lg border border-gray-200 mb-6">
         <div class="px-6 py-5 border-b border-gray-200">
@@ -134,18 +145,61 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kode Barang</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Tersedia</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Diminta</th>
+                                    @if($canKoreksi)
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Koreksi Qty</th>
+                                    @endif
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($permintaan->detailPermintaan as $index => $detail)
-                                <tr>
+                                @php
+                                    $detailStock = $stockData[$detail->id_detail_permintaan] ?? ['total' => 0, 'per_gudang' => collect()];
+                                    $totalStock = $detailStock['total'];
+                                    $isOverStock = $detail->qty_diminta > $totalStock;
+                                @endphp
+                                <tr class="{{ $isOverStock ? 'bg-red-50' : '' }}">
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
                                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang->kode_data_barang ?? '-' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang->nama_barang ?? '-' }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_diminta, 2, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <span class="font-semibold {{ $totalStock > 0 ? 'text-green-600' : 'text-red-600' }}">
+                                            {{ number_format($totalStock, 2, ',', '.') }}
+                                        </span>
+                                        @if($detailStock['per_gudang']->isNotEmpty())
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            @foreach($detailStock['per_gudang'] as $stockGudang)
+                                                <div>{{ $stockGudang['nama_gudang'] }}: {{ number_format($stockGudang['qty_akhir'], 2, ',', '.') }}</div>
+                                            @endforeach
+                                        </div>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <span class="{{ $isOverStock ? 'text-red-600 font-semibold' : 'text-gray-900' }}">
+                                            {{ number_format($detail->qty_diminta, 2, ',', '.') }}
+                                        </span>
+                                        @if($isOverStock)
+                                        <div class="text-xs text-red-600 mt-1">⚠ Melebihi stock!</div>
+                                        @endif
+                                    </td>
+                                    @if($canKoreksi)
+                                    <td class="px-4 py-3 text-sm">
+                                        <input 
+                                            type="number" 
+                                            name="koreksi_qty[{{ $detail->id_detail_permintaan }}]" 
+                                            form="formVerifikasi"
+                                            value="{{ old('koreksi_qty.'.$detail->id_detail_permintaan, $detail->qty_diminta) }}"
+                                            min="0.01"
+                                            step="0.01"
+                                            max="{{ $totalStock }}"
+                                            class="w-24 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="{{ number_format($detail->qty_diminta, 2, ',', '.') }}"
+                                        >
+                                    </td>
+                                    @endif
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->keterangan ?? '-' }}</td>
                                 </tr>
@@ -299,28 +353,41 @@
             {{-- Kasubbag TU - Verifikasi/Kembalikan (Step 3) --}}
             @elseif($stepOrder == 3 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.verifikasi'))
                 <div class="space-y-4">
-                    <form method="POST" action="{{ route('transaction.approval.verifikasi', $approval->id) }}" class="mb-4">
-                        @csrf
-                        <div class="mb-4">
-                            <label for="catatan_verifikasi" class="block text-sm font-medium text-gray-700 mb-2">Catatan Verifikasi (Opsional)</label>
-                            <textarea 
-                                id="catatan_verifikasi" 
-                                name="catatan" 
-                                rows="3"
-                                placeholder="Masukkan catatan verifikasi..."
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            ></textarea>
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    <strong>Koreksi Jumlah:</strong> Anda dapat mengoreksi jumlah permintaan jika diperlukan. Pastikan jumlah yang dikoreksi tidak melebihi stock tersedia.
+                                </p>
+                            </div>
                         </div>
-                        <button 
-                            type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                        >
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Verifikasi & Lanjutkan
-                        </button>
-                    </form>
+                    </div>
+                    <div class="mb-4">
+                        <label for="catatan_verifikasi" class="block text-sm font-medium text-gray-700 mb-2">Catatan Verifikasi (Opsional)</label>
+                        <textarea 
+                            id="catatan_verifikasi" 
+                            name="catatan" 
+                            rows="3"
+                            form="formVerifikasi"
+                            placeholder="Masukkan catatan verifikasi..."
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        ></textarea>
+                    </div>
+                    <button 
+                        type="submit" 
+                        form="formVerifikasi"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Verifikasi & Lanjutkan
+                    </button>
 
                     <form method="POST" action="{{ route('transaction.approval.kembalikan', $approval->id) }}">
                         @csrf
