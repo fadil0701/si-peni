@@ -102,6 +102,7 @@
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barang</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty Diminta</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty Disetujui</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
                             </tr>
                         </thead>
@@ -110,6 +111,7 @@
                                 <tr>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $detail->dataBarang->nama_barang ?? '-' }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ number_format($detail->qty_diminta, 2) }}</td>
+                                    <td class="px-4 py-2 text-sm font-semibold text-blue-900">{{ number_format($detail->qty_diminta, 2) }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
                                 </tr>
                             @endforeach
@@ -166,7 +168,7 @@
 <template id="itemTemplate">
     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div class="sm:col-span-5">
+            <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Inventory <span class="text-red-500">*</span>
                 </label>
@@ -174,10 +176,11 @@
                     name="detail[INDEX][id_inventory]" 
                     required
                     class="select-inventory block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    onchange="updateHargaSatuan(this)"
+                    onchange="updateInventoryDetails(this)"
                 >
                     <option value="">Pilih Inventory</option>
                 </select>
+                <input type="hidden" class="inventory-jenis-input" value="">
             </div>
 
             <div class="sm:col-span-2">
@@ -195,6 +198,17 @@
                         <option value="{{ $gudang->id_gudang }}">{{ $gudang->nama_gudang }}</option>
                     @endforeach
                 </select>
+            </div>
+
+            <div class="sm:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Qty Disetujui
+                </label>
+                <input 
+                    type="text" 
+                    class="qty-disetujui-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                    readonly
+                >
             </div>
 
             <div class="sm:col-span-2">
@@ -228,17 +242,53 @@
                     @endforeach
                 </select>
             </div>
-
-            <div class="sm:col-span-1 flex items-end">
-                <button 
-                    type="button" 
-                    class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                    Hapus
-                </button>
+        </div>
+        
+        <!-- Field untuk Farmasi/Persediaan: Exp Date dan Nomor Batch -->
+        <div class="mt-2 farmasi-persediaan-fields" style="display: none;">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Batch</label>
+                    <input 
+                        type="text" 
+                        class="no-batch-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                        readonly
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Exp Date</label>
+                    <input 
+                        type="text" 
+                        class="exp-date-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                        readonly
+                    >
+                </div>
             </div>
         </div>
-        <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        
+        <!-- Field untuk ASET: Nomor Seri dan Kode Register -->
+        <div class="mt-2 aset-fields" style="display: none;">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nomor Seri</label>
+                    <input 
+                        type="text" 
+                        class="no-seri-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                        readonly
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Kode Register</label>
+                    <input 
+                        type="text" 
+                        class="kode-register-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                        readonly
+                    >
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Harga Satuan <span class="text-red-500">*</span></label>
                 <input 
@@ -261,6 +311,14 @@
                     class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
             </div>
+            <div class="flex items-end">
+                <button 
+                    type="button" 
+                    class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                    Hapus
+                </button>
+            </div>
         </div>
     </div>
 </template>
@@ -273,9 +331,29 @@ const kategoriGudang = '{{ $kategoriGudang }}';
 
 // Pre-populate inventory data dari controller
 @php
-    $inventoriesData = $inventories->map(function($inv) {
+    $inventoriesData = $inventories->map(function($inv) use ($detailPermintaan) {
+        // Cari qty disetujui dari detail permintaan berdasarkan id_data_barang
+        $qtyDisetujui = 0;
+        $detailPermintaanItem = $detailPermintaan->firstWhere('id_data_barang', $inv->id_data_barang);
+        if ($detailPermintaanItem) {
+            $qtyDisetujui = (float)$detailPermintaanItem->qty_diminta;
+        }
+        
+        // Untuk ASET, ambil kode register dan nomor seri dari inventory_item
+        $kodeRegisterList = [];
+        $noSeriList = [];
+        if ($inv->jenis_inventory === 'ASET' && $inv->inventoryItems && $inv->inventoryItems->count() > 0) {
+            $kodeRegisterList = $inv->inventoryItems->pluck('kode_register')->filter()->values()->toArray();
+            $noSeriList = $inv->inventoryItems->pluck('no_seri')->filter()->unique()->values()->toArray();
+            // Jika tidak ada di inventory_item, gunakan dari data_inventory
+            if (empty($noSeriList) && $inv->no_seri) {
+                $noSeriList = [$inv->no_seri];
+            }
+        }
+        
         return [
             'id_inventory' => $inv->id_inventory,
+            'id_data_barang' => $inv->id_data_barang,
             'id_gudang' => $inv->id_gudang,
             'nama_barang' => ($inv->dataBarang->nama_barang ?? '-'),
             'kode_barang' => ($inv->dataBarang->kode_data_barang ?? ''),
@@ -283,6 +361,11 @@ const kategoriGudang = '{{ $kategoriGudang }}';
             'harga_satuan' => (float)($inv->harga_satuan ?? 0),
             'id_satuan' => $inv->id_satuan,
             'qty_input' => (float)($inv->qty_input ?? 0),
+            'qty_disetujui' => $qtyDisetujui,
+            'no_batch' => $inv->no_batch ?? null,
+            'tanggal_kedaluwarsa' => $inv->tanggal_kedaluwarsa ? \Carbon\Carbon::parse($inv->tanggal_kedaluwarsa)->format('d/m/Y') : null,
+            'no_seri_list' => $noSeriList,
+            'kode_register_list' => $kodeRegisterList,
         ];
     })->values()->toArray();
 @endphp
@@ -298,25 +381,85 @@ function loadInventoryByGudang(select) {
     filterInventoryByGudang(inventorySelect, gudangId);
 }
 
-// Update harga satuan saat inventory dipilih
-function updateHargaSatuan(select) {
+// Update semua detail inventory saat inventory dipilih
+function updateInventoryDetails(select) {
     const row = select.closest('.item-row');
     const hargaInput = row.querySelector('.harga-satuan-input');
     const satuanSelect = row.querySelector('.select-satuan');
+    const qtyDisetujuiInput = row.querySelector('.qty-disetujui-input');
+    const noBatchInput = row.querySelector('.no-batch-input');
+    const expDateInput = row.querySelector('.exp-date-input');
+    const noSeriInput = row.querySelector('.no-seri-input');
+    const kodeRegisterInput = row.querySelector('.kode-register-input');
+    const farmasiPersediaanFields = row.querySelector('.farmasi-persediaan-fields');
+    const asetFields = row.querySelector('.aset-fields');
+    const inventoryJenisInput = row.querySelector('.inventory-jenis-input');
     
     const selectedOption = select.options[select.selectedIndex];
     if (selectedOption.value) {
-        const harga = selectedOption.getAttribute('data-harga');
-        const satuanId = selectedOption.getAttribute('data-satuan');
+        const inventoryId = selectedOption.value;
+        const inventory = inventoriesFromController.find(inv => inv.id_inventory == inventoryId);
         
-        if (harga) {
-            hargaInput.value = harga;
+        if (inventory) {
+            // Update harga dan satuan
+            const harga = inventory.harga_satuan;
+            const satuanId = inventory.id_satuan;
+            
+            if (harga) {
+                hargaInput.value = harga;
+            }
+            if (satuanId) {
+                satuanSelect.value = satuanId;
+            }
+            
+            // Update qty disetujui
+            if (qtyDisetujuiInput) {
+                qtyDisetujuiInput.value = inventory.qty_disetujui ? inventory.qty_disetujui.toFixed(2) : '0.00';
+            }
+            
+            // Update jenis inventory untuk menentukan field mana yang ditampilkan
+            if (inventoryJenisInput) {
+                inventoryJenisInput.value = inventory.jenis_inventory;
+            }
+            
+            // Tampilkan/sembunyikan field berdasarkan jenis inventory
+            const isFarmasiPersediaan = ['FARMASI', 'PERSEDIAAN'].includes(inventory.jenis_inventory);
+            const isAset = inventory.jenis_inventory === 'ASET';
+            
+            if (isFarmasiPersediaan && farmasiPersediaanFields) {
+                farmasiPersediaanFields.style.display = 'block';
+                if (noBatchInput) noBatchInput.value = inventory.no_batch || '-';
+                if (expDateInput) expDateInput.value = inventory.tanggal_kedaluwarsa || '-';
+            } else {
+                if (farmasiPersediaanFields) farmasiPersediaanFields.style.display = 'none';
+            }
+            
+            if (isAset && asetFields) {
+                asetFields.style.display = 'block';
+                // Untuk ASET, tampilkan list kode register dan nomor seri
+                const noSeriList = inventory.no_seri_list || [];
+                const kodeRegisterList = inventory.kode_register_list || [];
+                if (noSeriInput) {
+                    noSeriInput.value = noSeriList.length > 0 ? noSeriList.join(', ') : '-';
+                }
+                if (kodeRegisterInput) {
+                    kodeRegisterInput.value = kodeRegisterList.length > 0 ? kodeRegisterList.join(', ') : '-';
+                }
+            } else {
+                if (asetFields) asetFields.style.display = 'none';
+            }
+            
+            calculateSubtotal(hargaInput);
         }
-        if (satuanId) {
-            satuanSelect.value = satuanId;
-        }
-        
-        calculateSubtotal(hargaInput);
+    } else {
+        // Reset semua field jika tidak ada inventory yang dipilih
+        if (qtyDisetujuiInput) qtyDisetujuiInput.value = '';
+        if (noBatchInput) noBatchInput.value = '';
+        if (expDateInput) expDateInput.value = '';
+        if (noSeriInput) noSeriInput.value = '';
+        if (kodeRegisterInput) kodeRegisterInput.value = '';
+        if (farmasiPersediaanFields) farmasiPersediaanFields.style.display = 'none';
+        if (asetFields) asetFields.style.display = 'none';
     }
 }
 
@@ -352,6 +495,12 @@ function populateInventoryForAllGudangs(inventorySelect) {
             option.setAttribute('data-harga', inv.harga_satuan);
             option.setAttribute('data-satuan', inv.id_satuan);
             option.setAttribute('data-gudang', inv.id_gudang);
+            option.setAttribute('data-jenis', inv.jenis_inventory);
+            option.setAttribute('data-qty-disetujui', inv.qty_disetujui || 0);
+            option.setAttribute('data-no-batch', inv.no_batch || '');
+            option.setAttribute('data-exp-date', inv.tanggal_kedaluwarsa || '');
+            option.setAttribute('data-no-seri-list', JSON.stringify(inv.no_seri_list || []));
+            option.setAttribute('data-kode-register-list', JSON.stringify(inv.kode_register_list || []));
             inventorySelect.appendChild(option);
         });
     } else {
@@ -387,6 +536,12 @@ function filterInventoryByGudang(inventorySelect, gudangId) {
             option.setAttribute('data-harga', inv.harga_satuan);
             option.setAttribute('data-satuan', inv.id_satuan);
             option.setAttribute('data-gudang', inv.id_gudang);
+            option.setAttribute('data-jenis', inv.jenis_inventory);
+            option.setAttribute('data-qty-disetujui', inv.qty_disetujui || 0);
+            option.setAttribute('data-no-batch', inv.no_batch || '');
+            option.setAttribute('data-exp-date', inv.tanggal_kedaluwarsa || '');
+            option.setAttribute('data-no-seri-list', JSON.stringify(inv.no_seri_list || []));
+            option.setAttribute('data-kode-register-list', JSON.stringify(inv.kode_register_list || []));
             inventorySelect.appendChild(option);
         });
     } else {
@@ -434,9 +589,9 @@ function addItemRow() {
     // Pre-populate inventory dengan semua inventory sesuai kategori
     populateInventoryForAllGudangs(inventorySelect);
     
-    // Attach event handler untuk update harga satuan
+    // Attach event handler untuk update semua detail inventory
     inventorySelect.addEventListener('change', function() {
-        updateHargaSatuan(this);
+        updateInventoryDetails(this);
         
         // Auto-select gudang berdasarkan inventory yang dipilih
         const selectedOption = this.options[this.selectedIndex];

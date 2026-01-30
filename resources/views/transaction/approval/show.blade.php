@@ -386,10 +386,10 @@
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Verifikasi & Lanjutkan
+                        Verifikasi, Setujui & Disposisi
                     </button>
 
-                    <form method="POST" action="{{ route('transaction.approval.kembalikan', $approval->id) }}">
+                    <form method="POST" action="{{ route('transaction.approval.kembalikan', $approval->id) }}" id="formKembalikan">
                         @csrf
                         <div class="mb-4">
                             <label for="catatan_kembalikan" class="block text-sm font-medium text-gray-700 mb-2">
@@ -399,19 +399,19 @@
                                 id="catatan_kembalikan" 
                                 name="catatan" 
                                 rows="3"
-                                required
-                                minlength="10"
+                                form="formKembalikan"
                                 placeholder="Masukkan alasan pengembalian (minimal 10 karakter)..."
                                 class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
-                            ></textarea>
+                            >{{ old('catatan') }}</textarea>
                             @error('catatan')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
                         <button 
                             type="submit" 
+                            form="formKembalikan"
                             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            onclick="return confirm('Apakah Anda yakin ingin mengembalikan permintaan ini?');"
+                            onclick="return validateKembalikan();"
                         >
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -421,84 +421,6 @@
                     </form>
                 </div>
             
-            {{-- Kepala Pusat - Approve/Reject (Step 4) --}}
-            @elseif($stepOrder == 4 && ($user->hasRole('admin') || $user->hasRole('kepala_pusat')))
-                @php
-                    $isAdmin = $user->hasRole('admin');
-                    $isKepalaPusat = $user->hasRole('kepala_pusat');
-                    // Untuk admin, selalu bisa approve meski step sebelumnya belum diverifikasi
-                    // Untuk kepala_pusat, harus menunggu step sebelumnya diverifikasi
-                    $showWarning = !$previousStepVerified && !$isAdmin;
-                    $showButtons = $isAdmin || $previousStepVerified;
-                @endphp
-                
-                @if($showWarning)
-                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded mb-4">
-                        <p class="text-sm text-yellow-700">
-                            <strong>Perhatian:</strong> Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum dapat disetujui atau ditolak.
-                        </p>
-                    </div>
-                @endif
-                
-                {{-- Tombol approve/tolak selalu muncul untuk admin, atau untuk kepala_pusat jika previousStepVerified = true --}}
-                @if($showButtons)
-                <div class="space-y-4">
-                    <form method="POST" action="{{ route('transaction.approval.approve', $approval->id) }}" class="mb-4">
-                        @csrf
-                        <div class="mb-4">
-                            <label for="catatan_approve" class="block text-sm font-medium text-gray-700 mb-2">Catatan (Opsional)</label>
-                            <textarea 
-                                id="catatan_approve" 
-                                name="catatan" 
-                                rows="3"
-                                placeholder="Masukkan catatan persetujuan..."
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            ></textarea>
-                        </div>
-                        <button 
-                            type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?');"
-                        >
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Setujui
-                        </button>
-                    </form>
-
-                    <form method="POST" action="{{ route('transaction.approval.reject', $approval->id) }}">
-                        @csrf
-                        <div class="mb-4">
-                            <label for="catatan_reject" class="block text-sm font-medium text-gray-700 mb-2">
-                                Catatan Penolakan <span class="text-red-500">*</span>
-                            </label>
-                            <textarea 
-                                id="catatan_reject" 
-                                name="catatan" 
-                                rows="3"
-                                required
-                                minlength="10"
-                                placeholder="Masukkan alasan penolakan (minimal 10 karakter)..."
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm @error('catatan') border-red-500 @enderror"
-                            ></textarea>
-                            @error('catatan')
-                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <button 
-                            type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?');"
-                        >
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Tolak
-                        </button>
-                    </form>
-                </div>
-                @endif
             @else
                 <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
                     <p class="text-sm text-yellow-700">
@@ -547,63 +469,68 @@
                     </div>
                 </div>
             </div>
+        @endif
+        
+        {{-- Informasi Disposisi - Setelah verifikasi Kasubbag TU, disposisi dilakukan otomatis --}}
+        @php
+            // Cek apakah sudah didisposisikan
+            // Disposisi ditandai dengan adanya approval log untuk step 4 (disposisi) dengan role admin gudang kategori
+            $step4FlowIds = \App\Models\ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('step_order', 4)
+                ->whereIn('role_id', function($query) {
+                    $query->select('id')
+                        ->from('roles')
+                        ->whereIn('name', ['admin_gudang_aset', 'admin_gudang_persediaan', 'admin_gudang_farmasi', 'admin_gudang']);
+                })
+                ->pluck('id');
             
-            {{-- Tombol Disposisi - Muncul setelah approval disetujui oleh kepala pusat --}}
-            @php
-                $user = auth()->user();
-                
-                // Cek apakah approval sudah disetujui oleh kepala pusat (step 4)
-                $kepalaPusatApproval = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
-                    ->where('id_referensi', $approval->id_referensi)
-                    ->whereHas('approvalFlow', function($q) {
-                        $q->where('step_order', 4);
-                    })
-                    ->where('status', 'DISETUJUI')
-                    ->first();
-                
-                // Cek apakah sudah didisposisikan
-                $sudahDidisposisikan = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
-                    ->where('id_referensi', $approval->id_referensi)
-                    ->where('status', 'DIDISPOSISIKAN')
-                    ->exists();
-                
-                // Cek permission untuk disposisi
-                // Admin dan admin_gudang bisa melakukan disposisi
-                $canDisposisi = ($user->hasRole('admin') || $user->hasRole('admin_gudang')) ||
-                                \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.disposisi');
-            @endphp
-            
-            @if($kepalaPusatApproval && !$sudahDidisposisikan && $canDisposisi)
-                <div class="mt-6 pt-6 border-t border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Disposisi ke Admin Gudang Kategori</h3>
-                    <p class="text-sm text-gray-600 mb-4">
-                        Permintaan telah disetujui oleh Kepala Pusat. Silakan lakukan disposisi ke Admin Gudang sesuai kategori barang.
-                    </p>
-                    <form method="POST" action="{{ route('transaction.approval.disposisi', $approval->id) }}">
-                        @csrf
-                        <button 
-                            type="submit" 
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            onclick="return confirm('Apakah Anda yakin ingin melakukan disposisi permintaan ini?');"
-                        >
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            $sudahDidisposisikan = \App\Models\ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('id_referensi', $approval->id_referensi)
+                ->whereIn('id_approval_flow', $step4FlowIds)
+                ->exists();
+        @endphp
+        
+        @if($step3Verified && $sudahDidisposisikan)
+            <div class="mt-6 pt-6 border-t border-gray-200">
+                <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            Lakukan Disposisi
-                        </button>
-                    </form>
-                </div>
-            @elseif($sudahDidisposisikan)
-                <div class="mt-6 pt-6 border-t border-gray-200">
-                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                        <p class="text-sm text-blue-700">
-                            <strong>Status:</strong> Permintaan telah didisposisikan ke Admin Gudang Kategori. Silakan lanjutkan ke menu "Proses Disposisi" untuk memproses lebih lanjut.
-                        </p>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-green-800">
+                                Permintaan telah diverifikasi, disetujui, dan didisposisikan ke Admin Gudang/Pengurus Barang. Admin Gudang dapat memproses permintaan ini di menu "Proses Disposisi".
+                            </p>
+                        </div>
                     </div>
                 </div>
-            @endif
+            </div>
         @endif
     </div>
 </div>
+
+@push('scripts')
+<script>
+    function validateKembalikan() {
+        const catatan = document.getElementById('catatan_kembalikan').value.trim();
+        
+        if (!catatan) {
+            alert('Catatan pengembalian wajib diisi.');
+            document.getElementById('catatan_kembalikan').focus();
+            return false;
+        }
+        
+        if (catatan.length < 10) {
+            alert('Catatan pengembalian minimal 10 karakter.');
+            document.getElementById('catatan_kembalikan').focus();
+            return false;
+        }
+        
+        return confirm('Apakah Anda yakin ingin mengembalikan permintaan ini?');
+    }
+</script>
+@endpush
 @endsection
 

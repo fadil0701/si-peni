@@ -400,7 +400,9 @@
             const menu = document.getElementById('user-dropdown-menu');
             const arrow = document.getElementById('user-menu-arrow');
             menu.classList.toggle('hidden');
-            arrow.classList.toggle('rotate-180');
+            if (arrow) {
+                arrow.classList.toggle('rotate-180');
+            }
         }
 
         // Close dropdown when clicking outside

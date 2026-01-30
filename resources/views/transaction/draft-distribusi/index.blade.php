@@ -6,30 +6,112 @@
     <div>
         <h1 class="text-2xl font-bold text-gray-900">Proses Disposisi{{ $kategoriGudang ? ' - ' . $kategoriGudang : '' }}</h1>
         <p class="mt-1 text-sm text-gray-600">
-            Daftar disposisi yang perlu diproses{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : ' (Semua Kategori)' }}
+            @if(($viewType ?? 'perlu_diproses') === 'riwayat')
+                Riwayat disposisi yang sudah diproses{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : ' (Semua Kategori)' }}
+            @else
+                Daftar disposisi yang perlu diproses{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : ' (Semua Kategori)' }}
+            @endif
         </p>
     </div>
     @if($isAdmin || ($isViewOnly ?? false))
     <div class="flex gap-2">
-        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'ASET']) }}" 
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'ASET', 'view_type' => $viewType ?? 'perlu_diproses']) }}" 
            class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'ASET' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
             ASET
         </a>
-        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'PERSEDIAAN']) }}" 
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'PERSEDIAAN', 'view_type' => $viewType ?? 'perlu_diproses']) }}" 
            class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'PERSEDIAAN' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
             PERSEDIAAN
         </a>
-        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'FARMASI']) }}" 
+        <a href="{{ route('transaction.draft-distribusi.index', ['kategori' => 'FARMASI', 'view_type' => $viewType ?? 'perlu_diproses']) }}" 
            class="px-3 py-1.5 text-sm rounded-md {{ $kategoriGudang == 'FARMASI' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
             FARMASI
         </a>
-        <a href="{{ route('transaction.draft-distribusi.index') }}" 
+        <a href="{{ route('transaction.draft-distribusi.index', ['view_type' => $viewType ?? 'perlu_diproses']) }}" 
            class="px-3 py-1.5 text-sm rounded-md {{ !$kategoriGudang ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
             Semua
         </a>
     </div>
     @endif
 </div>
+
+<!-- Tab Navigation -->
+<div class="mb-6 bg-white shadow-sm rounded-lg border border-gray-200">
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex" aria-label="Tabs">
+            @php
+                $currentViewType = $viewType ?? 'perlu_diproses';
+                $baseParams = ['kategori' => $kategoriGudang];
+            @endphp
+            <a 
+                href="{{ route('transaction.draft-distribusi.index', array_merge($baseParams, ['view_type' => 'perlu_diproses'])) }}" 
+                class="px-6 py-3 text-sm font-medium {{ $currentViewType === 'perlu_diproses' ? 'border-b-2 border-blue-500 text-blue-600' : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+            >
+                Perlu Diproses
+            </a>
+            <a 
+                href="{{ route('transaction.draft-distribusi.index', array_merge($baseParams, ['view_type' => 'riwayat'])) }}" 
+                class="px-6 py-3 text-sm font-medium {{ $currentViewType === 'riwayat' ? 'border-b-2 border-blue-500 text-blue-600' : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+            >
+                Riwayat
+            </a>
+        </nav>
+    </div>
+</div>
+
+<!-- Filters -->
+@if(($viewType ?? 'perlu_diproses') === 'riwayat')
+<div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
+    <form method="GET" action="{{ route('transaction.draft-distribusi.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <input type="hidden" name="view_type" value="riwayat">
+        @if($kategoriGudang)
+            <input type="hidden" name="kategori" value="{{ $kategoriGudang }}">
+        @endif
+        
+        <div>
+            <label for="tanggal_mulai" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
+            <input 
+                type="date" 
+                id="tanggal_mulai" 
+                name="tanggal_mulai" 
+                value="{{ request('tanggal_mulai') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div>
+            <label for="tanggal_akhir" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Akhir</label>
+            <input 
+                type="date" 
+                id="tanggal_akhir" 
+                name="tanggal_akhir" 
+                value="{{ request('tanggal_akhir') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div class="flex items-end">
+            <button 
+                type="submit" 
+                class="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+                Filter
+            </button>
+        </div>
+
+        <div class="flex items-end">
+            @if(request('tanggal_mulai') || request('tanggal_akhir'))
+                <a 
+                    href="{{ route('transaction.draft-distribusi.index', array_merge($baseParams, ['view_type' => 'riwayat'])) }}" 
+                    class="w-full px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 text-center"
+                >
+                    Reset
+                </a>
+            @endif
+        </div>
+    </form>
+</div>
+@endif
 
 <!-- Success/Error Messages -->
 @if(session('success'))
@@ -135,15 +217,27 @@
                                 $statusColor = match($approvalLog->status) {
                                     'MENUNGGU' => 'bg-yellow-100 text-yellow-800',
                                     'DIPROSES' => 'bg-blue-100 text-blue-800',
+                                    'DIDISPOSISIKAN' => 'bg-indigo-100 text-indigo-800',
                                     default => 'bg-gray-100 text-gray-800',
+                                };
+                                $statusText = match($approvalLog->status) {
+                                    'MENUNGGU' => 'Menunggu',
+                                    'DIPROSES' => 'Diproses',
+                                    'DIDISPOSISIKAN' => 'Didisposisikan',
+                                    default => $approvalLog->status,
                                 };
                             @endphp
                             <span class="px-2 py-1 text-xs font-medium rounded-full {{ $statusColor }}">
-                                {{ $approvalLog->status }}
+                                {{ $statusText }}
                             </span>
+                            @if(($viewType ?? 'perlu_diproses') === 'riwayat' && $approvalLog->approved_at)
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ \Carbon\Carbon::parse($approvalLog->approved_at)->format('d/m/Y H:i') }}
+                                </div>
+                            @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            @if($approvalLog->status == 'MENUNGGU' && !($isViewOnly ?? false))
+                            @if($approvalLog->status == 'MENUNGGU' && !($isViewOnly ?? false) && ($viewType ?? 'perlu_diproses') === 'perlu_diproses')
                                 @php
                                     // Tentukan kategori untuk URL
                                     $kategoriParam = null;
@@ -190,7 +284,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <h3 class="mt-2 text-sm font-medium text-gray-900">Tidak ada data</h3>
-                            <p class="mt-1 text-sm text-gray-500">Tidak ada disposisi yang perlu diproses untuk kategori {{ $kategoriGudang }}.</p>
+                            <p class="mt-1 text-sm text-gray-500">
+                                @if(($viewType ?? 'perlu_diproses') === 'riwayat')
+                                    Tidak ada riwayat disposisi{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : '' }}.
+                                @else
+                                    Tidak ada disposisi yang perlu diproses{{ $kategoriGudang ? ' untuk kategori ' . $kategoriGudang : '' }}.
+                                @endif
+                            </p>
                         </td>
                     </tr>
                 @endforelse

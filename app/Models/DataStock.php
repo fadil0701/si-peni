@@ -62,11 +62,62 @@ class DataStock extends Model
     }
 
     /**
+     * Get stock di gudang pusat saja (untuk PERSEDIAAN atau FARMASI)
+     * @param int $idDataBarang
+     * @param string $kategoriGudang 'PERSEDIAAN' atau 'FARMASI'
+     * @return float
+     */
+    public static function getStockGudangPusat($idDataBarang, string $kategoriGudang): float
+    {
+        $idGudangPusat = \App\Models\MasterGudang::where('jenis_gudang', 'PUSAT')
+            ->where('kategori_gudang', $kategoriGudang)
+            ->value('id_gudang');
+
+        if (!$idGudangPusat) {
+            return 0;
+        }
+
+        return (float) self::where('id_data_barang', $idDataBarang)
+            ->where('id_gudang', $idGudangPusat)
+            ->sum('qty_akhir');
+    }
+
+    /**
      * Get stock per gudang for a barang
      */
     public static function getStockPerGudang($idDataBarang): \Illuminate\Support\Collection
     {
         return self::where('id_data_barang', $idDataBarang)
+            ->with('gudang', 'satuan')
+            ->get()
+            ->map(function($stock) {
+                return [
+                    'id_gudang' => $stock->id_gudang,
+                    'nama_gudang' => $stock->gudang->nama_gudang ?? '-',
+                    'qty_akhir' => $stock->qty_akhir,
+                    'satuan' => $stock->satuan->nama_satuan ?? '-',
+                ];
+            });
+    }
+
+    /**
+     * Get stock per gudang pusat saja (untuk Farmasi/Persediaan)
+     * Hanya mengambil stock dari gudang dengan jenis_gudang = 'PUSAT' dan kategori_gudang = 'FARMASI' atau 'PERSEDIAAN'
+     */
+    public static function getStockPerGudangPusat($idDataBarang): \Illuminate\Support\Collection
+    {
+        // Ambil ID gudang pusat untuk Farmasi dan Persediaan
+        $gudangPusatIds = \App\Models\MasterGudang::where('jenis_gudang', 'PUSAT')
+            ->whereIn('kategori_gudang', ['FARMASI', 'PERSEDIAAN'])
+            ->pluck('id_gudang')
+            ->toArray();
+
+        if (empty($gudangPusatIds)) {
+            return collect([]);
+        }
+
+        return self::where('id_data_barang', $idDataBarang)
+            ->whereIn('id_gudang', $gudangPusatIds)
             ->with('gudang', 'satuan')
             ->get()
             ->map(function($stock) {

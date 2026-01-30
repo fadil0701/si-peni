@@ -41,7 +41,7 @@ class ApprovalPermintaanController extends Controller
         // Jika user adalah admin, tampilkan semua approval log
         // Jika tidak, tampilkan hanya yang sesuai dengan role user
         if ($user->hasRole('admin')) {
-            $query = ApprovalLog::with(['approvalFlow.role', 'user'])
+            $query = ApprovalLog::with(['approvalFlow.role', 'user', 'permintaan'])
                 ->where('modul_approval', 'PERMINTAAN_BARANG')
                 ->whereIn('status', ['MENUNGGU', 'DIKETAHUI', 'DIVERIFIKASI', 'DIDISPOSISIKAN']);
         } else {
@@ -49,11 +49,11 @@ class ApprovalPermintaanController extends Controller
             // Gunakan whereIn untuk id_approval_flow yang sesuai dengan role user
             if ($flowDefinitions->isEmpty()) {
                 // Jika tidak ada flow definition yang sesuai, tidak tampilkan apa-apa
-                $query = ApprovalLog::with(['approvalFlow.role', 'user'])
+                $query = ApprovalLog::with(['approvalFlow.role', 'user', 'permintaan'])
                     ->where('modul_approval', 'PERMINTAAN_BARANG')
                     ->whereRaw('1 = 0'); // Tidak tampilkan apa-apa
             } else {
-                $query = ApprovalLog::with(['approvalFlow.role', 'user'])
+                $query = ApprovalLog::with(['approvalFlow.role', 'user', 'permintaan'])
                     ->where('modul_approval', 'PERMINTAAN_BARANG')
                     ->whereIn('id_approval_flow', $flowDefinitions)
                     ->whereIn('status', ['MENUNGGU', 'DIKETAHUI', 'DIVERIFIKASI', 'DIDISPOSISIKAN']);
@@ -70,10 +70,24 @@ class ApprovalPermintaanController extends Controller
             $query->where('status', 'MENUNGGU');
         }
         
+        // Filter berdasarkan tanggal mulai (berdasarkan tanggal permintaan)
+        if ($request->filled('tanggal_mulai')) {
+            $query->whereHas('permintaan', function($q) use ($request) {
+                $q->whereDate('tanggal_permintaan', '>=', $request->tanggal_mulai);
+            });
+        }
+        
+        // Filter berdasarkan tanggal akhir (berdasarkan tanggal permintaan)
+        if ($request->filled('tanggal_akhir')) {
+            $query->whereHas('permintaan', function($q) use ($request) {
+                $q->whereDate('tanggal_permintaan', '<=', $request->tanggal_akhir);
+            });
+        }
+        
         // Ambil semua approval log untuk menentukan status per permintaan
         $allApprovals = $query->with(['approvalFlow' => function($q) {
             $q->with('role');
-        }])->get();
+        }, 'permintaan'])->get();
         
         // Kelompokkan berdasarkan id_referensi (permintaan)
         $permintaanGroups = [];
@@ -125,36 +139,104 @@ class ApprovalPermintaanController extends Controller
             
             // Jika tidak ada yang ditolak, lanjutkan pengecekan normal
             if (!$rejectedApproval) {
+                // Urutkan approvals berdasarkan step_order untuk memastikan urutan yang benar
+                usort($group['approvals'], function($a, $b) {
+                    $stepA = $a->approvalFlow->step_order ?? 999;
+                    $stepB = $b->approvalFlow->step_order ?? 999;
+                    return $stepA <=> $stepB;
+                });
+                
                 foreach ($group['approvals'] as $approval) {
                     $stepOrder = $approval->approvalFlow->step_order ?? 999;
                     
-                // Jika status sudah diselesaikan (bukan MENUNGGU), update last completed step
-                // Catatan: DIDISPOSISIKAN dan DIPROSES juga dianggap sebagai completed
-                if (in_array($approval->status, ['DIKETAHUI', 'DIVERIFIKASI', 'DISETUJUI', 'DIDISPOSISIKAN', 'DIPROSES'])) {
-                    if ($stepOrder > $maxCompletedStep) {
-                        $maxCompletedStep = $stepOrder;
-                        $lastCompletedStep = $stepOrder;
+                    // Jika status sudah diselesaikan (bukan MENUNGGU), update last completed step
+                    if (in_array($approval->status, ['DIKETAHUI', 'DIVERIFIKASI', 'DISETUJUI', 'DIDISPOSISIKAN', 'DIPROSES'])) {
+                        if ($stepOrder > $maxCompletedStep) {
+                            $maxCompletedStep = $stepOrder;
+                            $lastCompletedStep = $stepOrder;
+                        }
                     }
                 }
                 
-                // Untuk step 5 (disposisi), jika status MENUNGGU, ini adalah current step
-                if ($stepOrder == 5 && $approval->status === 'MENUNGGU' && !$currentStep) {
-                    $currentStep = $approval;
-                    $currentStatus = 'MENUNGGU';
-                }
-                    
-                    // Jika status masih MENUNGGU, ini adalah current step
-                    if ($approval->status === 'MENUNGGU' && !$currentStep) {
-                        $currentStep = $approval;
-                        $currentStatus = 'MENUNGGU';
+                // Cari current step berdasarkan urutan step_order (prioritas step yang lebih tinggi)
+                // Step 4 (disposisi) harus ditampilkan sebagai DIDISPOSISIKAN meskipun status approval lognya MENUNGGU
+                
+                // Cek apakah step 3 sudah diverifikasi
+                $step3Verified = false;
+                $step3Approval = null;
+                foreach ($group['approvals'] as $approval) {
+                    $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                    if ($stepOrder == 3 && $approval->status === 'DIVERIFIKASI') {
+                        $step3Verified = true;
+                        $step3Approval = $approval;
+                        break;
                     }
                 }
                 
-                // Jika tidak ada yang menunggu, gunakan approval terakhir dengan status terbaru
+                // Cek apakah ada step 4 (disposisi)
+                $step4Approval = null;
+                foreach ($group['approvals'] as $approval) {
+                    $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                    if ($stepOrder == 4) {
+                        $step4Approval = $approval;
+                        break;
+                    }
+                }
+                
+                // Prioritas 1: Cek step 4 (disposisi) dulu - ini adalah step terpenting untuk ditampilkan
+                if ($step4Approval) {
+                    if ($step4Approval->status === 'MENUNGGU') {
+                        $currentStep = $step4Approval;
+                        // Jika step 3 sudah diverifikasi, status = DISETUJUI (karena sudah diverifikasi dan didisposisikan)
+                        // Jika step 3 belum diverifikasi, status = DIDISPOSISIKAN
+                        $currentStatus = $step3Verified ? 'DISETUJUI' : 'DIDISPOSISIKAN';
+                    } elseif ($step4Approval->status === 'DIPROSES') {
+                        $currentStep = $step4Approval;
+                        $currentStatus = 'DIPROSES';
+                    }
+                }
+                
+                // Prioritas 2: Jika belum ada step 4, cek step 3 (verifikasi Kasubbag TU)
+                if (!$currentStep) {
+                    foreach ($group['approvals'] as $approval) {
+                        $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                        if ($stepOrder == 3) {
+                            if ($approval->status === 'MENUNGGU') {
+                                $currentStep = $approval;
+                                $currentStatus = 'MENUNGGU'; // Masih menunggu verifikasi
+                            } elseif ($approval->status === 'DIVERIFIKASI') {
+                                // Step 3 sudah diverifikasi -> status DISETUJUI
+                                $currentStep = $approval;
+                                $currentStatus = 'DISETUJUI'; // Status ditampilkan sebagai DISETUJUI karena sudah diverifikasi
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                // Prioritas 3: Jika belum ada step 3, cek step 2 (mengetahui Kepala Unit)
+                if (!$currentStep) {
+                    foreach ($group['approvals'] as $approval) {
+                        $stepOrder = $approval->approvalFlow->step_order ?? 999;
+                        if ($stepOrder == 2 && $approval->status === 'MENUNGGU') {
+                            $currentStep = $approval;
+                            $currentStatus = 'MENUNGGU'; // Masih menunggu diketahui
+                            break;
+                        }
+                    }
+                }
+                
+                // Jika masih belum ada yang menunggu, gunakan approval terakhir
                 if (!$currentStep) {
                     $currentStep = $group['latest_approval'];
                     if ($currentStep) {
-                        $currentStatus = $currentStep->status;
+                        // Jika approval terakhir adalah DIVERIFIKASI dan sudah ada step 4, status = DISETUJUI
+                        if ($currentStep->status === 'DIVERIFIKASI' && $step4Approval) {
+                            $currentStatus = 'DISETUJUI';
+                            $currentStep = $step4Approval;
+                        } else {
+                            $currentStatus = $currentStep->status;
+                        }
                     }
                 }
             } else {
@@ -288,25 +370,20 @@ class ApprovalPermintaanController extends Controller
         $currentFlow = $approval->approvalFlow;
         $nextFlow = $currentFlow ? $currentFlow->getNextStep() : null;
         
-        // Cek apakah step sebelumnya sudah diverifikasi (untuk kepala_pusat - step 4)
-        $previousStepVerified = true;
-        $stepOrder = $currentFlow->step_order ?? 0;
-        // Untuk admin, previousStepVerified selalu true (bisa approve meski step sebelumnya belum diverifikasi)
-        if ($stepOrder == 4 && !$user->hasRole('admin')) {
-            // Untuk step 4 (kepala_pusat), cek apakah step 3 (kasubbag_tu) sudah diverifikasi
-            $step3Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
-                ->where('step_order', 3)
+        // Cek apakah step 3 (Kasubbag TU) sudah diverifikasi untuk menentukan apakah bisa disposisi
+        $step3Verified = false;
+        $step3Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+            ->where('step_order', 3)
+            ->first();
+        if ($step3Flow) {
+            $step3Log = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('id_referensi', $approval->id_referensi)
+                ->where('id_approval_flow', $step3Flow->id)
                 ->first();
-            if ($step3Flow) {
-                $step3Log = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
-                    ->where('id_referensi', $approval->id_referensi)
-                    ->where('id_approval_flow', $step3Flow->id)
-                    ->first();
-                $previousStepVerified = $step3Log && $step3Log->status === 'DIVERIFIKASI';
-            }
+            $step3Verified = $step3Log && $step3Log->status === 'DIVERIFIKASI';
         }
         
-        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow', 'previousStepVerified', 'displayStatus', 'rejectedApproval', 'stockData'));
+        return view('transaction.approval.show', compact('approval', 'permintaan', 'approvalHistory', 'currentFlow', 'nextFlow', 'step3Verified', 'displayStatus', 'rejectedApproval', 'stockData'));
     }
 
     /**
@@ -444,25 +521,91 @@ class ApprovalPermintaanController extends Controller
                 'user_id' => $user->id,
             ]);
             
-            // Buat approval log untuk step berikutnya (Kepala Pusat)
-            $nextFlow = $approval->approvalFlow->getNextStep();
-            if ($nextFlow) {
-                ApprovalLog::create([
-                    'modul_approval' => $approval->modul_approval,
-                    'id_referensi' => $approval->id_referensi,
-                    'id_approval_flow' => $nextFlow->id,
-                    'user_id' => null,
-                    'role_id' => $nextFlow->role_id,
-                    'status' => 'MENUNGGU',
-                    'catatan' => null,
-                    'approved_at' => null,
-                ]);
+            // Update status permintaan menjadi DISETUJUI (setelah verifikasi Kasubbag TU, langsung bisa disposisi)
+            $permintaan = PermintaanBarang::find($approval->id_referensi);
+            if ($permintaan) {
+                $permintaan->update(['status_permintaan' => 'DISETUJUI']);
+            }
+            
+            // Langsung membuat approval log untuk disposisi (step 4) ke admin gudang sesuai kategori
+            // Ambil jenis permintaan dari permintaan
+            $jenisPermintaan = is_array($permintaan->jenis_permintaan) 
+                ? $permintaan->jenis_permintaan 
+                : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []);
+            
+            // Tentukan kategori gudang yang perlu didisposisikan
+            $kategoriGudang = [];
+            if (in_array('ASET', $jenisPermintaan)) {
+                $kategoriGudang[] = 'ASET';
+            }
+            if (in_array('FARMASI', $jenisPermintaan)) {
+                $kategoriGudang[] = 'FARMASI';
+            }
+            if (in_array('PERSEDIAAN', $jenisPermintaan)) {
+                $kategoriGudang[] = 'PERSEDIAAN';
+            }
+            
+            // Jika tidak ada kategori spesifik, gunakan admin_gudang umum
+            if (empty($kategoriGudang)) {
+                $kategoriGudang = ['UMUM'];
+            }
+            
+            // Buat approval log untuk setiap kategori gudang yang perlu didisposisikan
+            $roleMap = [
+                'ASET' => 'admin_gudang_aset',
+                'PERSEDIAAN' => 'admin_gudang_persediaan',
+                'FARMASI' => 'admin_gudang_farmasi',
+                'UMUM' => 'admin_gudang',
+            ];
+            
+            foreach ($kategoriGudang as $kategori) {
+                $roleName = $roleMap[$kategori] ?? 'admin_gudang';
+                $role = \App\Models\Role::where('name', $roleName)->first();
+                
+                if ($role) {
+                    // Cari flow definition untuk step 4 dengan role ini
+                    $step4Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                        ->where('step_order', 4)
+                        ->where('role_id', $role->id)
+                        ->first();
+                    
+                    if ($step4Flow) {
+                        // Cek apakah sudah ada approval log untuk step 4 dengan role ini
+                        $existingLog = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                            ->where('id_referensi', $permintaan->id_permintaan)
+                            ->where('id_approval_flow', $step4Flow->id)
+                            ->first();
+                        
+                        if (!$existingLog) {
+                            // Buat approval log baru untuk disposisi dengan status MENUNGGU
+                            ApprovalLog::create([
+                                'modul_approval' => 'PERMINTAAN_BARANG',
+                                'id_referensi' => $permintaan->id_permintaan,
+                                'id_approval_flow' => $step4Flow->id,
+                                'user_id' => null, // Akan diisi saat admin gudang memproses
+                                'role_id' => $role->id,
+                                'status' => 'MENUNGGU',
+                                'catatan' => 'Didisposisikan oleh Kasubbag TU setelah verifikasi',
+                                'approved_at' => null,
+                            ]);
+                        } else {
+                            // Update existing log jika status bukan MENUNGGU
+                            if ($existingLog->status !== 'MENUNGGU') {
+                                $existingLog->update([
+                                    'status' => 'MENUNGGU',
+                                    'user_id' => null,
+                                    'approved_at' => null,
+                                ]);
+                            }
+                        }
+                    }
+                }
             }
             
             DB::commit();
             
             return redirect()->route('transaction.approval.show', $id)
-                ->with('success', 'Permintaan telah diverifikasi.');
+                ->with('success', 'Permintaan telah diverifikasi, disetujui, dan didisposisikan ke Admin Gudang/Pengurus Barang.');
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('Error verifikasi approval: ' . $e->getMessage());
@@ -727,7 +870,31 @@ class ApprovalPermintaanController extends Controller
      */
     public function disposisi(Request $request, $id)
     {
-        $approval = ApprovalLog::with('approvalFlow')->findOrFail($id);
+        // $id bisa berupa id approval log atau id permintaan
+        // Cek apakah ini id approval log atau id permintaan
+        $approval = ApprovalLog::with('approvalFlow')->find($id);
+        if (!$approval) {
+            // Jika bukan approval log, coba sebagai id permintaan
+            $permintaan = PermintaanBarang::find($id);
+            if (!$permintaan) {
+                abort(404, 'Approval atau permintaan tidak ditemukan.');
+            }
+            // Ambil approval log verifikasi (step 3)
+            $step3Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('step_order', 3)
+                ->first();
+            if ($step3Flow) {
+                $approval = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                    ->where('id_referensi', $permintaan->id_permintaan)
+                    ->where('id_approval_flow', $step3Flow->id)
+                    ->first();
+            }
+        }
+        
+        if (!$approval) {
+            abort(404, 'Approval tidak ditemukan.');
+        }
+        
         $user = Auth::user();
         
         // Validasi permission - Admin atau user dengan permission disposisi
@@ -735,24 +902,36 @@ class ApprovalPermintaanController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk mendisposisikan permintaan ini.');
         }
         
-        // Validasi bahwa permintaan sudah disetujui oleh Kepala Pusat
+        // Validasi bahwa permintaan sudah diverifikasi oleh Kasubbag TU
         $permintaan = PermintaanBarang::find($approval->id_referensi);
-        if (!$permintaan || $permintaan->status_permintaan !== 'DISETUJUI_PIMPINAN') {
-            return redirect()->route('transaction.approval.show', $id)
-                ->with('error', 'Permintaan harus disetujui oleh Kepala Pusat terlebih dahulu sebelum didisposisikan.');
+        if (!$permintaan || $permintaan->status_permintaan !== 'DISETUJUI') {
+            return redirect()->route('transaction.approval.show', $approval->id)
+                ->with('error', 'Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum didisposisikan.');
+        }
+        
+        // Validasi bahwa step 3 (Kasubbag TU) sudah diverifikasi
+        $step3Flow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+            ->where('step_order', 3)
+            ->first();
+        
+        if ($step3Flow) {
+            $step3Log = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                ->where('id_referensi', $approval->id_referensi)
+                ->where('id_approval_flow', $step3Flow->id)
+                ->first();
+            
+            if (!$step3Log || $step3Log->status !== 'DIVERIFIKASI') {
+                return redirect()->route('transaction.approval.show', $approval->id)
+                    ->with('error', 'Permintaan harus diverifikasi oleh Kasubbag TU terlebih dahulu sebelum didisposisikan.');
+            }
         }
 
         DB::beginTransaction();
         try {
-            // Update approval log disposisi
-            $approval->update([
-                'status' => 'DIDISPOSISIKAN',
-                'catatan' => 'Disposisi oleh Admin Gudang/Pengurus Barang',
-                'approved_at' => now(),
-                'user_id' => $user->id,
-            ]);
+            // Buat approval log baru untuk disposisi (tidak update approval log verifikasi)
+            // Approval log verifikasi tetap dengan status DIVERIFIKASI
             
-            // Hapus approval log untuk admin_gudang yang dibuat saat kepala pusat approve (jika ada)
+            // Hapus approval log untuk admin_gudang yang sudah ada (jika ada)
             // Karena nanti akan dibuat approval log untuk setiap kategori gudang
             $adminGudangRole = Role::where('name', 'admin_gudang')->first();
             if ($adminGudangRole) {
@@ -797,10 +976,17 @@ class ApprovalPermintaanController extends Controller
                 
                 $role = Role::where('name', $roleName)->first();
                 
+                \Log::info('Disposisi - Processing kategori', [
+                    'kategori' => $kategori,
+                    'role_name' => $roleName,
+                    'role_found' => $role ? true : false,
+                    'role_id' => $role ? $role->id : null
+                ]);
+                
                 if ($role) {
-                    // Cari atau buat flow definition untuk step disposisi dengan role ini
+                    // Cari atau buat flow definition untuk step disposisi dengan role ini (step_order = 4)
                     $disposisiFlow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
-                        ->where('step_order', 5)
+                        ->where('step_order', 4)
                         ->where('role_id', $role->id)
                         ->first();
                     
@@ -808,12 +994,12 @@ class ApprovalPermintaanController extends Controller
                     if (!$disposisiFlow) {
                         $disposisiFlow = ApprovalFlowDefinition::create([
                             'modul_approval' => 'PERMINTAAN_BARANG',
-                            'step_order' => 5,
+                            'step_order' => 4,
                             'role_id' => $role->id,
                             'nama_step' => 'Didisposisikan - ' . $kategori,
                             'status' => 'MENUNGGU',
                             'status_text' => 'Permintaan telah didisposisikan ke Admin Gudang ' . $kategori,
-                            'is_required' => true,
+                            'is_required' => false,
                             'can_reject' => false,
                             'can_approve' => false,
                         ]);
@@ -822,19 +1008,64 @@ class ApprovalPermintaanController extends Controller
                     // Pastikan tidak ada approval log yang sudah ada untuk step ini dengan role ini
                     $existingLog = ApprovalLog::where('modul_approval', $approval->modul_approval)
                         ->where('id_referensi', $approval->id_referensi)
-                        ->where('id_approval_flow', $disposisiFlow->id)
+                        ->where(function($q) use ($disposisiFlow, $role) {
+                            $q->where('id_approval_flow', $disposisiFlow->id)
+                              ->orWhere(function($q2) use ($role) {
+                                  $q2->where('role_id', $role->id)
+                                     ->whereHas('approvalFlow', function($q3) {
+                                         $q3->where('step_order', 4)
+                                            ->where('modul_approval', 'PERMINTAAN_BARANG');
+                                     });
+                              });
+                        })
                         ->first();
                     
-                    if (!$existingLog) {
-                        ApprovalLog::create([
+                    // Jika ada existing log dengan status DIDISPOSISIKAN, update menjadi MENUNGGU
+                    if ($existingLog) {
+                        if ($existingLog->status === 'DIDISPOSISIKAN' || $existingLog->id_approval_flow !== $disposisiFlow->id) {
+                            $existingLog->update([
+                                'id_approval_flow' => $disposisiFlow->id,
+                                'status' => 'MENUNGGU',
+                                'user_id' => null,
+                                'approved_at' => null,
+                                'role_id' => $role->id
+                            ]);
+                            \Log::info('Updated existing approval log', [
+                                'approval_log_id' => $existingLog->id,
+                                'id_referensi' => $approval->id_referensi,
+                                'old_status' => 'DIDISPOSISIKAN',
+                                'new_status' => 'MENUNGGU'
+                            ]);
+                        } else {
+                            \Log::info('Approval log already exists and is correct', [
+                                'existing_log_id' => $existingLog->id,
+                                'id_referensi' => $approval->id_referensi,
+                                'role_id' => $role->id,
+                                'status' => $existingLog->status
+                            ]);
+                        }
+                    } else {
+                        // Buat approval log untuk admin gudang kategori dengan status MENUNGGU
+                        // agar muncul di daftar "Proses Disposisi"
+                        $newLog = ApprovalLog::create([
                             'modul_approval' => $approval->modul_approval,
                             'id_referensi' => $approval->id_referensi,
                             'id_approval_flow' => $disposisiFlow->id,
-                            'user_id' => null,
+                            'user_id' => null, // Belum ada user yang memproses
                             'role_id' => $role->id,
-                            'status' => 'MENUNGGU',
-                            'catatan' => 'Disposisi untuk kategori: ' . $kategori,
-                            'approved_at' => null,
+                            'status' => 'MENUNGGU', // Status MENUNGGU agar muncul di daftar Proses Disposisi
+                            'catatan' => 'Disposisi untuk kategori: ' . $kategori . ' oleh ' . $user->name,
+                            'approved_at' => null, // Belum diproses
+                        ]);
+                        
+                        \Log::info('Approval log created for disposisi', [
+                            'approval_log_id' => $newLog->id,
+                            'id_referensi' => $approval->id_referensi,
+                            'role_id' => $role->id,
+                            'role_name' => $role->name,
+                            'kategori' => $kategori,
+                            'step_order' => $disposisiFlow->step_order,
+                            'status' => $newLog->status
                         ]);
                     }
                 }

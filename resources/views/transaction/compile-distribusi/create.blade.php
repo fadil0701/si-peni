@@ -58,42 +58,114 @@
             <div>
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Detail Draft Distribusi</h3>
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kategori</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barang</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gudang Asal</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harga Satuan</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @foreach($draftDetails as $draft)
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100">
                                 <tr>
-                                    <td class="px-4 py-2 text-sm text-gray-900">
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                                            {{ $draft->kategori_gudang }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->inventory->dataBarang->nama_barang ?? '-' }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->gudangAsal->nama_gudang ?? '-' }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ number_format($draft->qty_distribusi, 2) }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->satuan->nama_satuan ?? '-' }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-900">Rp {{ number_format($draft->harga_satuan, 2, ',', '.') }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-900 font-medium">Rp {{ number_format($draft->subtotal, 2, ',', '.') }}</td>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Kategori</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barang</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gudang Asal</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
+                                    @if($draftDetails->whereIn('kategori_gudang', ['FARMASI', 'PERSEDIAAN'])->count() > 0)
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No. Batch</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Exp Date</th>
+                                    @endif
+                                    @if($draftDetails->where('kategori_gudang', 'ASET')->count() > 0)
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No. Seri</th>
+                                    @endif
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Harga Satuan</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                                 </tr>
-                            @endforeach
-                            <tr class="bg-gray-50 font-semibold">
-                                <td colspan="6" class="px-4 py-2 text-sm text-gray-900 text-right">Total:</td>
-                                <td class="px-4 py-2 text-sm text-gray-900">
-                                    Rp {{ number_format($draftDetails->sum('subtotal'), 2, ',', '.') }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($draftDetails as $draft)
+                                    @php
+                                        $inventory = $draft->inventory;
+                                        $isAset = $draft->kategori_gudang === 'ASET';
+                                        $isFarmasiPersediaan = in_array($draft->kategori_gudang, ['FARMASI', 'PERSEDIAAN']);
+                                    @endphp
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-gray-900">
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                                {{ $draft->kategori_gudang }}
+                                            </span>
+                                        </td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">{{ $inventory->dataBarang->nama_barang ?? '-' }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->gudangAsal->nama_gudang ?? '-' }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">{{ number_format($draft->qty_distribusi, 2) }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->satuan->nama_satuan ?? '-' }}</td>
+                                        @php
+                                            $hasFarmasiPersediaan = $draftDetails->whereIn('kategori_gudang', ['FARMASI', 'PERSEDIAAN'])->count() > 0;
+                                            $hasAset = $draftDetails->where('kategori_gudang', 'ASET')->count() > 0;
+                                        @endphp
+                                        @if($hasFarmasiPersediaan)
+                                        <td class="px-4 py-2 text-sm text-gray-900">
+                                            @if($isFarmasiPersediaan)
+                                                {{ $inventory->no_batch ?? '-' }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">
+                                            @if($isFarmasiPersediaan && $inventory->tanggal_kedaluwarsa)
+                                                {{ \Carbon\Carbon::parse($inventory->tanggal_kedaluwarsa)->format('d/m/Y') }}
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        @endif
+                                        @if($hasAset)
+                                        <td class="px-4 py-2 text-sm text-gray-900">
+                                            @if($isAset)
+                                                @php
+                                                    // Ambil nomor seri dari inventory_item yang akan didistribusikan
+                                                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                                                        ->where('id_gudang', $draft->id_gudang_asal)
+                                                        ->where('status_item', 'AKTIF')
+                                                        ->limit((int)$draft->qty_distribusi)
+                                                        ->get();
+                                                    
+                                                    $noSeriList = $inventoryItems->pluck('no_seri')->filter()->unique()->values();
+                                                @endphp
+                                                @if($noSeriList->count() > 0)
+                                                    @if($noSeriList->count() <= 3)
+                                                        {{ $noSeriList->join(', ') }}
+                                                    @else
+                                                        {{ $noSeriList->take(3)->join(', ') }}<br>
+                                                        <span class="text-xs text-gray-500">+{{ $noSeriList->count() - 3 }} lainnya</span>
+                                                    @endif
+                                                @else
+                                                    {{ $inventory->no_seri ?? '-' }}
+                                                @endif
+                                            @else
+                                                -
+                                            @endif
+                                        </td>
+                                        @endif
+                                        <td class="px-4 py-2 text-sm text-gray-900">Rp {{ number_format($draft->harga_satuan, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900 font-medium">Rp {{ number_format($draft->subtotal, 2, ',', '.') }}</td>
+                                    </tr>
+                                @endforeach
+                                <tr class="bg-gray-50 font-semibold">
+                                    @php
+                                        $colspan = 5; // Kategori, Barang, Gudang Asal, Qty, Satuan
+                                        if($draftDetails->whereIn('kategori_gudang', ['FARMASI', 'PERSEDIAAN'])->count() > 0) {
+                                            $colspan += 2; // No. Batch, Exp Date
+                                        }
+                                        if($draftDetails->where('kategori_gudang', 'ASET')->count() > 0) {
+                                            $colspan += 1; // No. Seri
+                                        }
+                                        $colspan += 1; // Harga Satuan
+                                    @endphp
+                                    <td colspan="{{ $colspan }}" class="px-4 py-2 text-sm text-gray-900 text-right">Total:</td>
+                                    <td class="px-4 py-2 text-sm text-gray-900">
+                                        Rp {{ number_format($draftDetails->sum('subtotal'), 2, ',', '.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

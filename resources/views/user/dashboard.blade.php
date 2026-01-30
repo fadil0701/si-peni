@@ -156,7 +156,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Inventaris Aset Terbaru -->
     <div class="bg-white shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
+        <div class="px-6 py-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Inventaris Aset Terbaru</h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -210,7 +210,7 @@
 
     <!-- Riwayat Transaksi Terakhir -->
     <div class="bg-white shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
+        <div class="px-6 py-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Riwayat Transaksi Terakhir</h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">

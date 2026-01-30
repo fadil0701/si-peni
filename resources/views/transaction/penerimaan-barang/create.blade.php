@@ -181,7 +181,7 @@
 <template id="itemTemplate">
     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div class="sm:col-span-4">
+            <div class="sm:col-span-2">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Barang
                 </label>
@@ -191,9 +191,10 @@
                     readonly
                 >
                 <input type="hidden" name="detail[INDEX][id_inventory]" class="id-inventory-input">
+                <input type="hidden" class="kategori-gudang-input">
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Qty Distribusi
                 </label>
@@ -204,7 +205,7 @@
                 >
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Qty Diterima <span class="text-red-500">*</span>
                 </label>
@@ -219,7 +220,7 @@
                 >
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Satuan <span class="text-red-500">*</span>
                 </label>
@@ -235,7 +236,40 @@
                 </select>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-2 batch-exp-date-container" style="display: none;">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    No. Batch
+                </label>
+                <input 
+                    type="text" 
+                    class="no-batch-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                    readonly
+                >
+            </div>
+
+            <div class="sm:col-span-2 batch-exp-date-container" style="display: none;">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Exp Date
+                </label>
+                <input 
+                    type="text" 
+                    class="exp-date-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                    readonly
+                >
+            </div>
+
+            <div class="sm:col-span-2 no-seri-container" style="display: none;">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    No. Seri
+                </label>
+                <input 
+                    type="text" 
+                    class="no-seri-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-700 sm:text-sm"
+                    readonly
+                >
+            </div>
+
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
                 <input 
                     type="text" 
@@ -275,18 +309,55 @@ function loadDistribusiDetail(distribusiId) {
                 let html = `<p class="text-sm text-gray-700 mb-2"><strong>No SBBK:</strong> ${data.distribusi.no_sbbk}</p>`;
                 html += `<p class="text-sm text-gray-700 mb-4"><strong>Gudang Tujuan:</strong> ${data.distribusi.gudang_tujuan}</p>`;
                 
+                // Cek apakah ada farmasi/persediaan atau aset
+                const hasFarmasiPersediaan = data.details.some(d => ['FARMASI', 'PERSEDIAAN'].includes(d.kategori_gudang));
+                const hasAset = data.details.some(d => d.kategori_gudang === 'ASET');
+                
                 html += '<table class="min-w-full divide-y divide-gray-200">';
                 html += '<thead class="bg-gray-50"><tr>';
                 html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barang</th>';
                 html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty Distribusi</th>';
                 html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>';
+                if (hasFarmasiPersediaan) {
+                    html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No. Batch</th>';
+                    html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Exp Date</th>';
+                }
+                if (hasAset) {
+                    html += '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No. Seri</th>';
+                }
                 html += '</tr></thead><tbody>';
                 
                 data.details.forEach(detail => {
+                    const isFarmasiPersediaan = ['FARMASI', 'PERSEDIAAN'].includes(detail.kategori_gudang);
+                    const isAset = detail.kategori_gudang === 'ASET';
+                    
                     html += '<tr>';
                     html += `<td>${detail.nama_barang}</td>`;
                     html += `<td>${detail.qty_distribusi}</td>`;
                     html += `<td>${detail.nama_satuan}</td>`;
+                    if (hasFarmasiPersediaan) {
+                        html += `<td>${isFarmasiPersediaan ? (detail.no_batch || '-') : '-'}</td>`;
+                        html += `<td>${isFarmasiPersediaan ? (detail.tanggal_kedaluwarsa || '-') : '-'}</td>`;
+                    }
+                    if (hasAset) {
+                        if (isAset) {
+                            if (detail.no_seri) {
+                                if (Array.isArray(detail.no_seri)) {
+                                    if (detail.no_seri.length <= 3) {
+                                        html += `<td>${detail.no_seri.join(', ')}</td>`;
+                                    } else {
+                                        html += `<td>${detail.no_seri.slice(0, 3).join(', ')}<br><span class="text-xs text-gray-500">+${detail.no_seri.length - 3} lainnya</span></td>`;
+                                    }
+                                } else {
+                                    html += `<td>${detail.no_seri}</td>`;
+                                }
+                            } else {
+                                html += '<td>-</td>';
+                            }
+                        } else {
+                            html += '<td>-</td>';
+                        }
+                    }
                     html += '</tr>';
                 });
                 
@@ -344,15 +415,66 @@ function loadDetailPenerimaan(details) {
         // Set values
         const namaBarangInput = itemElement.querySelector('.nama-barang');
         const idInventoryInput = itemElement.querySelector('.id-inventory-input');
+        const kategoriGudangInput = itemElement.querySelector('.kategori-gudang-input');
         const qtyDistribusiInput = itemElement.querySelector('.qty-distribusi');
         const qtyDiterimaInput = itemElement.querySelector('.qty-diterima-input');
         const satuanSelect = itemElement.querySelector('.select-satuan');
+        const noBatchInput = itemElement.querySelector('.no-batch-input');
+        const expDateInput = itemElement.querySelector('.exp-date-input');
+        const noSeriInput = itemElement.querySelector('.no-seri-input');
+        const batchExpDateContainers = itemElement.querySelectorAll('.batch-exp-date-container'); // Gunakan querySelectorAll untuk mendapatkan semua container
+        const noSeriContainer = itemElement.querySelector('.no-seri-container');
         
         if (namaBarangInput) namaBarangInput.value = detail.nama_barang || '';
         if (idInventoryInput) idInventoryInput.value = detail.id_inventory || '';
+        if (kategoriGudangInput) kategoriGudangInput.value = detail.kategori_gudang || '';
         if (qtyDistribusiInput) qtyDistribusiInput.value = detail.qty_distribusi || '0';
         if (qtyDiterimaInput) qtyDiterimaInput.value = detail.qty_distribusi || '0'; // Default sama dengan qty distribusi
         if (satuanSelect) satuanSelect.value = detail.id_satuan || '';
+        
+        // Tampilkan/sembunyikan kolom berdasarkan kategori gudang
+        const isFarmasiPersediaan = ['FARMASI', 'PERSEDIAAN'].includes(detail.kategori_gudang);
+        const isAset = detail.kategori_gudang === 'ASET';
+        
+        // Tampilkan/sembunyikan semua container batch-exp-date (ada 2: No. Batch dan Exp Date)
+        if (batchExpDateContainers && batchExpDateContainers.length > 0) {
+            batchExpDateContainers.forEach(container => {
+                if (isFarmasiPersediaan) {
+                    container.style.display = 'block';
+                } else {
+                    container.style.display = 'none';
+                }
+            });
+            
+            // Set nilai untuk No. Batch dan Exp Date jika Farmasi/Persediaan
+            if (isFarmasiPersediaan) {
+                if (noBatchInput) noBatchInput.value = detail.no_batch || '-';
+                if (expDateInput) expDateInput.value = detail.tanggal_kedaluwarsa || '-';
+            }
+        }
+        
+        if (noSeriContainer) {
+            if (isAset) {
+                noSeriContainer.style.display = 'block';
+                if (noSeriInput) {
+                    if (detail.no_seri) {
+                        if (Array.isArray(detail.no_seri)) {
+                            if (detail.no_seri.length <= 3) {
+                                noSeriInput.value = detail.no_seri.join(', ');
+                            } else {
+                                noSeriInput.value = detail.no_seri.slice(0, 3).join(', ') + ' (+' + (detail.no_seri.length - 3) + ' lainnya)';
+                            }
+                        } else {
+                            noSeriInput.value = detail.no_seri;
+                        }
+                    } else {
+                        noSeriInput.value = '-';
+                    }
+                }
+            } else {
+                noSeriContainer.style.display = 'none';
+            }
+        }
         
         container.appendChild(itemElement);
         index++;

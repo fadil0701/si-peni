@@ -29,8 +29,8 @@ class CompileDistribusiController extends Controller
         }
 
         // Ambil permintaan yang sudah memiliki draft detail dari semua kategori dan statusnya READY
-        // Setelah disposisi, status permintaan adalah DISETUJUI_PIMPINAN atau DISETUJUI
-        $query = PermintaanBarang::whereIn('status_permintaan', ['DISETUJUI', 'DISETUJUI_PIMPINAN'])
+        // Setelah verifikasi Kasubbag TU, status permintaan adalah DISETUJUI
+        $query = PermintaanBarang::where('status_permintaan', 'DISETUJUI')
             ->whereHas('draftDetailDistribusi', function($q) {
                 $q->where('status', 'READY');
             })

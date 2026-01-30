@@ -51,10 +51,82 @@ class DraftDistribusiController extends Controller
             ->pluck('id')
             ->toArray();
         
+        // Debug: Log role IDs yang dicari
+        \Log::info('DraftDistribusiController - Looking for approval logs', [
+            'kategori_role_ids' => $kategoriRoleIds,
+            'kategori_role_names' => \App\Models\Role::whereIn('id', $kategoriRoleIds)->pluck('name')->toArray(),
+            'user_roles' => $user->roles->pluck('name')->toArray()
+        ]);
+        
+        // Tentukan view type: 'perlu_diproses' (default) atau 'riwayat'
+        $viewType = $request->get('view_type', 'perlu_diproses');
+        
+        // Query approval log untuk step 4 (disposisi)
         $approvalLogsQuery = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
-            ->where('status', 'MENUNGGU')
             ->whereIn('role_id', $kategoriRoleIds) // Hanya role kategori spesifik
-            ->with('approvalFlow.role'); // Eager load role untuk mendapatkan kategori
+            ->whereHas('approvalFlow', function($q) {
+                $q->where('step_order', 4) // Hanya step 4 (disposisi)
+                  ->where('modul_approval', 'PERMINTAAN_BARANG');
+            })
+            ->with(['approvalFlow.role', 'permintaan']); // Eager load role dan permintaan untuk mendapatkan kategori
+        
+        // Filter berdasarkan view type
+        if ($viewType === 'riwayat') {
+            // Riwayat: tampilkan yang sudah diproses (status DIPROSES atau status lainnya selain MENUNGGU)
+            $approvalLogsQuery->whereIn('status', ['DIPROSES', 'DIDISPOSISIKAN']);
+        } else {
+            // Perlu diproses: hanya yang status MENUNGGU
+            $approvalLogsQuery->where('status', 'MENUNGGU');
+        }
+        
+        // Filter berdasarkan tanggal mulai (berdasarkan tanggal permintaan)
+        if ($request->filled('tanggal_mulai')) {
+            $approvalLogsQuery->whereHas('permintaan', function($q) use ($request) {
+                $q->whereDate('tanggal_permintaan', '>=', $request->tanggal_mulai);
+            });
+        }
+        
+        // Filter berdasarkan tanggal akhir (berdasarkan tanggal permintaan)
+        if ($request->filled('tanggal_akhir')) {
+            $approvalLogsQuery->whereHas('permintaan', function($q) use ($request) {
+                $q->whereDate('tanggal_permintaan', '<=', $request->tanggal_akhir);
+            });
+        }
+        
+        // Debug: Log jumlah approval logs yang ditemukan sebelum filter tambahan
+        $countBeforeFilter = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+            ->where('status', 'MENUNGGU')
+            ->whereIn('role_id', $kategoriRoleIds)
+            ->whereHas('approvalFlow', function($q) {
+                $q->where('step_order', 4)
+                  ->where('modul_approval', 'PERMINTAAN_BARANG');
+            })
+            ->count();
+        
+        // Debug: Cek semua approval log untuk step 4
+        $allStep4Logs = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+            ->whereHas('approvalFlow', function($q) {
+                $q->where('step_order', 4)
+                  ->where('modul_approval', 'PERMINTAAN_BARANG');
+            })
+            ->with('approvalFlow.role')
+            ->get();
+        
+        \Log::info('DraftDistribusiController - Approval logs found', [
+            'count_before_filter' => $countBeforeFilter,
+            'kategori_role_ids' => $kategoriRoleIds,
+            'kategori_role_names' => \App\Models\Role::whereIn('id', $kategoriRoleIds)->pluck('name')->toArray(),
+            'all_step4_logs' => $allStep4Logs->map(function($log) {
+                return [
+                    'id' => $log->id,
+                    'id_referensi' => $log->id_referensi,
+                    'role_id' => $log->role_id,
+                    'role_name' => $log->approvalFlow->role->name ?? 'N/A',
+                    'status' => $log->status,
+                    'step_order' => $log->approvalFlow->step_order ?? 'N/A'
+                ];
+            })->toArray()
+        ]);
         
         // Jika bukan admin dan bukan view-only, filter berdasarkan role user
         if (!$isAdmin && !$isViewOnly) {
@@ -79,19 +151,41 @@ class DraftDistribusiController extends Controller
         }
         // Jika admin atau view-only tanpa filter, tampilkan semua kategori (sudah difilter di whereIn di atas)
         
-        $approvalLogs = $approvalLogsQuery->latest()
-            ->paginate(\App\Helpers\PaginationHelper::getPerPage($request, 10))->appends($request->query());
+        // Urutkan berdasarkan tanggal: untuk riwayat berdasarkan approved_at, untuk perlu diproses berdasarkan created_at
+        if ($viewType === 'riwayat') {
+            $approvalLogs = $approvalLogsQuery->orderBy('approved_at', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->paginate(\App\Helpers\PaginationHelper::getPerPage($request, 10))->appends($request->query());
+        } else {
+            $approvalLogs = $approvalLogsQuery->latest('created_at')
+                ->paginate(\App\Helpers\PaginationHelper::getPerPage($request, 10))->appends($request->query());
+        }
+        
+        // Debug: Log approval logs yang ditemukan
+        \Log::info('DraftDistribusiController - Approval logs paginated', [
+            'total' => $approvalLogs->total(),
+            'count' => $approvalLogs->count(),
+            'items' => $approvalLogs->items()
+        ]);
         
         // Load permintaan untuk setiap approval log secara manual karena relationship conditional
         $approvalLogs->getCollection()->transform(function($log) {
             if ($log->modul_approval === 'PERMINTAAN_BARANG') {
                 $log->permintaan = PermintaanBarang::with(['unitKerja', 'pemohon', 'detailPermintaan.dataBarang'])
                     ->find($log->id_referensi);
+                
+                // Debug jika permintaan tidak ditemukan
+                if (!$log->permintaan) {
+                    \Log::warning('DraftDistribusiController - Permintaan not found', [
+                        'approval_log_id' => $log->id,
+                        'id_referensi' => $log->id_referensi
+                    ]);
+                }
             }
             return $log;
         });
 
-        return view('transaction.draft-distribusi.index', compact('approvalLogs', 'kategoriGudang', 'isAdmin', 'isViewOnly'));
+        return view('transaction.draft-distribusi.index', compact('approvalLogs', 'kategoriGudang', 'isAdmin', 'isViewOnly', 'viewType'));
     }
 
     /**
@@ -156,17 +250,20 @@ class DraftDistribusiController extends Controller
         $inventories = DataInventory::whereIn('id_gudang', $gudangIds)
             ->where('jenis_inventory', $kategoriGudang)
             ->where('status_inventory', 'AKTIF')
-            ->with(['dataBarang', 'satuan'])
+            ->with(['dataBarang', 'satuan', 'inventoryItems' => function($q) {
+                $q->where('status_item', 'AKTIF')
+                  ->orderBy('kode_register');
+            }])
             ->get();
 
-        // Filter detail permintaan sesuai kategori
+        // Filter detail permintaan sesuai kategori dan load satuan
         $detailPermintaan = $permintaan->detailPermintaan->filter(function($detail) use ($kategoriGudang) {
             // Cek apakah barang ini termasuk dalam kategori yang diminta
             $inventory = DataInventory::where('id_data_barang', $detail->id_data_barang)
                 ->where('jenis_inventory', $kategoriGudang)
                 ->first();
             return $inventory !== null;
-        });
+        })->load('satuan');
 
         $satuans = MasterSatuan::all();
 

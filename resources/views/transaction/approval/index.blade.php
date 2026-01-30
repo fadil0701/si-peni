@@ -21,7 +21,7 @@
 
 <!-- Filters -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
-    <form method="GET" action="{{ route('transaction.approval.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <form method="GET" action="{{ route('transaction.approval.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div>
             <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select 
@@ -39,17 +39,42 @@
             </select>
         </div>
 
-        <div class="sm:col-span-2 flex items-end">
+        <div>
+            <label for="tanggal_mulai" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
+            <input 
+                type="date" 
+                id="tanggal_mulai" 
+                name="tanggal_mulai" 
+                value="{{ request('tanggal_mulai') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div>
+            <label for="tanggal_akhir" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Akhir</label>
+            <input 
+                type="date" 
+                id="tanggal_akhir" 
+                name="tanggal_akhir" 
+                value="{{ request('tanggal_akhir') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div class="flex items-end">
             <button 
                 type="submit" 
-                class="w-full sm:w-auto px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                class="w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
                 Filter
             </button>
-            @if(request('status'))
+        </div>
+
+        <div class="flex items-end">
+            @if(request('status') || request('tanggal_mulai') || request('tanggal_akhir'))
                 <a 
                     href="{{ route('transaction.approval.index') }}" 
-                    class="ml-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
+                    class="w-full px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 text-center"
                 >
                     Reset
                 </a>
@@ -134,18 +159,18 @@
                             // Sudah diketahui oleh Kepala Unit
                             $rowBgColor = 'bg-blue-50';
                             $rowBorderColor = 'border-l-4 border-blue-400';
-                        } elseif ($lastCompletedStep == 3) {
-                            // Sudah diverifikasi oleh Kasubbag TU
-                            $rowBgColor = 'bg-purple-50';
-                            $rowBorderColor = 'border-l-4 border-purple-400';
-                        } elseif ($lastCompletedStep == 4) {
-                            // Sudah disetujui oleh Kepala Pusat
+                        } elseif ($lastCompletedStep == 3 || $currentStatus === 'DISETUJUI') {
+                            // Sudah diverifikasi dan disetujui oleh Kasubbag TU (step 3) atau sudah disetujui
                             $rowBgColor = 'bg-green-50';
-                            $rowBorderColor = 'border-l-4 border-green-400';
-                        } elseif ($lastCompletedStep >= 5) {
-                            // Sudah didisposisikan atau diproses (step 5 atau lebih)
+                            $rowBorderColor = 'border-l-4 border-green-500';
+                        } elseif ($lastCompletedStep == 4 || $currentStatus === 'DIDISPOSISIKAN') {
+                            // Sudah didisposisikan ke Admin Gudang (step 4)
                             $rowBgColor = 'bg-indigo-50';
                             $rowBorderColor = 'border-l-4 border-indigo-500';
+                        } elseif ($lastCompletedStep >= 5 || $currentStatus === 'DIPROSES') {
+                            // Sudah diproses oleh Admin Gudang (step 5 atau lebih)
+                            $rowBgColor = 'bg-blue-50';
+                            $rowBorderColor = 'border-l-4 border-blue-500';
                         }
                         
                         // Status badge color

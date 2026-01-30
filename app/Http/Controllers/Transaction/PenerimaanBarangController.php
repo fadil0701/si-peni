@@ -58,6 +58,16 @@ class PenerimaanBarangController extends Controller
             });
         }
 
+        // Filter berdasarkan tanggal mulai
+        if ($request->filled('tanggal_mulai')) {
+            $query->whereDate('tanggal_penerimaan', '>=', $request->tanggal_mulai);
+        }
+
+        // Filter berdasarkan tanggal akhir
+        if ($request->filled('tanggal_akhir')) {
+            $query->whereDate('tanggal_penerimaan', '<=', $request->tanggal_akhir);
+        }
+
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
         $penerimaans = $query->latest('tanggal_penerimaan')->paginate($perPage)->appends($request->query());
 
@@ -199,10 +209,11 @@ class PenerimaanBarangController extends Controller
             'distribusi.gudangAsal',
             'distribusi.gudangTujuan',
             'distribusi.permintaan',
-            'distribusi.detailDistribusi.inventory', // Eager load detail distribusi untuk mendapatkan qty dikirim
+            'distribusi.detailDistribusi.inventory.gudang', // Eager load detail distribusi untuk mendapatkan qty dikirim
             'unitKerja',
             'pegawaiPenerima',
             'detailPenerimaan.inventory.dataBarang',
+            'detailPenerimaan.inventory.gudang', // Eager load gudang untuk mendapatkan kategori_gudang
             'detailPenerimaan.satuan'
         ])->findOrFail($id);
 
@@ -365,17 +376,38 @@ class PenerimaanBarangController extends Controller
     {
         $distribusi = TransaksiDistribusi::with([
             'detailDistribusi.inventory.dataBarang',
+            'detailDistribusi.inventory.gudang', // Eager load gudang untuk mendapatkan kategori_gudang
             'detailDistribusi.satuan',
             'gudangTujuan.unitKerja'
         ])->findOrFail($id);
 
         $details = $distribusi->detailDistribusi->map(function($detail) {
+            $inventory = $detail->inventory;
+            $kategoriGudang = $inventory->gudang->kategori_gudang ?? null;
+            $isAset = $kategoriGudang === 'ASET';
+            $isFarmasiPersediaan = in_array($kategoriGudang, ['FARMASI', 'PERSEDIAAN']);
+            
+            // Untuk ASET, ambil nomor seri dari inventory_item
+            $noSeriList = [];
+            if ($isAset) {
+                $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                    ->where('id_gudang', $inventory->id_gudang)
+                    ->where('status_item', 'AKTIF')
+                    ->limit((int)$detail->qty_distribusi)
+                    ->get();
+                $noSeriList = $inventoryItems->pluck('no_seri')->filter()->unique()->values();
+            }
+            
             return [
                 'id_inventory' => $detail->id_inventory,
-                'nama_barang' => $detail->inventory->dataBarang->nama_barang ?? '-',
+                'nama_barang' => $inventory->dataBarang->nama_barang ?? '-',
                 'qty_distribusi' => $detail->qty_distribusi,
                 'id_satuan' => $detail->id_satuan,
                 'nama_satuan' => $detail->satuan->nama_satuan ?? '-',
+                'kategori_gudang' => $kategoriGudang,
+                'no_batch' => $isFarmasiPersediaan ? ($inventory->no_batch ?? null) : null,
+                'tanggal_kedaluwarsa' => $isFarmasiPersediaan && $inventory->tanggal_kedaluwarsa ? $inventory->tanggal_kedaluwarsa->format('d/m/Y') : null,
+                'no_seri' => $isAset ? ($noSeriList->count() > 0 ? $noSeriList->toArray() : ($inventory->no_seri ?? null)) : null,
             ];
         });
 

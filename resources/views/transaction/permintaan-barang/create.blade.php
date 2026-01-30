@@ -169,7 +169,48 @@
                                     Sub Jenis Permintaan <span class="text-red-500">*</span>
                                 </label>
                                 <div id="subJenisOptions" class="space-y-2">
-                                    <!-- Sub jenis akan ditampilkan di sini via JavaScript -->
+                                    @php
+                                        $jenisPermintaanOld = old('jenis_permintaan', []);
+                                    @endphp
+                                    <div class="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            id="subjenis_aset" 
+                                            name="jenis_permintaan[]" 
+                                            value="ASET"
+                                            {{ in_array('ASET', $jenisPermintaanOld) ? 'checked' : '' }}
+                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        >
+                                        <label for="subjenis_aset" class="ml-2 block text-sm text-gray-700">
+                                            Aset
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            id="subjenis_persediaan" 
+                                            name="jenis_permintaan[]" 
+                                            value="PERSEDIAAN"
+                                            {{ in_array('PERSEDIAAN', $jenisPermintaanOld) ? 'checked' : '' }}
+                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        >
+                                        <label for="subjenis_persediaan" class="ml-2 block text-sm text-gray-700">
+                                            Persediaan
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input 
+                                            type="checkbox" 
+                                            id="subjenis_farmasi" 
+                                            name="jenis_permintaan[]" 
+                                            value="FARMASI"
+                                            {{ in_array('FARMASI', $jenisPermintaanOld) ? 'checked' : '' }}
+                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        >
+                                        <label for="subjenis_farmasi" class="ml-2 block text-sm text-gray-700">
+                                            Farmasi
+                                        </label>
+                                    </div>
                                 </div>
                                 @error('jenis_permintaan')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -340,8 +381,8 @@
 
 <!-- Template untuk item detail (hidden) -->
 <template id="itemTemplate">
-    <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
+                    <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
             <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Data Barang <span class="text-red-500">*</span>
@@ -434,6 +475,97 @@ const inventoryAsetIds = @json(array_map('intval', $inventoryAsetIds ?? []));
 const stockPersediaanIds = @json(array_map('intval', $stockPersediaanIds ?? []));
 const stockFarmasiIds = @json(array_map('intval', $stockFarmasiIds ?? []));
 
+// Helper: lookup stock (kunci di JSON bisa string atau number)
+function getStockForBarang(barangId) {
+    if (!barangId) return null;
+    const id = String(barangId);
+    const num = parseInt(barangId, 10);
+    return stockData[id] || stockData[num] || null;
+}
+
+// Pesan validasi qty (max) dalam bahasa Indonesia (menggantikan pesan bawaan browser)
+function updateQtyValidity(input) {
+    if (!input || !input.classList.contains('qty-input')) return;
+    const max = input.getAttribute('max');
+    if (!max) {
+        input.setCustomValidity('');
+        return;
+    }
+    const val = parseFloat(input.value);
+    const maxNum = parseFloat(max);
+    if (isNaN(val) || val <= 0) {
+        input.setCustomValidity('');
+        return;
+    }
+    if (val > maxNum) {
+        const maxFormatted = number_format(maxNum, 2, ',', '.');
+        input.setCustomValidity('Nilai harus kurang dari atau sama dengan ' + maxFormatted + '.');
+    } else {
+        input.setCustomValidity('');
+    }
+}
+
+// Helper function untuk format number
+function number_format(number, decimals, dec_point, thousands_sep) {
+    number = (number + '').replace(/[^0-9+\-Ee.]/g, '');
+    const n = !isFinite(+number) ? 0 : +number;
+    const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
+    const sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
+    const dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
+    let s = '';
+    const toFixedFix = function(n, prec) {
+        const k = Math.pow(10, prec);
+        return '' + Math.round(n * k) / k;
+    };
+    s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
+    if (s[0].length > 3) {
+        s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+    }
+    if ((s[1] || '').length < prec) {
+        s[1] = s[1] || '';
+        s[1] += new Array(prec - s[1].length + 1).join('0');
+    }
+    return s.join(dec);
+}
+
+// Helper: nilai stock yang ditampilkan. ASET = aset_available (tidak wajib validasi). PERSEDIAAN/FARMASI = stock gudang pusat (wajib validasi).
+function getDisplayStock(barangId) {
+    const info = getStockForBarang(barangId);
+    if (!info) return null;
+    const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
+    const id = parseInt(barangId, 10);
+    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
+    const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
+    const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
+    if (inAsetIds && checkedJenis.includes('ASET') && info.aset_available !== undefined) {
+        return parseFloat(info.aset_available) || 0;
+    }
+    if (inFarmasiIds && checkedJenis.includes('FARMASI') && info.stock_gudang_pusat_farmasi !== undefined) {
+        return parseFloat(info.stock_gudang_pusat_farmasi) || 0;
+    }
+    if (inPersediaanIds && checkedJenis.includes('PERSEDIAAN') && info.stock_gudang_pusat_persediaan !== undefined) {
+        return parseFloat(info.stock_gudang_pusat_persediaan) || 0;
+    }
+    return parseFloat(info.total) || 0;
+}
+
+// Kapan wajib batasi Qty dengan stock? Hanya untuk PERSEDIAAN/FARMASI. Untuk ASET selalu abaikan stock (jangan set max).
+function shouldEnforceMaxStock(barangId) {
+    const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
+    const id = parseInt(barangId, 10);
+    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
+    const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
+    const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
+    // Jika hanya ASET yang dicentang → jangan pernah batasi stock
+    if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') return false;
+    // Jika barang hanya ada di daftar ASET (bukan Persediaan/Farmasi) → jangan batasi
+    if (inAsetIds && !inFarmasiIds && !inPersediaanIds) return false;
+    // Hanya batasi (set max) untuk barang Persediaan/Farmasi saat jenis itu dicentang
+    if (checkedJenis.includes('FARMASI') && inFarmasiIds) return true;
+    if (checkedJenis.includes('PERSEDIAAN') && inPersediaanIds) return true;
+    return false;
+}
+
 // Debug: log data yang diterima
 console.log('=== Filter Data Barang Debug ===');
 console.log('inventoryAsetIds:', inventoryAsetIds);
@@ -507,13 +639,23 @@ function filterDataBarangByJenisPermintaan() {
         // Jika option yang dipilih sekarang disembunyikan, reset ke kosong
         if (currentValue && !options.find(opt => opt.value === currentValue && opt.style.display !== 'none')) {
             select.value = '';
-            // Trigger change untuk update stock info
+        }
+        // Trigger change agar stock display dan max qty mengikuti sub jenis (ASET = tanpa max, Persediaan/Farmasi = max stock pusat)
+        if (select.value) {
             select.dispatchEvent(new Event('change'));
         }
     });
+    // Jika hanya ASET yang dicentang, hapus max dari semua input qty agar tidak ada validasi "min must be less than max"
+    // checkedJenis sudah dideklarasikan di awal fungsi, jadi tidak perlu dideklarasikan lagi
+    if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') {
+        document.querySelectorAll('.qty-input').forEach(input => {
+            input.removeAttribute('max');
+            input.setCustomValidity('');
+        });
+    }
 }
 
-    // Fungsi untuk menambahkan item baru
+// Fungsi untuk menambahkan item baru
 function tambahItem() {
     const template = document.getElementById('itemTemplate');
     const container = document.getElementById('detailContainer');
@@ -555,9 +697,10 @@ function tambahItem() {
                 selectSatuan.value = satuanId;
             }
             
-            // Tampilkan stock tersedia di kolom terpisah
-            if (barangId && stockData[barangId]) {
-                const totalStock = stockData[barangId].total;
+            // Tampilkan stock tersedia: ASET = aset_available (belum register unit kerja), PERSEDIAAN/FARMASI = total dari Data Stock
+            const displayQty = getDisplayStock(barangId);
+            if (barangId && displayQty !== null) {
+                const totalStock = displayQty;
                 if (stockDisplay) {
                     stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
                     stockDisplay.className = totalStock > 0 
@@ -565,9 +708,13 @@ function tambahItem() {
                         : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
                 }
                 if (qtyInput) {
-                    qtyInput.setAttribute('max', totalStock);
-                    if (parseFloat(qtyInput.value) > totalStock) {
-                        qtyInput.value = totalStock;
+                    if (shouldEnforceMaxStock(barangId)) {
+                        qtyInput.setAttribute('max', totalStock);
+                        if (parseFloat(qtyInput.value) > totalStock) qtyInput.value = totalStock;
+                        updateQtyValidity(qtyInput);
+                    } else {
+                        qtyInput.removeAttribute('max');
+                        qtyInput.setCustomValidity('');
                     }
                 }
             } else {
@@ -575,7 +722,10 @@ function tambahItem() {
                     stockDisplay.textContent = '-';
                     stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
                 }
-                if (qtyInput) qtyInput.removeAttribute('max');
+                if (qtyInput) {
+                    qtyInput.removeAttribute('max');
+                    qtyInput.setCustomValidity('');
+                }
             }
         });
     }
@@ -596,6 +746,17 @@ document.addEventListener('DOMContentLoaded', function() {
         btnTambahItem.addEventListener('click', function(e) {
             e.preventDefault();
             tambahItem();
+        });
+    }
+
+    // Pesan validasi qty (max) dalam bahasa Indonesia saat user mengetik
+    const formPermintaan = document.getElementById('formPermintaan');
+    if (formPermintaan) {
+        formPermintaan.addEventListener('input', function(e) {
+            if (e.target.classList.contains('qty-input')) updateQtyValidity(e.target);
+        });
+        formPermintaan.addEventListener('change', function(e) {
+            if (e.target.classList.contains('qty-input')) updateQtyValidity(e.target);
         });
     }
     
@@ -621,9 +782,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectSatuan.value = satuanId;
             }
             
-            // Tampilkan stock tersedia di kolom terpisah
-            if (barangId && stockData[barangId]) {
-                const totalStock = stockData[barangId].total;
+            // Tampilkan stock tersedia: ASET = aset_available, PERSEDIAAN/FARMASI = total dari Data Stock
+            const displayQty = getDisplayStock(barangId);
+            if (barangId && displayQty !== null) {
+                const totalStock = displayQty;
                 if (stockDisplay) {
                     stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
                     stockDisplay.className = totalStock > 0 
@@ -631,9 +793,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
                 }
                 if (qtyInput) {
-                    qtyInput.setAttribute('max', totalStock);
-                    if (parseFloat(qtyInput.value) > totalStock) {
-                        qtyInput.value = totalStock;
+                    if (shouldEnforceMaxStock(barangId)) {
+                        qtyInput.setAttribute('max', totalStock);
+                        if (parseFloat(qtyInput.value) > totalStock) qtyInput.value = totalStock;
+                        updateQtyValidity(qtyInput);
+                    } else {
+                        qtyInput.removeAttribute('max');
+                        qtyInput.setCustomValidity('');
                     }
                 }
             } else {
@@ -641,11 +807,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     stockDisplay.textContent = '-';
                     stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
                 }
-                if (qtyInput) qtyInput.removeAttribute('max');
+                if (qtyInput) {
+                    qtyInput.removeAttribute('max');
+                    qtyInput.setCustomValidity('');
+                }
             }
         });
         
-        // Trigger change untuk item yang sudah terpilih (untuk menampilkan stock)
+        // Trigger change untuk item yang sudah terpilih (untuk menampilkan stock + satuan)
         if (select.value) {
             // Delay sedikit untuk memastikan DOM sudah ready
             setTimeout(() => {
@@ -654,59 +823,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Helper function untuk format number
-    function number_format(number, decimals, dec_point, thousands_sep) {
-        number = (number + '').replace(/[^0-9+\-Ee.]/g, '');
-        const n = !isFinite(+number) ? 0 : +number;
-        const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
-        const sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
-        const dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
-        let s = '';
-        const toFixedFix = function(n, prec) {
-            const k = Math.pow(10, prec);
-            return '' + Math.round(n * k) / k;
-        };
-        s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
-        if (s[0].length > 3) {
-            s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
-        }
-        if ((s[1] || '').length < prec) {
-            s[1] = s[1] || '';
-            s[1] += new Array(prec - s[1].length + 1).join('0');
-        }
-        return s.join(dec);
-    }
-    
     // Tambah item pertama jika belum ada (hanya jika tidak ada old input)
     const container = document.getElementById('detailContainer');
     if (container && container.children.length === 0) {
         tambahItem();
     }
     
-    // Setup event listeners untuk detail items yang sudah ada (dari old input)
-    container.querySelectorAll('.item-row').forEach(row => {
-        const selectBarang = row.querySelector('.select-data-barang');
-        const selectSatuan = row.querySelector('.select-satuan');
-        const btnHapus = row.querySelector('.btnHapusItem');
-        
-        // Auto-set satuan ketika data barang dipilih
-        if (selectBarang && selectSatuan) {
-            selectBarang.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const satuanId = selectedOption.getAttribute('data-satuan');
-                if (satuanId) {
-                    selectSatuan.value = satuanId;
+    // Setup event listeners untuk detail items yang sudah ada (dari old input atau baris pertama)
+    if (container) {
+        container.querySelectorAll('.item-row').forEach(row => {
+            const selectBarang = row.querySelector('.select-data-barang');
+            const selectSatuan = row.querySelector('.select-satuan');
+            const stockDisplay = row.querySelector('.stock-display');
+            const qtyInput = row.querySelector('.qty-input');
+            const btnHapus = row.querySelector('.btnHapusItem');
+            
+            // Auto-set satuan dan tampilkan stock ketika data barang dipilih
+            if (selectBarang) {
+                selectBarang.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    const satuanId = selectedOption ? selectedOption.getAttribute('data-satuan') : null;
+                    const barangId = this.value;
+                    if (satuanId && selectSatuan) {
+                        selectSatuan.value = satuanId;
+                    }
+                    const displayQty = getDisplayStock(barangId);
+                    if (barangId && displayQty !== null && stockDisplay) {
+                        const totalStock = displayQty;
+                        stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
+                        stockDisplay.className = totalStock > 0 
+                            ? 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-green-50 text-sm font-semibold text-green-700 text-center' 
+                            : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
+                        if (qtyInput) {
+                            if (shouldEnforceMaxStock(barangId)) {
+                                qtyInput.setAttribute('max', totalStock);
+                                if (parseFloat(qtyInput.value) > totalStock) qtyInput.value = totalStock;
+                                updateQtyValidity(qtyInput);
+                            } else {
+                                qtyInput.removeAttribute('max');
+                                qtyInput.setCustomValidity('');
+                            }
+                        }
+                    } else {
+                        if (stockDisplay) {
+                            stockDisplay.textContent = '-';
+                            stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
+                        }
+                        if (qtyInput) {
+                            qtyInput.removeAttribute('max');
+                            qtyInput.setCustomValidity('');
+                        }
+                    }
+                });
+                if (selectBarang.value) {
+                    setTimeout(() => selectBarang.dispatchEvent(new Event('change')), 50);
                 }
-            });
-        }
-        
-        // Hapus item
-        if (btnHapus) {
-            btnHapus.addEventListener('click', function() {
-                this.closest('.item-row').remove();
-            });
-        }
-    });
+            }
+            
+            // Hapus item
+            if (btnHapus) {
+                btnHapus.addEventListener('click', function() {
+                    this.closest('.item-row').remove();
+                });
+            }
+        });
+    }
     
     // Auto-select unit kerja dan pemohon berdasarkan user yang login
     @php

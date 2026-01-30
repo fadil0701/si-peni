@@ -127,7 +127,8 @@ class ClearTransactionData extends Command
         $count = DB::table($tableName)->count();
         
         if ($count > 0) {
-            DB::table($tableName)->truncate();
+            // Gunakan DELETE daripada TRUNCATE untuk menghindari foreign key constraint issues
+            DB::table($tableName)->delete();
             $this->line("  ✓ {$displayName}: {$count} record(s) dihapus");
         } else {
             $this->line("  ⊘ {$displayName}: Tidak ada data");

@@ -57,6 +57,16 @@ class DistribusiController extends Controller
             });
         }
 
+        // Filter berdasarkan tanggal mulai
+        if ($request->filled('tanggal_mulai')) {
+            $query->whereDate('tanggal_distribusi', '>=', $request->tanggal_mulai);
+        }
+
+        // Filter berdasarkan tanggal akhir
+        if ($request->filled('tanggal_akhir')) {
+            $query->whereDate('tanggal_distribusi', '<=', $request->tanggal_akhir);
+        }
+
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
         $distribusis = $query->latest('tanggal_distribusi')->paginate($perPage)->appends($request->query());
         

@@ -53,37 +53,24 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'can_approve' => false, // Kepala Unit tidak bisa approve
             ],
             
-            // Step 3: Kasubbag TU verifikasi
+            // Step 3: Kasubbag TU verifikasi dan menyetujui serta melakukan disposisi
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
                 'step_order' => 3,
                 'role_id' => $roles['kasubbag_tu']->id ?? null,
-                'nama_step' => 'Diketahui TU',
+                'nama_step' => 'Verifikasi dan Disposisi',
                 'status' => 'MENUNGGU',
-                'status_text' => 'Kasubbag TU telah memverifikasi administrasi permintaan',
+                'status_text' => 'Kasubbag TU memverifikasi, menyetujui, dan melakukan disposisi ke Admin Gudang/Pengurus Barang',
                 'is_required' => true,
                 'can_reject' => true, // Bisa mengembalikan jika tidak lengkap
-                'can_approve' => false, // Tidak bisa approve final
+                'can_approve' => true, // Bisa approve dan langsung disposisi
             ],
             
-            // Step 4: Kepala Pusat approve/reject
+            // Step 4: Disposisi ke Admin Gudang berdasarkan kategori (akan dibuat dinamis saat verifikasi)
+            // Step 4.1: Disposisi ke Admin Gudang Aset
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
                 'step_order' => 4,
-                'role_id' => $roles['kepala_pusat']->id ?? null,
-                'nama_step' => 'Disetujui Pimpinan',
-                'status' => 'MENUNGGU',
-                'status_text' => 'Kepala Pusat telah menyetujui permintaan',
-                'is_required' => true,
-                'can_reject' => true,
-                'can_approve' => true, // Bisa approve final
-            ],
-            
-            // Step 5: Disposisi ke Admin Gudang berdasarkan kategori (akan dibuat dinamis saat approve)
-            // Step 5.1: Disposisi ke Admin Gudang Aset
-            [
-                'modul_approval' => 'PERMINTAAN_BARANG',
-                'step_order' => 5,
                 'role_id' => $roles['admin_gudang_aset']->id ?? null,
                 'nama_step' => 'Didisposisikan - ASET',
                 'status' => 'MENUNGGU',
@@ -92,10 +79,10 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'can_reject' => false,
                 'can_approve' => false,
             ],
-            // Step 5.2: Disposisi ke Admin Gudang Persediaan
+            // Step 4.2: Disposisi ke Admin Gudang Persediaan
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
-                'step_order' => 5,
+                'step_order' => 4,
                 'role_id' => $roles['admin_gudang_persediaan']->id ?? null,
                 'nama_step' => 'Didisposisikan - PERSEDIAAN',
                 'status' => 'MENUNGGU',
@@ -104,10 +91,10 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'can_reject' => false,
                 'can_approve' => false,
             ],
-            // Step 5.3: Disposisi ke Admin Gudang Farmasi
+            // Step 4.3: Disposisi ke Admin Gudang Farmasi
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
-                'step_order' => 5,
+                'step_order' => 4,
                 'role_id' => $roles['admin_gudang_farmasi']->id ?? null,
                 'nama_step' => 'Didisposisikan - FARMASI',
                 'status' => 'MENUNGGU',
@@ -116,10 +103,10 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'can_reject' => false,
                 'can_approve' => false,
             ],
-            // Step 5.4: Disposisi ke Admin Gudang Umum (fallback)
+            // Step 4.4: Disposisi ke Admin Gudang Umum (fallback)
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
-                'step_order' => 5,
+                'step_order' => 4,
                 'role_id' => $roles['admin_gudang']->id ?? null,
                 'nama_step' => 'Didisposisikan',
                 'status' => 'MENUNGGU',
@@ -129,10 +116,10 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'can_approve' => false,
             ],
             
-            // Step 6: Diproses oleh Admin Gudang
+            // Step 5: Diproses oleh Admin Gudang
             [
                 'modul_approval' => 'PERMINTAAN_BARANG',
-                'step_order' => 6,
+                'step_order' => 5,
                 'role_id' => $roles['admin_gudang']->id ?? null,
                 'nama_step' => 'Diproses',
                 'status' => 'MENUNGGU',
@@ -147,10 +134,13 @@ class ApprovalFlowDefinitionSeeder extends Seeder
         ];
 
         foreach ($flowDefinitions as $flow) {
+            // Gunakan modul_approval, step_order, dan role_id sebagai unique key
+            // karena constraint unique adalah ['modul_approval', 'step_order', 'role_id']
             DB::table('approval_flow_definition')->updateOrInsert(
                 [
                     'modul_approval' => $flow['modul_approval'],
                     'step_order' => $flow['step_order'],
+                    'role_id' => $flow['role_id'],
                 ],
                 $flow
             );

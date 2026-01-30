@@ -214,14 +214,14 @@
                     @foreach(old('detail', $permintaan->detailPermintaan) as $index => $detail)
                     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                            <div class="sm:col-span-5">
+                            <div class="sm:col-span-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                     Data Barang <span class="text-red-500">*</span>
                                 </label>
                                 <select 
                                     name="detail[{{ $index }}][id_data_barang]" 
                                     required
-                                    class="select-data-barang block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    class="select-data-barang block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error("detail.{$index}.id_data_barang") border-red-500 @enderror"
                                 >
                                     <option value="">Pilih Data Barang</option>
                                     @foreach($dataBarangs as $dataBarang)
@@ -232,9 +232,12 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @error("detail.{$index}.id_data_barang")
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
 
-                            <div class="sm:col-span-2">
+                            <div class="sm:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                     Qty <span class="text-red-500">*</span>
                                 </label>
@@ -246,18 +249,22 @@
                                     step="0.01"
                                     value="{{ old("detail.{$index}.qty_diminta", is_object($detail) ? $detail->qty_diminta : ($detail['qty_diminta'] ?? '')) }}"
                                     placeholder="0"
-                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    max=""
+                                    class="qty-input block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error("detail.{$index}.qty_diminta") border-red-500 @enderror"
                                 >
+                                @error("detail.{$index}.qty_diminta")
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
 
-                            <div class="sm:col-span-2">
+                            <div class="sm:col-span-1">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
                                     Satuan <span class="text-red-500">*</span>
                                 </label>
                                 <select 
                                     name="detail[{{ $index }}][id_satuan]" 
                                     required
-                                    class="select-satuan block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    class="select-satuan block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error("detail.{$index}.id_satuan") border-red-500 @enderror"
                                 >
                                     <option value="">Pilih Satuan</option>
                                     @foreach($satuans as $satuan)
@@ -267,9 +274,21 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @error("detail.{$index}.id_satuan")
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
 
-                            <div class="sm:col-span-2">
+                            <div class="sm:col-span-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Stock Tersedia
+                                </label>
+                                <div class="stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center">
+                                    -
+                                </div>
+                            </div>
+
+                            <div class="sm:col-span-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
                                 <input 
                                     type="text" 
@@ -283,9 +302,12 @@
                             <div class="sm:col-span-1 flex items-end">
                                 <button 
                                     type="button" 
-                                    class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                    class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                                    title="Hapus Item"
                                 >
-                                    Hapus
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>
@@ -320,7 +342,7 @@
 <template id="itemTemplate">
     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div class="sm:col-span-5">
+            <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Data Barang <span class="text-red-500">*</span>
                 </label>
@@ -338,7 +360,7 @@
                 </select>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Qty <span class="text-red-500">*</span>
                 </label>
@@ -349,18 +371,19 @@
                     min="0.01"
                     step="0.01"
                     placeholder="0"
-                    class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    max=""
+                    class="qty-input block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Satuan <span class="text-red-500">*</span>
                 </label>
                 <select 
                     name="detail[INDEX][id_satuan]" 
                     required
-                    class="select-satuan block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    class="select-satuan block w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                     <option value="">Pilih Satuan</option>
                     @foreach($satuans as $satuan)
@@ -369,7 +392,16 @@
                 </select>
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="sm:col-span-1">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Stock Tersedia
+                </label>
+                <div class="stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center">
+                    -
+                </div>
+            </div>
+
+            <div class="sm:col-span-4">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
                 <input 
                     type="text" 
@@ -382,9 +414,12 @@
             <div class="sm:col-span-1 flex items-end">
                 <button 
                     type="button" 
-                    class="btnHapusItem w-full px-3 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                    title="Hapus Item"
                 >
-                    Hapus
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                 </button>
             </div>
         </div>
@@ -394,6 +429,100 @@
 @push('scripts')
 <script>
 let itemIndex = {{ count(old('detail', $permintaan->detailPermintaan)) }};
+const stockData = @json($stockData ?? []);
+const inventoryAsetIds = @json(array_map('intval', $inventoryAsetIds ?? []));
+const stockPersediaanIds = @json(array_map('intval', $stockPersediaanIds ?? []));
+const stockFarmasiIds = @json(array_map('intval', $stockFarmasiIds ?? []));
+
+// Helper function untuk format number
+function number_format(number, decimals, dec_point, thousands_sep) {
+    number = (number + '').replace(/[^0-9+\-Ee.]/g, '');
+    const n = !isFinite(+number) ? 0 : +number;
+    const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
+    const sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
+    const dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
+    let s = '';
+    const toFixedFix = function(n, prec) {
+        const k = Math.pow(10, prec);
+        return '' + Math.round(n * k) / k;
+    };
+    s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
+    if (s[0].length > 3) {
+        s[0] = s[0].replace(/\B(?=(?:\d{3})+(?!\d))/g, sep);
+    }
+    if ((s[1] || '').length < prec) {
+        s[1] = s[1] || '';
+        s[1] += new Array(prec - s[1].length + 1).join('0');
+    }
+    return s.join(dec);
+}
+
+// Helper: lookup stock
+function getStockForBarang(barangId) {
+    if (!barangId) return null;
+    const id = String(barangId);
+    const num = parseInt(barangId, 10);
+    return stockData[id] || stockData[num] || null;
+}
+
+// Helper: nilai stock yang ditampilkan. ASET = aset_available, PERSEDIAAN/FARMASI = stock gudang pusat.
+function getDisplayStock(barangId) {
+    const info = getStockForBarang(barangId);
+    if (!info) return null;
+    const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
+    const id = parseInt(barangId, 10);
+    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
+    const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
+    const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
+    if (inAsetIds && checkedJenis.includes('ASET') && info.aset_available !== undefined) {
+        return parseFloat(info.aset_available) || 0;
+    }
+    if (inFarmasiIds && checkedJenis.includes('FARMASI') && info.stock_gudang_pusat_farmasi !== undefined) {
+        return parseFloat(info.stock_gudang_pusat_farmasi) || 0;
+    }
+    if (inPersediaanIds && checkedJenis.includes('PERSEDIAAN') && info.stock_gudang_pusat_persediaan !== undefined) {
+        return parseFloat(info.stock_gudang_pusat_persediaan) || 0;
+    }
+    return parseFloat(info.total) || 0;
+}
+
+// Kapan wajib batasi Qty dengan stock? Hanya untuk PERSEDIAAN/FARMASI. Untuk ASET selalu abaikan stock.
+function shouldEnforceMaxStock(barangId) {
+    const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
+    const id = parseInt(barangId, 10);
+    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
+    const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
+    const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
+    if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') return false;
+    if (inAsetIds && !inFarmasiIds && !inPersediaanIds) return false;
+    if (checkedJenis.includes('FARMASI') && inFarmasiIds) return true;
+    if (checkedJenis.includes('PERSEDIAAN') && inPersediaanIds) return true;
+    return false;
+}
+
+// Pesan validasi qty (max) dalam bahasa Indonesia
+function updateQtyValidity(input) {
+    if (!input) return;
+    // Cek apakah ini input qty (bisa pakai class atau name attribute)
+    if (!input.classList.contains('qty-input') && (!input.name || !input.name.includes('[qty_diminta]'))) return;
+    const max = input.getAttribute('max');
+    if (!max) {
+        input.setCustomValidity('');
+        return;
+    }
+    const val = parseFloat(input.value);
+    const maxNum = parseFloat(max);
+    if (isNaN(val) || val <= 0) {
+        input.setCustomValidity('');
+        return;
+    }
+    if (val > maxNum) {
+        const maxFormatted = number_format(maxNum, 2, ',', '.');
+        input.setCustomValidity('Nilai harus kurang dari atau sama dengan ' + maxFormatted + '.');
+    } else {
+        input.setCustomValidity('');
+    }
+}
 
 // Fungsi untuk menambahkan item baru
 function tambahItem() {
@@ -418,16 +547,49 @@ function tambahItem() {
     container.appendChild(finalItem);
     itemIndex++;
     
-    // Auto-set satuan ketika data barang dipilih
+    // Auto-set satuan dan tampilkan stock ketika data barang dipilih
     const selectBarang = finalItem.querySelector('.select-data-barang');
     const selectSatuan = finalItem.querySelector('.select-satuan');
+    const qtyInput = finalItem.querySelector('input[name*="[qty_diminta]"]');
+    const stockDisplay = finalItem.querySelector('.stock-display');
     
     if (selectBarang && selectSatuan) {
         selectBarang.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             const satuanId = selectedOption.getAttribute('data-satuan');
+            const barangId = this.value;
+            
             if (satuanId) {
                 selectSatuan.value = satuanId;
+            }
+            
+            // Tampilkan stock tersedia
+            const displayQty = getDisplayStock(barangId);
+            if (barangId && displayQty !== null && stockDisplay) {
+                const totalStock = displayQty;
+                stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
+                stockDisplay.className = totalStock > 0 
+                    ? 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-green-50 text-sm font-semibold text-green-700 text-center' 
+                    : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
+                if (qtyInput) {
+                    if (shouldEnforceMaxStock(barangId)) {
+                        qtyInput.setAttribute('max', totalStock);
+                        if (parseFloat(qtyInput.value) > totalStock) qtyInput.value = totalStock;
+                        updateQtyValidity(qtyInput);
+                    } else {
+                        qtyInput.removeAttribute('max');
+                        qtyInput.setCustomValidity('');
+                    }
+                }
+            } else {
+                if (stockDisplay) {
+                    stockDisplay.textContent = '-';
+                    stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
+                }
+                if (qtyInput) {
+                    qtyInput.removeAttribute('max');
+                    qtyInput.setCustomValidity('');
+                }
             }
         });
     }
@@ -468,24 +630,93 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Auto-set satuan untuk item yang sudah ada
+    // Auto-set satuan dan tampilkan stock untuk item yang sudah ada
     document.querySelectorAll('.select-data-barang').forEach(select => {
         select.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
             const satuanId = selectedOption.getAttribute('data-satuan');
+            const barangId = this.value;
             const row = this.closest('.item-row');
             const selectSatuan = row.querySelector('.select-satuan');
+            const qtyInput = row.querySelector('input[name*="[qty_diminta]"]');
+            const stockDisplay = row.querySelector('.stock-display');
+            
             if (satuanId && selectSatuan) {
                 selectSatuan.value = satuanId;
             }
+            
+            // Tampilkan stock tersedia
+            const displayQty = getDisplayStock(barangId);
+            if (barangId && displayQty !== null && stockDisplay) {
+                const totalStock = displayQty;
+                stockDisplay.textContent = totalStock > 0 ? number_format(totalStock, 2, ',', '.') : '0';
+                stockDisplay.className = totalStock > 0 
+                    ? 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-green-50 text-sm font-semibold text-green-700 text-center' 
+                    : 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-red-50 text-sm font-semibold text-red-700 text-center';
+                if (qtyInput) {
+                    if (shouldEnforceMaxStock(barangId)) {
+                        qtyInput.setAttribute('max', totalStock);
+                        if (parseFloat(qtyInput.value) > totalStock) qtyInput.value = totalStock;
+                        updateQtyValidity(qtyInput);
+                    } else {
+                        qtyInput.removeAttribute('max');
+                        qtyInput.setCustomValidity('');
+                    }
+                }
+            } else {
+                if (stockDisplay) {
+                    stockDisplay.textContent = '-';
+                    stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center';
+                }
+                if (qtyInput) {
+                    qtyInput.removeAttribute('max');
+                    qtyInput.setCustomValidity('');
+                }
+            }
         });
+        
+        // Trigger change untuk item yang sudah terpilih (untuk menampilkan stock)
+        if (select.value) {
+            setTimeout(() => select.dispatchEvent(new Event('change')), 100);
+        }
     });
+    
+    // Pesan validasi qty (max) dalam bahasa Indonesia saat user mengetik
+    const formPermintaan = document.getElementById('formPermintaan');
+    if (formPermintaan) {
+        formPermintaan.addEventListener('input', function(e) {
+            if (e.target.name && e.target.name.includes('[qty_diminta]')) updateQtyValidity(e.target);
+        });
+        formPermintaan.addEventListener('change', function(e) {
+            if (e.target.name && e.target.name.includes('[qty_diminta]')) updateQtyValidity(e.target);
+        });
+    }
     
     // Initialize sub jenis saat halaman dimuat
     const tipePermintaan = document.querySelector('input[name="tipe_permintaan"]:checked');
     if (tipePermintaan) {
         updateSubJenis();
     }
+    
+    // Update stock display saat sub jenis checkbox berubah
+    document.querySelectorAll('input[name="jenis_permintaan[]"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            // Trigger change pada semua select data barang untuk update stock display
+            document.querySelectorAll('.select-data-barang').forEach(select => {
+                if (select.value) {
+                    setTimeout(() => select.dispatchEvent(new Event('change')), 50);
+                }
+            });
+            // Jika hanya ASET yang dicentang, hapus max dari semua input qty
+            const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
+            if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') {
+                document.querySelectorAll('input[name*="[qty_diminta]"]').forEach(input => {
+                    input.removeAttribute('max');
+                    input.setCustomValidity('');
+                });
+            }
+        });
+    });
 });
 </script>
 @endpush

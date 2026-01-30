@@ -118,32 +118,99 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gudang Asal</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Distribusi</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
+                                @if($distribusi->detailDistribusi->whereIn('inventory.gudang.kategori_gudang', ['FARMASI', 'PERSEDIAAN'])->count() > 0)
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No. Batch</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exp Date</th>
+                                @endif
+                                @if($distribusi->detailDistribusi->where('inventory.gudang.kategori_gudang', 'ASET')->count() > 0)
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No. Seri</th>
+                                @endif
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga Satuan</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @php $total = 0; @endphp
+                            @php 
+                                $total = 0;
+                                $hasFarmasiPersediaan = $distribusi->detailDistribusi->whereIn('inventory.gudang.kategori_gudang', ['FARMASI', 'PERSEDIAAN'])->count() > 0;
+                                $hasAset = $distribusi->detailDistribusi->where('inventory.gudang.kategori_gudang', 'ASET')->count() > 0;
+                            @endphp
                             @foreach($distribusi->detailDistribusi as $index => $detail)
-                            @php $total += $detail->subtotal; @endphp
+                            @php 
+                                $total += $detail->subtotal;
+                                $inventory = $detail->inventory;
+                                $kategoriGudang = $inventory->gudang->kategori_gudang ?? null;
+                                $isAset = $kategoriGudang === 'ASET';
+                                $isFarmasiPersediaan = in_array($kategoriGudang, ['FARMASI', 'PERSEDIAAN']);
+                                
+                                // Untuk ASET, ambil nomor seri dari inventory_item
+                                $noSeriList = [];
+                                if ($isAset) {
+                                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $inventory->id_inventory)
+                                        ->where('id_gudang', $inventory->id_gudang)
+                                        ->where('status_item', 'AKTIF')
+                                        ->limit((int)$detail->qty_distribusi)
+                                        ->get();
+                                    $noSeriList = $inventoryItems->pluck('no_seri')->filter()->unique()->values();
+                                }
+                            @endphp
                             <tr>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">
-                                    {{ $detail->inventory->dataBarang->nama_barang ?? '-' }}
+                                    {{ $inventory->dataBarang->nama_barang ?? '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">
-                                    {{ $detail->inventory->gudang->nama_gudang ?? '-' }}
+                                    {{ $inventory->gudang->nama_gudang ?? '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_distribusi, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
+                                @if($hasFarmasiPersediaan)
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    @if($isFarmasiPersediaan)
+                                        {{ $inventory->no_batch ?? '-' }}
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    @if($isFarmasiPersediaan && $inventory->tanggal_kedaluwarsa)
+                                        {{ \Carbon\Carbon::parse($inventory->tanggal_kedaluwarsa)->format('d/m/Y') }}
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                @endif
+                                @if($hasAset)
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    @if($isAset)
+                                        @if($noSeriList->count() > 0)
+                                            @if($noSeriList->count() <= 3)
+                                                {{ $noSeriList->join(', ') }}
+                                            @else
+                                                {{ $noSeriList->take(3)->join(', ') }}<br>
+                                                <span class="text-xs text-gray-500">+{{ $noSeriList->count() - 3 }} lainnya</span>
+                                            @endif
+                                        @else
+                                            {{ $inventory->no_seri ?? '-' }}
+                                        @endif
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                @endif
                                 <td class="px-4 py-3 text-sm text-gray-900">Rp {{ number_format($detail->harga_satuan, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-sm font-semibold text-gray-900">Rp {{ number_format($detail->subtotal, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->keterangan ?? '-' }}</td>
                             </tr>
                             @endforeach
                             <tr class="bg-gray-50 font-semibold">
-                                <td colspan="6" class="px-4 py-3 text-sm text-gray-900 text-right">Total</td>
+                                @php
+                                    $colspan = 6; // No, Nama Barang, Gudang Asal, Qty, Satuan, Harga Satuan
+                                    if ($hasFarmasiPersediaan) $colspan += 2; // No. Batch, Exp Date
+                                    if ($hasAset) $colspan += 1; // No. Seri
+                                @endphp
+                                <td colspan="{{ $colspan }}" class="px-4 py-3 text-sm text-gray-900 text-right">Total</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">Rp {{ number_format($total, 2, ',', '.') }}</td>
                                 <td></td>
                             </tr>
