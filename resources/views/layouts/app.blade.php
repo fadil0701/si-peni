@@ -26,30 +26,11 @@
                     </div>
                 </div>
 
-                <!-- Navigation -->
+                <!-- Navigation: gunakan variabel shared dari AppServiceProvider (currentUser, accessibleMenus, userRoles, userRoleIds, userPrimaryRole) -->
                 <nav class="flex-1 overflow-y-auto p-4">
                     @php
                         use App\Helpers\PermissionHelper;
-                        
-                        // Pastikan user roles ter-load dengan permissions
-                        $currentUser = auth()->user();
-                        if ($currentUser) {
-                            // Load roles dengan permissions untuk memastikan permission ter-load
-                            if (!$currentUser->relationLoaded('roles')) {
-                                $currentUser->load('roles');
-                            }
-                            // Pastikan permissions ter-load untuk setiap role
-                            foreach ($currentUser->roles as $role) {
-                                if (!$role->relationLoaded('permissions')) {
-                                    $role->load('permissions');
-                                }
-                            }
-                        }
-                        
-                        // Get accessible menus untuk semua menu dan submenu
-                        $accessibleMenus = auth()->check() ? PermissionHelper::getAccessibleMenus($currentUser) : [];
-                        
-                        // Check permissions untuk menu utama berdasarkan accessibleMenus
+                        $accessibleMenus = $accessibleMenus ?? [];
                         $canAccessMasterManajemen = isset($accessibleMenus['master-manajemen']);
                         $canAccessMasterData = isset($accessibleMenus['master-data']);
                         $canAccessInventory = isset($accessibleMenus['inventory']);
@@ -262,7 +243,7 @@
                             </a>
                         </li>
                         @endif
-                        @if(auth()->check() && PermissionHelper::canAccess($currentUser, 'admin.*'))
+                        @if($currentUser && PermissionHelper::canAccess($currentUser, 'admin.*'))
                             <li>
                                 <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('admin')">
                                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,12 +298,12 @@
                                     onclick="toggleUserMenu()"
                                     class="flex items-center space-x-3 text-left focus:outline-none"
                                 >
-                                    <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name ?? 'AD') }}&background=1e40af&color=fff&size=128" alt="User" class="h-10 w-10 rounded-full">
+                                    <img src="https://ui-avatars.com/api/?name={{ urlencode($currentUser?->name ?? 'AD') }}&background=1e40af&color=fff&size=128" alt="User" class="h-10 w-10 rounded-full">
                                     <div>
-                                        <p class="text-sm font-medium text-gray-900">{{ Auth::user()->name ?? 'User' }}</p>
+                                        <p class="text-sm font-medium text-gray-900">{{ $currentUser?->name ?? 'User' }}</p>
                                         <p class="text-xs text-gray-500">
-                                            @if(Auth::user()->roles && Auth::user()->roles->count() > 0)
-                                                {{ Auth::user()->roles->first()->display_name }}
+                                            @if($userPrimaryRole)
+                                                {{ $userPrimaryRole->display_name }}
                                             @else
                                                 User
                                             @endif

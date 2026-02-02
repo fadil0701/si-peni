@@ -172,6 +172,45 @@ class PermissionHelper
                 'master-data.data-barang.update',
                 // Tidak termasuk destroy, delete - harus di-checklist secara eksplisit
             ],
+
+            // 6b. ADMIN GUDANG PER KATEGORI (filter di controller: aset/persediaan/farmasi hanya akses kategorinya)
+            'admin_gudang_aset' => [
+                'inventory.data-stock.index', 'inventory.data-stock.show', 'inventory.data-stock.create', 'inventory.data-stock.store', 'inventory.data-stock.edit', 'inventory.data-stock.update',
+                'inventory.data-inventory.index', 'inventory.data-inventory.show', 'inventory.data-inventory.create', 'inventory.data-inventory.store', 'inventory.data-inventory.edit', 'inventory.data-inventory.update',
+                'transaction.distribusi.index', 'transaction.distribusi.show', 'transaction.penerimaan-barang.index', 'transaction.penerimaan-barang.show', 'transaction.penerimaan-barang.create', 'transaction.penerimaan-barang.store', 'transaction.penerimaan-barang.edit', 'transaction.penerimaan-barang.update',
+                'transaction.approval.index', 'transaction.approval.show', 'transaction.approval.disposisi',
+                'asset.register-aset.index', 'asset.register-aset.show', 'asset.register-aset.create', 'asset.register-aset.store', 'asset.register-aset.edit', 'asset.register-aset.update',
+                'reports.stock-gudang', 'master.gudang.index', 'master.gudang.show',
+                'master-data.data-barang.index', 'master-data.data-barang.show', 'master-data.data-barang.create', 'master-data.data-barang.store', 'master-data.data-barang.edit', 'master-data.data-barang.update',
+            ],
+            'admin_gudang_persediaan' => [
+                'inventory.data-stock.index', 'inventory.data-stock.show', 'inventory.data-stock.create', 'inventory.data-stock.store', 'inventory.data-stock.edit', 'inventory.data-stock.update',
+                'inventory.data-inventory.index', 'inventory.data-inventory.show', 'inventory.data-inventory.create', 'inventory.data-inventory.store', 'inventory.data-inventory.edit', 'inventory.data-inventory.update',
+                'transaction.distribusi.index', 'transaction.distribusi.show', 'transaction.penerimaan-barang.index', 'transaction.penerimaan-barang.show', 'transaction.penerimaan-barang.create', 'transaction.penerimaan-barang.store', 'transaction.penerimaan-barang.edit', 'transaction.penerimaan-barang.update',
+                'transaction.approval.index', 'transaction.approval.show', 'transaction.approval.disposisi',
+                'asset.register-aset.index', 'asset.register-aset.show', 'asset.register-aset.create', 'asset.register-aset.store', 'asset.register-aset.edit', 'asset.register-aset.update',
+                'reports.stock-gudang', 'master.gudang.index', 'master.gudang.show',
+                'master-data.data-barang.index', 'master-data.data-barang.show', 'master-data.data-barang.create', 'master-data.data-barang.store', 'master-data.data-barang.edit', 'master-data.data-barang.update',
+            ],
+            'admin_gudang_farmasi' => [
+                'inventory.data-stock.index', 'inventory.data-stock.show', 'inventory.data-stock.create', 'inventory.data-stock.store', 'inventory.data-stock.edit', 'inventory.data-stock.update',
+                'inventory.data-inventory.index', 'inventory.data-inventory.show', 'inventory.data-inventory.create', 'inventory.data-inventory.store', 'inventory.data-inventory.edit', 'inventory.data-inventory.update',
+                'transaction.distribusi.index', 'transaction.distribusi.show', 'transaction.penerimaan-barang.index', 'transaction.penerimaan-barang.show', 'transaction.penerimaan-barang.create', 'transaction.penerimaan-barang.store', 'transaction.penerimaan-barang.edit', 'transaction.penerimaan-barang.update',
+                'transaction.approval.index', 'transaction.approval.show', 'transaction.approval.disposisi',
+                'asset.register-aset.index', 'asset.register-aset.show', 'asset.register-aset.create', 'asset.register-aset.store', 'asset.register-aset.edit', 'asset.register-aset.update',
+                'reports.stock-gudang', 'master.gudang.index', 'master.gudang.show',
+                'master-data.data-barang.index', 'master-data.data-barang.show', 'master-data.data-barang.create', 'master-data.data-barang.store', 'master-data.data-barang.edit', 'master-data.data-barang.update',
+            ],
+            // 6c. ADMIN GUDANG UNIT (hanya akses gudang unit kerjanya, tidak bisa gudang pusat)
+            'admin_gudang_unit' => [
+                'inventory.data-stock.index', 'inventory.data-stock.show',
+                'inventory.data-inventory.index', 'inventory.data-inventory.show',
+                'transaction.penerimaan-barang.index', 'transaction.penerimaan-barang.show', 'transaction.penerimaan-barang.create', 'transaction.penerimaan-barang.store', 'transaction.penerimaan-barang.edit', 'transaction.penerimaan-barang.update',
+                'transaction.retur-barang.index', 'transaction.retur-barang.show', 'transaction.retur-barang.create', 'transaction.retur-barang.store',
+                'transaction.pemakaian-barang.index', 'transaction.pemakaian-barang.show', 'transaction.pemakaian-barang.create', 'transaction.pemakaian-barang.store',
+                'asset.register-aset.index', 'asset.register-aset.show', 'asset.register-aset.edit', 'asset.register-aset.update',
+                'reports.stock-gudang', 'master.gudang.index', 'master.gudang.show',
+            ],
             
             // 7. UNIT TERKAIT
             'perencanaan' => [

@@ -167,8 +167,6 @@
                             <option value="">Pilih Status</option>
                             <option value="DRAFT" {{ old('status_retur', $retur->status_retur) == 'DRAFT' ? 'selected' : '' }}>Draft</option>
                             <option value="DIAJUKAN" {{ old('status_retur', $retur->status_retur) == 'DIAJUKAN' ? 'selected' : '' }}>Diajukan</option>
-                            <option value="DITERIMA" {{ old('status_retur', $retur->status_retur) == 'DITERIMA' ? 'selected' : '' }}>Diterima</option>
-                            <option value="DITOLAK" {{ old('status_retur', $retur->status_retur) == 'DITOLAK' ? 'selected' : '' }}>Ditolak</option>
                         </select>
                         @error('status_retur')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

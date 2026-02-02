@@ -26,7 +26,7 @@
 
 <!-- Filters -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
-    <form method="GET" action="{{ route('transaction.pemakaian-barang.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <form method="GET" action="{{ route('transaction.pemakaian-barang.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-6">
         <div>
             <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select 
@@ -58,6 +58,24 @@
             </select>
         </div>
 
+        @if(isset($unitKerjas) && $unitKerjas->isNotEmpty())
+        <div>
+            <label for="id_unit_kerja" class="block text-sm font-medium text-gray-700 mb-1">Unit Kerja</label>
+            <select 
+                id="id_unit_kerja" 
+                name="id_unit_kerja" 
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+                <option value="">Semua Unit Kerja</option>
+                @foreach($unitKerjas as $uk)
+                    <option value="{{ $uk->id_unit_kerja }}" {{ request('id_unit_kerja') == $uk->id_unit_kerja ? 'selected' : '' }}>
+                        {{ $uk->nama_unit_kerja }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        @endif
+
         <div>
             <label for="tanggal_dari" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Dari</label>
             <input 
@@ -65,6 +83,17 @@
                 id="tanggal_dari" 
                 name="tanggal_dari" 
                 value="{{ request('tanggal_dari') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div>
+            <label for="tanggal_sampai" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Sampai</label>
+            <input 
+                type="date" 
+                id="tanggal_sampai" 
+                name="tanggal_sampai" 
+                value="{{ request('tanggal_sampai') }}"
                 class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
         </div>

@@ -239,7 +239,47 @@ RETUR (jika ada)
 
 ---
 
-**Last Updated:** {{ date('d/m/Y') }}
-**Version:** 1.0
+---
+
+## Alur Permintaan Barang – Dua Cabang (Barang Ada vs Tidak Ada di Stock)
+
+Flowchart ini memetakan alur setelah **Kasubbag TU Verifikasi** menjadi dua cabang berdasarkan ketersediaan barang di stock.
+
+### Cabang 1: Barang ADA di Stock (Pemenuhan dari Gudang)
+
+```
+Kasubbag TU Verif → Disetujui
+    → SPPB (Surat Perintah Pengeluaran Barang)
+    → Pengurus Barang (Admin Gudang)
+    → Dispo Gudang (Farmasi / Persediaan)
+    → Dokumen SBBK → Distribusi
+    → Unit Kerja (Cek dan Terima Barang)
+    → Cek Fisik: Sesuai → Selesai (SBBK ditandatangani, barang masuk data stock unit)
+```
+
+**Implementasi saat ini:** Setelah Kasubbag TU verifikasi, sistem membuat **disposisi ke Admin Gudang** (step 4) sesuai kategori (Persediaan/Farmasi). Admin Gudang memproses disposisi → Compile SBBK → Distribusi → Penerimaan.
+
+### Cabang 2: Barang TIDAK ADA di Stock (Pengadaan Barang dan Jasa)
+
+```
+SPB (Permintaan yang tidak ada di Data Stock)
+    → Kepala Pusat (Setuju / Tidak)
+    → Jika Disetujui:
+        → PPK (Pejabat Pembuat Komitmen) – Upload Dokumen Spektek
+        → PPBJ (Pejabat Pengadaan Barang/Jasa) – Upload Dokumen Pengadaan
+        → Selesai
+```
+
+**Implementasi saat ini:**
+
+- Sistem mendeteksi item yang **tidak ada di stock** (permintaan lainnya / `id_data_barang` null, atau stock gudang pusat = 0).
+- Jika ada item seperti itu, setelah Kasubbag TU verifikasi dibuat **disposisi ke Pengadaan Barang dan Jasa** (step 4 – role `pengadaan`). Role Pengadaan melihat permintaan tersebut di menu **Persetujuan** dan dapat memproses pengadaan.
+
+**Catatan:** Di flowchart, cabang pengadaan melalui **persetujuan Kepala Pusat** dulu sebelum ke PPK/PPBJ. Di sistem saat ini, disposisi ke Pengadaan dibuat langsung setelah verifikasi Kasubbag TU (tanpa step persetujuan Kepala Pusat khusus untuk pengadaan). Jika diinginkan penambahan step “Persetujuan Kepala Pusat untuk Disposisi ke Pengadaan” sebelum item masuk ke bagian Pengadaan, dapat ditambahkan di kemudian hari.
+
+---
+
+**Last Updated:** 02/02/2026  
+**Version:** 1.1
 
 

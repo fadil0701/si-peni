@@ -23,9 +23,8 @@ class UserController extends Controller
     {
         $roles = Role::all();
         $modules = Module::orderBy('sort_order')->get();
-        // Ambil pegawai yang belum punya user
-        $pegawais = MasterPegawai::whereDoesntHave('user')
-            ->orWhereNull('user_id')
+        // Semua pegawai untuk dropdown auto-fill nama & email (nama tetap muncul)
+        $pegawais = MasterPegawai::with('unitKerja')
             ->orderBy('nama_pegawai')
             ->get();
         return view('admin.users.create', compact('roles', 'pegawais', 'modules'));

@@ -67,8 +67,8 @@
                 >{{ old('description', $role->description) }}</textarea>
             </div>
 
-            <!-- User Modules Info -->
-            @if(isset($userModules) && $userModules->isNotEmpty())
+            <!-- Info modul user (sederhana) -->
+            @if($userModules->isNotEmpty())
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                     <div class="flex items-start">
                         <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,55 +136,43 @@
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
-                    @foreach($permissions as $module => $modulePermissions)
-                        @php
-                            $moduleDisplayName = ucwords(str_replace(['-', '_'], ' ', $module));
-                            $moduleId = 'module-' . str_replace(['.', '-', '_'], '-', $module);
-                            $modulePermissionIds = $modulePermissions->pluck('id')->toArray();
-                            $checkedInModule = array_intersect($modulePermissionIds, $rolePermissions);
-                            $allChecked = count($checkedInModule) === count($modulePermissionIds);
-                            $someChecked = count($checkedInModule) > 0 && count($checkedInModule) < count($modulePermissionIds);
-                        @endphp
-                        <div class="mb-4 border border-gray-200 rounded-lg bg-white overflow-hidden module-container" data-module="{{ $module }}">
-                            <!-- Module Header (Collapsible) -->
+                    @foreach($permissionGroups as $group)
+                        @php $moduleId = 'module-' . str_replace(['.', '-', '_'], '-', $group['module']); @endphp
+                        <div class="mb-4 border border-gray-200 rounded-lg bg-white overflow-hidden module-container" data-module="{{ $group['module'] }}">
                             <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 cursor-pointer module-header" data-target="{{ $moduleId }}">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-3">
                                         <svg class="w-5 h-5 text-blue-600 transition-transform transform module-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                         </svg>
-                                        <h4 class="text-sm font-semibold text-gray-900">
-                                            {{ $moduleDisplayName }}
-                                        </h4>
-                                        <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full module-count" data-module="{{ $module }}">
-                                            {{ count($checkedInModule) }}/{{ $modulePermissions->count() }}
+                                        <h4 class="text-sm font-semibold text-gray-900">{{ $group['label'] }}</h4>
+                                        <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full module-count" data-module="{{ $group['module'] }}">
+                                            {{ count($group['checked_ids']) }}/{{ $group['items']->count() }}
                                         </span>
                                     </div>
                                     <label class="flex items-center text-xs text-blue-600 hover:text-blue-800 cursor-pointer" onclick="event.stopPropagation()">
                                         <input 
                                             type="checkbox" 
                                             class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded module-select-all"
-                                            data-module="{{ $module }}"
-                                            {{ $allChecked ? 'checked' : '' }}
-                                            {{ $someChecked ? 'indeterminate' : '' }}
+                                            data-module="{{ $group['module'] }}"
+                                            {{ $group['all_checked'] ? 'checked' : '' }}
+                                            {{ $group['some_checked'] ? 'indeterminate' : '' }}
                                         >
                                         <span class="ml-2 font-medium">Pilih Semua</span>
                                     </label>
                                 </div>
                             </div>
-                            
-                            <!-- Module Permissions (Collapsible Content) -->
                             <div id="{{ $moduleId }}" class="module-content hidden">
                                 <div class="p-4 space-y-3">
-                                    @foreach($modulePermissions as $permission)
+                                    @foreach($group['items'] as $permission)
                                         <label class="flex items-start p-3 rounded-lg hover:bg-gray-50 transition-colors permission-item" data-permission-name="{{ strtolower($permission->display_name . ' ' . $permission->name) }}">
                                             <input 
                                                 type="checkbox" 
                                                 name="permissions[]" 
                                                 value="{{ $permission->id }}"
-                                                {{ in_array($permission->id, $rolePermissions) ? 'checked' : '' }}
+                                                {{ in_array($permission->id, $group['checked_ids']) ? 'checked' : '' }}
                                                 class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded permission-checkbox"
-                                                data-module="{{ $module }}"
+                                                data-module="{{ $group['module'] }}"
                                             >
                                             <div class="ml-3 flex-1">
                                                 <div class="flex items-center justify-between">
@@ -206,7 +194,7 @@
                     @endforeach
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                    <span id="selected-count" class="font-medium text-blue-600">{{ count($rolePermissions) }}</span> permission dipilih
+                    <span id="selected-count" class="font-medium text-blue-600">{{ $totalChecked }}</span> permission dipilih
                 </p>
             </div>
 

@@ -33,6 +33,15 @@ class DistribusiController extends Controller
         } elseif ($user->hasRole('admin_gudang_farmasi')) {
             $gudangFarmasiIds = MasterGudang::where('kategori_gudang', 'FARMASI')->pluck('id_gudang');
             $query->whereIn('id_gudang_asal', $gudangFarmasiIds);
+        } elseif ($user->hasRole('admin_gudang_unit')) {
+            // Admin Gudang Unit: hanya distribusi yang tujuan = gudang unit kerjanya (tidak bisa akses gudang pusat)
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')->where('id_unit_kerja', $pegawai->id_unit_kerja)->pluck('id_gudang');
+                $query->whereIn('id_gudang_tujuan', $gudangUnitIds);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
         }
 
         // Filters
@@ -78,6 +87,13 @@ class DistribusiController extends Controller
             $gudangsQuery->where('kategori_gudang', 'PERSEDIAAN');
         } elseif ($user->hasRole('admin_gudang_farmasi')) {
             $gudangsQuery->where('kategori_gudang', 'FARMASI');
+        } elseif ($user->hasRole('admin_gudang_unit')) {
+            $pegawai = MasterPegawai::where('user_id', $user->id)->first();
+            if ($pegawai && $pegawai->id_unit_kerja) {
+                $gudangsQuery->where('jenis_gudang', 'UNIT')->where('id_unit_kerja', $pegawai->id_unit_kerja);
+            } else {
+                $gudangsQuery->whereRaw('1 = 0');
+            }
         }
         $gudangs = $gudangsQuery->get();
 

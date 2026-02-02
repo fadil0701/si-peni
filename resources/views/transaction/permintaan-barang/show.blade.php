@@ -139,8 +139,8 @@
                             @foreach($permintaan->detailPermintaan as $index => $detail)
                             <tr>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
-                                <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang->kode_data_barang ?? '-' }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang->nama_barang ?? '-' }}</td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang?->kode_data_barang ?? '-' }}</td>
+                                <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang?->nama_barang ?? $detail->deskripsi_barang ?? '-' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_diminta, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->keterangan ?? '-' }}</td>

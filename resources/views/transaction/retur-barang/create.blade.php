@@ -163,10 +163,8 @@
                             class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('status_retur') border-red-500 @enderror"
                         >
                             <option value="">Pilih Status</option>
-                            <option value="DRAFT" {{ old('status_retur') == 'DRAFT' ? 'selected' : '' }}>Draft</option>
+                            <option value="DRAFT" {{ old('status_retur', 'DRAFT') == 'DRAFT' ? 'selected' : '' }}>Draft</option>
                             <option value="DIAJUKAN" {{ old('status_retur') == 'DIAJUKAN' ? 'selected' : '' }}>Diajukan</option>
-                            <option value="DITERIMA" {{ old('status_retur') == 'DITERIMA' ? 'selected' : '' }}>Diterima</option>
-                            <option value="DITOLAK" {{ old('status_retur') == 'DITOLAK' ? 'selected' : '' }}>Ditolak</option>
                         </select>
                         @error('status_retur')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

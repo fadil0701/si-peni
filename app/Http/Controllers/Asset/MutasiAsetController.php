@@ -127,8 +127,9 @@ class MutasiAsetController extends Controller
                 'tanggal_penempatan' => $validated['tanggal_mutasi']
             ]);
             
-            // Update inventory_item untuk set id_ruangan baru
+            // Sinkronkan ruangan ke Register Aset dan inventory_item
             $registerAset = RegisterAset::findOrFail($validated['id_register_aset']);
+            $registerAset->update(['id_ruangan' => $validated['id_ruangan_tujuan']]);
             if ($registerAset->inventory) {
                 \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
                     ->update(['id_ruangan' => $validated['id_ruangan_tujuan']]);
@@ -162,8 +163,9 @@ class MutasiAsetController extends Controller
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
-                $isAuthorized = $mutasiAset->ruanganAsal->id_unit_kerja == $pegawai->id_unit_kerja 
-                    || $mutasiAset->ruanganTujuan->id_unit_kerja == $pegawai->id_unit_kerja;
+                $idUkAsal = $mutasiAset->ruanganAsal?->id_unit_kerja;
+                $idUkTujuan = $mutasiAset->ruanganTujuan?->id_unit_kerja;
+                $isAuthorized = $idUkAsal == $pegawai->id_unit_kerja || $idUkTujuan == $pegawai->id_unit_kerja;
                 if (!$isAuthorized) {
                     abort(403, 'Unauthorized - Anda hanya dapat melihat mutasi aset dari unit kerja Anda sendiri');
                 }
@@ -215,13 +217,15 @@ class MutasiAsetController extends Controller
             'keterangan' => 'nullable|string|max:1000',
         ]);
         
+        $oldIdRuanganTujuan = $mutasiAset->id_ruangan_tujuan;
+        
         DB::beginTransaction();
         try {
             // Update mutasi aset
             $mutasiAset->update($validated);
             
-            // Update KIR jika ruangan tujuan berubah
-            if ($mutasiAset->id_ruangan_tujuan != $validated['id_ruangan_tujuan']) {
+            // Update KIR, Register Aset, dan inventory_item jika ruangan tujuan berubah
+            if ($oldIdRuanganTujuan != $validated['id_ruangan_tujuan']) {
                 $kir = KartuInventarisRuangan::where('id_register_aset', $mutasiAset->id_register_aset)->first();
                 if ($kir) {
                     $kir->update([
@@ -230,11 +234,13 @@ class MutasiAsetController extends Controller
                     ]);
                 }
                 
-                // Update inventory_item
                 $registerAset = $mutasiAset->registerAset;
-                if ($registerAset && $registerAset->inventory) {
-                    \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
-                        ->update(['id_ruangan' => $validated['id_ruangan_tujuan']]);
+                if ($registerAset) {
+                    $registerAset->update(['id_ruangan' => $validated['id_ruangan_tujuan']]);
+                    if ($registerAset->inventory) {
+                        \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
+                            ->update(['id_ruangan' => $validated['id_ruangan_tujuan']]);
+                    }
                 }
             }
             

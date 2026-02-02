@@ -653,10 +653,11 @@ class RegisterAsetController extends Controller
 
         DB::beginTransaction();
         try {
-            // Jika unit kerja atau ruangan berubah, regenerate nomor register
+            // Simpan id_ruangan lama untuk update InventoryItem jika ruangan dihapus
+            $oldIdRuangan = $registerAset->id_ruangan;
+            // Jika ruangan berubah atau flag regenerate, regenerate nomor register
             $shouldRegenerate = $request->has('regenerate_nomor_register') && $request->regenerate_nomor_register;
-            $unitKerjaChanged = $registerAset->id_unit_kerja != $registerAset->id_unit_kerja; // Tidak berubah karena tidak bisa diubah
-            $ruanganChanged = $registerAset->id_ruangan != $validated['id_ruangan'];
+            $ruanganChanged = (int) $registerAset->id_ruangan !== (int) ($validated['id_ruangan'] ?? 0);
             
             if ($shouldRegenerate || $ruanganChanged) {
                 // Generate nomor register baru dengan format baru
@@ -713,24 +714,17 @@ class RegisterAsetController extends Controller
                     $kir->update(['id_penanggung_jawab' => $validated['id_penanggung_jawab']]);
                 }
             } else {
-                // Jika ruangan dihapus, hapus KIR dan update InventoryItem
-                \App\Models\KartuInventarisRuangan::where('id_register_aset', $registerAset->id_register_aset)
-                    ->delete();
-
-                // Update InventoryItem untuk set id_ruangan menjadi null
-                // Ambil InventoryItem yang memiliki ruangan yang sama dengan RegisterAset ini
-                $kir = \App\Models\KartuInventarisRuangan::where('id_register_aset', $registerAset->id_register_aset)
-                    ->first();
-                
-                if ($kir) {
+                // Jika ruangan dihapus: update InventoryItem dulu (pakai old id_ruangan), baru hapus KIR
+                if ($oldIdRuangan) {
                     $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $registerAset->id_inventory)
-                        ->where('id_ruangan', $kir->id_ruangan)
+                        ->where('id_ruangan', $oldIdRuangan)
                         ->get();
-                    
                     foreach ($inventoryItems as $inventoryItem) {
                         $inventoryItem->update(['id_ruangan' => null]);
                     }
                 }
+                \App\Models\KartuInventarisRuangan::where('id_register_aset', $registerAset->id_register_aset)
+                    ->delete();
             }
 
             DB::commit();

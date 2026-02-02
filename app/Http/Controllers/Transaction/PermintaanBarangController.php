@@ -110,28 +110,7 @@ class PermintaanBarangController extends Controller
         
         $satuans = MasterSatuan::all();
 
-        // Data barang HANYA dari Data Inventory (filter per jenis)
-        // ASET: yang punya aset tersedia = belum didistribusikan ke unit pemohon (masih di gudang)
-        // Termasuk: belum punya register, register id_unit_kerja null, atau register id_unit_kerja = unit kerja gudang
-        $inventoryAsetIds = DataInventory::where('jenis_inventory', 'ASET')
-            ->where('status_inventory', 'AKTIF')
-            ->where(function($q) {
-                $q->whereDoesntHave('registerAset')
-                    ->orWhereHas('registerAset', function($subQ) {
-                        $subQ->whereNull('id_unit_kerja')
-                            ->orWhereRaw('register_aset.id_unit_kerja = (SELECT id_unit_kerja FROM master_gudang WHERE master_gudang.id_gudang = data_inventory.id_gudang LIMIT 1)');
-                    });
-            })
-            ->whereHas('inventoryItems', function($q) {
-                $q->where(function($subQ) {
-                    $subQ->where('kondisi_item', 'BAIK')->orWhereNull('kondisi_item');
-                })->where('status_item', 'AKTIF');
-            })
-            ->pluck('id_data_barang')
-            ->unique()
-            ->values()
-            ->toArray();
-
+        // Data barang untuk permintaan rutin/cito: HANYA Persediaan & Farmasi (Aset non-stock tidak masuk alur permintaan barang)
         // PERSEDIAAN & FARMASI: barang yang ada di Data Inventory (jenis sama)
         $stockPersediaanIds = DataInventory::where('jenis_inventory', 'PERSEDIAAN')
             ->where('status_inventory', 'AKTIF')
@@ -147,9 +126,8 @@ class PermintaanBarangController extends Controller
             ->values()
             ->toArray();
 
-        // Dropdown Data Barang hanya berisi barang yang ada di Data Inventory (gabungan semua jenis)
+        // Dropdown Data Barang: hanya Persediaan & Farmasi (permintaan rutin/cito)
         $inventoryBarangIds = array_unique(array_merge(
-            array_map('intval', $inventoryAsetIds),
             array_map('intval', $stockPersediaanIds),
             array_map('intval', $stockFarmasiIds)
         ));
@@ -157,50 +135,13 @@ class PermintaanBarangController extends Controller
             ? MasterDataBarang::with(['subjenisBarang', 'satuan'])->whereIn('id_data_barang', $inventoryBarangIds)->orderBy('kode_data_barang')->get()
             : collect();
 
-        // Stock data: ASET = aset_available (tanpa validasi stock), PERSEDIAAN/FARMASI = stock gudang pusat saja (wajib validasi)
+        // Stock data: hanya PERSEDIAAN/FARMASI (stock gudang pusat, wajib validasi)
         $stockPersediaanIdsInt = array_map('intval', $stockPersediaanIds);
         $stockFarmasiIdsInt = array_map('intval', $stockFarmasiIds);
         $stockData = [];
         foreach ($dataBarangs as $barang) {
             $key = (string) $barang->id_data_barang;
             $idBarang = (int) $barang->id_data_barang;
-            // ASET: jumlah inventory_item yang masih di gudang pusat (belum didistribusikan)
-            // Stock dihitung langsung dari inventory_item yang masih di gudang pusat aset
-            $asetAvailable = 0;
-            if (in_array($idBarang, array_map('intval', $inventoryAsetIds))) {
-                // Hitung inventory_item yang masih di gudang pusat aset (belum didistribusikan)
-                // Kriteria: 
-                // 1. inventory_item dengan status AKTIF dan kondisi BAIK
-                // 2. dari data_inventory yang AKTIF
-                // 3. gudang adalah gudang pusat dengan kategori ASET
-                // 4. belum memiliki register_aset dengan id_unit_kerja yang berbeda dari unit kerja gudang
-                $asetAvailable = (int) DB::table('inventory_item')
-                    ->join('data_inventory', 'inventory_item.id_inventory', '=', 'data_inventory.id_inventory')
-                    ->join('master_gudang', 'data_inventory.id_gudang', '=', 'master_gudang.id_gudang')
-                    ->where('data_inventory.id_data_barang', $barang->id_data_barang)
-                    ->where('data_inventory.jenis_inventory', 'ASET')
-                    ->where('data_inventory.status_inventory', 'AKTIF')
-                    ->where('master_gudang.jenis_gudang', 'PUSAT')
-                    ->where('master_gudang.kategori_gudang', 'ASET')
-                    ->where('inventory_item.status_item', 'AKTIF')
-                    ->where(function($q) {
-                        $q->where('inventory_item.kondisi_item', 'BAIK')
-                          ->orWhereNull('inventory_item.kondisi_item');
-                    })
-                    ->whereNotExists(function($query) {
-                        $query->select(DB::raw(1))
-                            ->from('register_aset')
-                            ->join('master_gudang as gudang_aset', function($join) {
-                                $join->on('gudang_aset.id_unit_kerja', '=', 'register_aset.id_unit_kerja');
-                            })
-                            ->whereColumn('register_aset.id_inventory', 'data_inventory.id_inventory')
-                            ->whereNotNull('register_aset.id_unit_kerja')
-                            ->whereColumn('gudang_aset.id_unit_kerja', '!=', 'master_gudang.id_unit_kerja')
-                            ->where('register_aset.status_aset', 'AKTIF');
-                    })
-                    ->count();
-            }
-            // PERSEDIAAN/FARMASI: stock di gudang pusat saja (Gudang Persediaan / Gudang Farmasi)
             $stockPusatPersediaan = in_array($idBarang, $stockPersediaanIdsInt)
                 ? (float) DataStock::getStockGudangPusat($barang->id_data_barang, 'PERSEDIAAN') : 0;
             $stockPusatFarmasi = in_array($idBarang, $stockFarmasiIdsInt)
@@ -208,10 +149,9 @@ class PermintaanBarangController extends Controller
 
             $stockData[$key] = [
                 'total' => (float) DataStock::getTotalStock($barang->id_data_barang),
-                'aset_available' => (int) $asetAvailable,
                 'stock_gudang_pusat_persediaan' => $stockPusatPersediaan,
                 'stock_gudang_pusat_farmasi' => $stockPusatFarmasi,
-                'per_gudang' => DataStock::getStockPerGudangPusat($barang->id_data_barang), // Hanya gudang pusat Farmasi/Persediaan
+                'per_gudang' => DataStock::getStockPerGudangPusat($barang->id_data_barang),
             ];
         }
 
@@ -221,7 +161,6 @@ class PermintaanBarangController extends Controller
             'dataBarangs', 
             'satuans', 
             'stockData',
-            'inventoryAsetIds',
             'stockPersediaanIds',
             'stockFarmasiIds'
         ));
@@ -243,24 +182,24 @@ class PermintaanBarangController extends Controller
                 'tanggal_permintaan' => 'required|date',
                 'tipe_permintaan' => 'required|in:RUTIN,CITO',
                 'jenis_permintaan' => 'required|array|min:1',
-                'jenis_permintaan.*' => 'required|in:ASET,PERSEDIAAN,FARMASI',
+                'jenis_permintaan.*' => 'required|in:PERSEDIAAN,FARMASI',
                 'keterangan' => 'nullable|string',
                 'detail' => 'required|array|min:1',
-                'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
+                'detail.*.id_data_barang' => 'nullable|exists:master_data_barang,id_data_barang',
+                'detail.*.deskripsi_barang' => 'nullable|string|max:500',
                 'detail.*.qty_diminta' => 'required|numeric|min:0.01',
                 'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
                 'detail.*.keterangan' => 'nullable|string',
             ], [
                 'tipe_permintaan.required' => 'Tipe permintaan harus dipilih (Rutin atau CITO (Penting)).',
                 'tipe_permintaan.in' => 'Tipe permintaan harus Rutin atau CITO (Penting).',
-                'jenis_permintaan.required' => 'Sub jenis permintaan harus dipilih minimal satu (Aset, Persediaan, atau Farmasi).',
+                'jenis_permintaan.required' => 'Sub jenis permintaan harus dipilih minimal satu (Persediaan atau Farmasi).',
                 'jenis_permintaan.array' => 'Sub jenis permintaan harus berupa array.',
                 'jenis_permintaan.min' => 'Sub jenis permintaan harus dipilih minimal satu.',
-                'jenis_permintaan.*.in' => 'Sub jenis permintaan harus Aset, Persediaan, atau Farmasi.',
+                'jenis_permintaan.*.in' => 'Sub jenis permintaan hanya Persediaan atau Farmasi (Aset tidak masuk permintaan rutin/cito).',
                 'detail.required' => 'Detail permintaan harus diisi.',
                 'detail.array' => 'Detail permintaan harus berupa array.',
                 'detail.min' => 'Detail permintaan harus diisi minimal satu item.',
-                'detail.*.id_data_barang.required' => 'Data barang harus dipilih.',
                 'detail.*.qty_diminta.required' => 'Jumlah yang diminta harus diisi.',
                 'detail.*.qty_diminta.numeric' => 'Jumlah yang diminta harus berupa angka.',
                 'detail.*.qty_diminta.min' => 'Jumlah yang diminta minimal 0.01.',
@@ -274,11 +213,30 @@ class PermintaanBarangController extends Controller
             return back()->withInput()->withErrors($e->errors());
         }
 
-        // Validasi stock hanya untuk PERSEDIAAN dan FARMASI (stock gudang pusat). ASET tidak divalidasi stock.
+        // Setiap baris detail: wajib salah satu — dari master (id_data_barang) atau permintaan lainnya (deskripsi_barang)
+        $detailErrors = [];
+        foreach ($validated['detail'] as $index => $detail) {
+            $hasMaster = !empty($detail['id_data_barang']);
+            $hasLainnya = !empty(trim((string) ($detail['deskripsi_barang'] ?? '')));
+            if (!$hasMaster && !$hasLainnya) {
+                $detailErrors["detail.{$index}.id_data_barang"] = 'Pilih data barang dari master atau isi deskripsi untuk permintaan lainnya.';
+            }
+            if ($hasMaster && $hasLainnya) {
+                $detailErrors["detail.{$index}.id_data_barang"] = 'Pilih salah satu: data barang dari master ATAU isi deskripsi permintaan lainnya, jangan keduanya.';
+            }
+        }
+        if (!empty($detailErrors)) {
+            return back()->withInput()->withErrors($detailErrors);
+        }
+
+        // Validasi stock hanya untuk baris yang dari master (id_data_barang). Permintaan lainnya tidak divalidasi stock.
         $stockPersediaanIds = DataInventory::where('jenis_inventory', 'PERSEDIAAN')->where('status_inventory', 'AKTIF')->pluck('id_data_barang')->unique()->toArray();
         $stockFarmasiIds = DataInventory::where('jenis_inventory', 'FARMASI')->where('status_inventory', 'AKTIF')->pluck('id_data_barang')->unique()->toArray();
         $stockErrors = [];
         foreach ($validated['detail'] as $index => $detail) {
+            if (empty($detail['id_data_barang'])) {
+                continue; // permintaan lainnya — skip stock check
+            }
             $idDataBarang = (int) $detail['id_data_barang'];
             $qtyDiminta = (float) $detail['qty_diminta'];
             $stockPusat = null;
@@ -317,24 +275,27 @@ class PermintaanBarangController extends Controller
             $noPermintaan = sprintf('PMT/%s/%04d', $tahun, $urut);
 
             // Create permintaan
-            // Simpan jenis_permintaan sebagai JSON array yang berisi sub jenis (ASET, PERSEDIAAN, FARMASI)
-            // Tipe permintaan (RUTIN/TAHUNAN) disimpan di kolom terpisah
+            // Simpan jenis_permintaan sebagai JSON array: hanya PERSEDIAAN dan/atau FARMASI (satu SPB bisa ke semua gudang)
+            // Aset non-stock tidak masuk permintaan rutin/cito
             $permintaan = PermintaanBarang::create([
                 'no_permintaan' => $noPermintaan,
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
                 'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau CITO
-                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON: ["ASET", "PERSEDIAAN", "FARMASI"]
+                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // ["PERSEDIAAN"] dan/atau ["FARMASI"]
                 'status_permintaan' => 'DRAFT',
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
 
-            // Create detail permintaan
+            // Create detail permintaan (dari master atau permintaan lainnya — tidak masuk master/stock)
             foreach ($validated['detail'] as $detail) {
+                $idDataBarang = !empty($detail['id_data_barang']) ? $detail['id_data_barang'] : null;
+                $deskripsiBarang = !empty(trim((string) ($detail['deskripsi_barang'] ?? ''))) ? trim($detail['deskripsi_barang']) : null;
                 DetailPermintaanBarang::create([
                     'id_permintaan' => $permintaan->id_permintaan,
-                    'id_data_barang' => $detail['id_data_barang'],
+                    'id_data_barang' => $idDataBarang,
+                    'deskripsi_barang' => $deskripsiBarang,
                     'qty_diminta' => $detail['qty_diminta'],
                     'id_satuan' => $detail['id_satuan'],
                     'keterangan' => $detail['keterangan'] ?? null,
@@ -389,26 +350,7 @@ class PermintaanBarangController extends Controller
             $pegawais = MasterPegawai::all();
         }
 
-        // Data barang HANYA dari Data Inventory (filter per jenis) - sama seperti create
-        $inventoryAsetIds = DataInventory::where('jenis_inventory', 'ASET')
-            ->where('status_inventory', 'AKTIF')
-            ->where(function($q) {
-                $q->whereDoesntHave('registerAset')
-                    ->orWhereHas('registerAset', function($subQ) {
-                        $subQ->whereNull('id_unit_kerja')
-                            ->orWhereRaw('register_aset.id_unit_kerja = (SELECT id_unit_kerja FROM master_gudang WHERE master_gudang.id_gudang = data_inventory.id_gudang LIMIT 1)');
-                    });
-            })
-            ->whereHas('inventoryItems', function($q) {
-                $q->where(function($subQ) {
-                    $subQ->where('kondisi_item', 'BAIK')->orWhereNull('kondisi_item');
-                })->where('status_item', 'AKTIF');
-            })
-            ->pluck('id_data_barang')
-            ->unique()
-            ->values()
-            ->toArray();
-
+        // Data barang untuk permintaan rutin/cito: HANYA Persediaan & Farmasi (sama seperti create)
         $stockPersediaanIds = DataInventory::where('jenis_inventory', 'PERSEDIAAN')
             ->where('status_inventory', 'AKTIF')
             ->pluck('id_data_barang')
@@ -424,7 +366,6 @@ class PermintaanBarangController extends Controller
             ->toArray();
 
         $inventoryBarangIds = array_unique(array_merge(
-            array_map('intval', $inventoryAsetIds),
             array_map('intval', $stockPersediaanIds),
             array_map('intval', $stockFarmasiIds)
         ));
@@ -432,44 +373,13 @@ class PermintaanBarangController extends Controller
             ? MasterDataBarang::with(['subjenisBarang', 'satuan'])->whereIn('id_data_barang', $inventoryBarangIds)->orderBy('kode_data_barang')->get()
             : collect();
 
-        // Stock data: ASET = aset_available, PERSEDIAAN/FARMASI = stock gudang pusat
+        // Stock data: hanya PERSEDIAAN/FARMASI (stock gudang pusat)
         $stockPersediaanIdsInt = array_map('intval', $stockPersediaanIds);
         $stockFarmasiIdsInt = array_map('intval', $stockFarmasiIds);
         $stockData = [];
         foreach ($dataBarangs as $barang) {
             $key = (string) $barang->id_data_barang;
             $idBarang = (int) $barang->id_data_barang;
-            // ASET: jumlah inventory_item yang masih di gudang pusat (belum didistribusikan)
-            $asetAvailable = 0;
-            if (in_array($idBarang, array_map('intval', $inventoryAsetIds))) {
-                // Hitung inventory_item yang masih di gudang pusat aset (belum didistribusikan)
-                // Kriteria: inventory_item dari inventory yang masih di gudang pusat aset dan belum didistribusikan
-                $asetAvailable = (int) DB::table('inventory_item')
-                    ->join('data_inventory', 'inventory_item.id_inventory', '=', 'data_inventory.id_inventory')
-                    ->join('master_gudang', 'data_inventory.id_gudang', '=', 'master_gudang.id_gudang')
-                    ->where('data_inventory.id_data_barang', $barang->id_data_barang)
-                    ->where('data_inventory.jenis_inventory', 'ASET')
-                    ->where('data_inventory.status_inventory', 'AKTIF')
-                    ->where('master_gudang.jenis_gudang', 'PUSAT')
-                    ->where('master_gudang.kategori_gudang', 'ASET')
-                    ->where('inventory_item.status_item', 'AKTIF')
-                    ->where(function($q) {
-                        $q->where('inventory_item.kondisi_item', 'BAIK')
-                          ->orWhereNull('inventory_item.kondisi_item');
-                    })
-                    ->whereNotExists(function($query) {
-                        $query->select(DB::raw(1))
-                            ->from('register_aset')
-                            ->join('master_gudang as gudang_aset', function($join) {
-                                $join->on('gudang_aset.id_unit_kerja', '=', 'register_aset.id_unit_kerja');
-                            })
-                            ->whereColumn('register_aset.id_inventory', 'data_inventory.id_inventory')
-                            ->whereNotNull('register_aset.id_unit_kerja')
-                            ->whereColumn('gudang_aset.id_unit_kerja', '!=', 'master_gudang.id_unit_kerja')
-                            ->where('register_aset.status_aset', 'AKTIF');
-                    })
-                    ->count();
-            }
             $stockPusatPersediaan = in_array($idBarang, $stockPersediaanIdsInt)
                 ? (float) DataStock::getStockGudangPusat($barang->id_data_barang, 'PERSEDIAAN') : 0;
             $stockPusatFarmasi = in_array($idBarang, $stockFarmasiIdsInt)
@@ -477,10 +387,9 @@ class PermintaanBarangController extends Controller
 
             $stockData[$key] = [
                 'total' => (float) DataStock::getTotalStock($barang->id_data_barang),
-                'aset_available' => (int) $asetAvailable,
                 'stock_gudang_pusat_persediaan' => $stockPusatPersediaan,
                 'stock_gudang_pusat_farmasi' => $stockPusatFarmasi,
-                'per_gudang' => DataStock::getStockPerGudangPusat($barang->id_data_barang), // Hanya gudang pusat Farmasi/Persediaan
+                'per_gudang' => DataStock::getStockPerGudangPusat($barang->id_data_barang),
             ];
         }
         $satuans = MasterSatuan::all();
@@ -492,7 +401,6 @@ class PermintaanBarangController extends Controller
             'dataBarangs', 
             'satuans',
             'stockData',
-            'inventoryAsetIds',
             'stockPersediaanIds',
             'stockFarmasiIds'
         ));
@@ -514,36 +422,83 @@ class PermintaanBarangController extends Controller
             'tanggal_permintaan' => 'required|date',
             'tipe_permintaan' => 'required|in:RUTIN,CITO',
             'jenis_permintaan' => 'required|array|min:1',
-            'jenis_permintaan.*' => 'required|in:ASET,PERSEDIAAN,FARMASI',
+            'jenis_permintaan.*' => 'required|in:PERSEDIAAN,FARMASI',
             'keterangan' => 'nullable|string',
             'detail' => 'required|array|min:1',
-            'detail.*.id_data_barang' => 'required|exists:master_data_barang,id_data_barang',
+            'detail.*.id_data_barang' => 'nullable|exists:master_data_barang,id_data_barang',
+            'detail.*.deskripsi_barang' => 'nullable|string|max:500',
             'detail.*.qty_diminta' => 'required|numeric|min:0.01',
             'detail.*.id_satuan' => 'required|exists:master_satuan,id_satuan',
             'detail.*.keterangan' => 'nullable|string',
         ]);
 
+        // Setiap baris detail: wajib salah satu — dari master atau permintaan lainnya
+        $detailErrors = [];
+        foreach ($validated['detail'] as $index => $detail) {
+            $hasMaster = !empty($detail['id_data_barang']);
+            $hasLainnya = !empty(trim((string) ($detail['deskripsi_barang'] ?? '')));
+            if (!$hasMaster && !$hasLainnya) {
+                $detailErrors["detail.{$index}.id_data_barang"] = 'Pilih data barang dari master atau isi deskripsi untuk permintaan lainnya.';
+            }
+            if ($hasMaster && $hasLainnya) {
+                $detailErrors["detail.{$index}.id_data_barang"] = 'Pilih salah satu: data barang dari master ATAU isi deskripsi permintaan lainnya, jangan keduanya.';
+            }
+        }
+        if (!empty($detailErrors)) {
+            return back()->withInput()->withErrors($detailErrors);
+        }
+
+        // Validasi stock hanya untuk baris yang dari master
+        $stockPersediaanIds = DataInventory::where('jenis_inventory', 'PERSEDIAAN')->where('status_inventory', 'AKTIF')->pluck('id_data_barang')->unique()->toArray();
+        $stockFarmasiIds = DataInventory::where('jenis_inventory', 'FARMASI')->where('status_inventory', 'AKTIF')->pluck('id_data_barang')->unique()->toArray();
+        $stockErrors = [];
+        foreach ($validated['detail'] as $index => $detail) {
+            if (empty($detail['id_data_barang'])) {
+                continue;
+            }
+            $idDataBarang = (int) $detail['id_data_barang'];
+            $qtyDiminta = (float) $detail['qty_diminta'];
+            $stockPusat = null;
+            $labelGudang = '';
+            if (in_array($idDataBarang, array_map('intval', $stockFarmasiIds))) {
+                $stockPusat = DataStock::getStockGudangPusat($detail['id_data_barang'], 'FARMASI');
+                $labelGudang = 'Gudang Farmasi (Pusat)';
+            } elseif (in_array($idDataBarang, array_map('intval', $stockPersediaanIds))) {
+                $stockPusat = DataStock::getStockGudangPusat($detail['id_data_barang'], 'PERSEDIAAN');
+                $labelGudang = 'Gudang Persediaan (Pusat)';
+            }
+            if ($stockPusat !== null && $qtyDiminta > $stockPusat) {
+                $dataBarang = MasterDataBarang::find($detail['id_data_barang']);
+                $stockErrors["detail.{$index}.qty_diminta"] = "Jumlah yang diminta ({$qtyDiminta}) melebihi stock di {$labelGudang} ({$stockPusat}) untuk barang {$dataBarang->nama_barang}.";
+            }
+        }
+        if (!empty($stockErrors)) {
+            return back()->withInput()->withErrors($stockErrors);
+        }
+
         DB::beginTransaction();
         try {
-            // Update permintaan
-            // Simpan jenis_permintaan sebagai JSON array
+            // Update permintaan (jenis_permintaan hanya PERSEDIAAN dan/atau FARMASI)
             $permintaan->update([
                 'id_unit_kerja' => $validated['id_unit_kerja'],
                 'id_pemohon' => $validated['id_pemohon'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'tipe_permintaan' => $validated['tipe_permintaan'], // RUTIN atau CITO
-                'jenis_permintaan' => json_encode($validated['jenis_permintaan']), // Simpan sebagai JSON
+                'tipe_permintaan' => $validated['tipe_permintaan'],
+                'jenis_permintaan' => json_encode($validated['jenis_permintaan']),
                 'keterangan' => $validated['keterangan'] ?? null,
             ]);
 
             // Delete existing details
             $permintaan->detailPermintaan()->delete();
 
-            // Create new details
+            // Create new details (dari master atau permintaan lainnya)
             foreach ($validated['detail'] as $detail) {
+                $idDataBarang = !empty($detail['id_data_barang']) ? $detail['id_data_barang'] : null;
+                $deskripsiBarang = !empty(trim((string) ($detail['deskripsi_barang'] ?? ''))) ? trim($detail['deskripsi_barang']) : null;
                 DetailPermintaanBarang::create([
                     'id_permintaan' => $permintaan->id_permintaan,
-                    'id_data_barang' => $detail['id_data_barang'],
+                    'id_data_barang' => $idDataBarang,
+                    'deskripsi_barang' => $deskripsiBarang,
                     'qty_diminta' => $detail['qty_diminta'],
                     'id_satuan' => $detail['id_satuan'],
                     'keterangan' => $detail['keterangan'] ?? null,

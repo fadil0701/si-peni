@@ -19,26 +19,29 @@ Dokumen ini berisi rencana langkah selanjutnya untuk:
 
 ### ✅ Fitur yang Sudah Lengkap
 - ✅ QR Code Generation untuk Inventory Item
-- ✅ Register Aset - Create & Store Logic
-- ✅ Permintaan Barang dengan Approval Flow
+- ✅ Register Aset - Create, Update & Store Logic (update logic ruangan diperbaiki Feb 2026)
+- ✅ Permintaan Barang dengan Approval Flow (hanya Persediaan + Farmasi; Aset non-stock tidak masuk rutin/cito)
+- ✅ Permintaan Barang index: tombol Ajukan, Detail, Edit, Hapus (icon + tooltip); cursor pointer konsisten (form + button) (Feb 2026)
+- ✅ Permintaan Lainnya (freetext) di detail permintaan – barang tidak masuk master/stock
+- ✅ Disposisi ke Pengadaan Barang dan Jasa untuk item tidak ada di stock gudang pusat
+- ✅ Approval: tombol Setujui/Tolak/Mengetahui/Verifikasi di index; item tanpa stock tetap dapat didisposisikan
+- ✅ Detail stock di approval hanya menampilkan stock gudang pusat
 - ✅ Distribusi Barang (SBBK)
 - ✅ Penerimaan Barang
 - ✅ Approval System (Multi-level)
+- ✅ Stock Adjustment & History (controller, views, approval; filter barang & query create diperbaiki Feb 2026)
+- ✅ Retur Barang (workflow DRAFT→DIAJUKAN→DITERIMA/DITOLAK; stock update saat terima; validasi status Feb 2026)
+- ✅ Kartu Inventaris Ruangan (KIR) - CRUD & integrasi Register Aset (filter create tanpa KIR; sync id_ruangan; null-safe ruangan di show/edit/update Feb 2026)
+- ✅ Mutasi Aset - CRUD & integrasi KIR/Register Aset (sync id_ruangan store/update; filter create hanya aset punya KIR; null-safe ruangan asal di show Feb 2026)
+- ✅ Pemakaian Barang - CRUD, DRAFT→DIAJUKAN→DISETUJUI/DITOLAK, update stock saat approve; validasi stok & filter; auto-approve admin gagal validasi → rollback & error (Feb 2026)
 - ✅ Master Data Management
 - ✅ User & Role Management
 - ✅ Permission System
 
 ### ⚠️ Fitur yang Perlu Perbaikan
-- ⚠️ Register Aset - Update Logic (ada TODO comment)
-- ⚠️ Retur Barang (perlu review kelengkapan)
-- ⚠️ Stock Adjustment & History (belum lengkap)
 - ⚠️ Laporan per Modul (perlu dilengkapi)
 
 ### ❌ Fitur yang Belum Ada / Perlu Verifikasi
-- ⚠️ Kartu Inventaris Ruangan (KIR) - CRUD (Controller ada, perlu verifikasi kelengkapan)
-- ⚠️ Mutasi Aset - CRUD (Controller ada, perlu verifikasi kelengkapan)
-- ⚠️ Pemakaian Barang (Controller ada, perlu verifikasi kelengkapan)
-- ⚠️ Stock Adjustment UI (Controller ada, perlu verifikasi kelengkapan)
 - ❌ Perencanaan - Rekap Tahunan
 - ❌ Pengadaan - Proses & Kontrak/SP/PO
 - ❌ Keuangan - Verifikasi Dokumen & Realisasi Anggaran
@@ -52,101 +55,101 @@ Dokumen ini berisi rencana langkah selanjutnya untuk:
 ### 1. Perbaikan Fitur Existing
 
 #### 1.1 Register Aset - Update Logic
-**Status:** ⚠️ Partial Implementation  
-**File:** `app/Http/Controllers/Asset/RegisterAsetController.php:326`
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Asset/RegisterAsetController.php`
 
 **Tugas:**
-- [ ] Review method `update()` di RegisterAsetController
-- [ ] Lengkapi validasi untuk semua field yang bisa di-update
-- [ ] Pastikan logic update sudah lengkap
-- [ ] Tambahkan audit trail jika diperlukan
-- [ ] Test semua skenario update
+- [x] Perbaikan logic saat ruangan dihapus: simpan old id_ruangan, update InventoryItem sebelum hapus KIR
+- [x] Perbaikan variabel $unitKerjaChanged (dihapus) dan $ruanganChanged
+- [ ] Tambahkan audit trail jika diperlukan (opsional)
+- [ ] Test semua skenario update (disarankan)
 
-**Estimasi:** 1-2 hari
+**Estimasi:** Selesai
 
 ---
 
 #### 1.2 Stock Adjustment & History
-**Status:** ❌ Belum Ada UI  
-**File:** Tabel `stock_adjustment` sudah ada di database
+**Status:** ✅ Sudah Ada (dilengkapi Feb 2026)  
+**File:** `app/Http/Controllers/Inventory/StockAdjustmentController.php`, views `inventory/stock-adjustment/*`
 
 **Tugas:**
-- [ ] Buat controller `StockAdjustmentController`
-- [ ] Buat views: index, create, edit, show
-- [ ] Tambahkan routes di `web.php`
-- [ ] Implementasi approval flow jika diperlukan
-- [ ] Buat history view untuk tracking perubahan stock
-- [ ] Integrasi dengan semua transaksi stock (masuk/keluar)
+- [x] Controller, views (index, create, edit, show), routes, approval (ajukan/approve/reject) sudah ada
+- [x] Query create(): filter stock by gudang Persediaan/Farmasi (kategori_gudang), bukan by data_inventory
+- [x] Index: filter oleh Barang (id_data_barang) dan Tanggal Sampai; daftar = riwayat penyesuaian stock
+- [ ] Integrasi dengan semua transaksi stock masuk/keluar (opsional, untuk audit trail lengkap)
 
-**Estimasi:** 3-4 hari
+**Estimasi:** Selesai
 
 ---
 
 #### 1.3 Retur Barang - Review & Lengkapi
-**Status:** ⚠️ Perlu Verifikasi  
+**Status:** ✅ Selesai (Feb 2026)  
 **File:** `app/Http/Controllers/Transaction/ReturBarangController.php`
 
 **Tugas:**
-- [ ] Review implementasi retur barang secara menyeluruh
-- [ ] Pastikan semua status retur ter-handle (DRAFT, DIAJUKAN, DITERIMA, DITOLAK)
-- [ ] Pastikan stock update saat retur diterima
-- [ ] Verifikasi workflow sesuai dokumentasi
-- [ ] Test semua skenario retur
+- [x] Review implementasi retur barang: index, create, store, show, edit, update, destroy, terima, tolak, ajukan
+- [x] Semua status ter-handle: DRAFT → (ajukan) → DIAJUKAN → (terima/tolak) → DITERIMA/DITOLAK
+- [x] Stock update saat retur diterima (terima(): DataStock gudang asal dikurangi, gudang tujuan ditambah; PERSEDIAAN/FARMASI & ASET)
+- [x] Validasi status: create/edit hanya DRAFT atau DIAJUKAN (DITERIMA/DITOLAK hanya via aksi Terima/Tolak)
+- [x] Tambah import DataStock di controller
+- [ ] Test semua skenario retur (disarankan)
 
-**Estimasi:** 2-3 hari
+**Estimasi:** Selesai
 
 ---
 
 ### 2. Fitur Baru Prioritas Tinggi
 
 #### 2.1 Kartu Inventaris Ruangan (KIR)
-**Status:** ❌ Belum Diimplementasi  
-**Dampak:** Fitur penting untuk tracking aset per ruangan
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Asset/KartuInventarisRuanganController.php`, views `asset/kartu-inventaris-ruangan/*`
 
 **Tugas:**
-- [ ] Review migration untuk tabel `kartu_inventaris_ruangan`
-- [ ] Buat controller `KartuInventarisRuanganController`
-- [ ] Buat views: index, create, edit, show
-- [ ] Tambahkan routes di `web.php`
-- [ ] Integrasi dengan Register Aset
-- [ ] Tambahkan filter berdasarkan ruangan, unit kerja
-- [ ] Tambahkan export Excel/PDF untuk KIR
+- [x] Migration, controller, views (index, create, edit, show), routes sudah ada
+- [x] Create: filter Register Aset hanya yang belum punya KIR
+- [x] Store: set `RegisterAset.id_ruangan` saat KIR dibuat
+- [x] Update: sinkronisasi `RegisterAset.id_ruangan` bila ruangan KIR diubah
+- [x] Destroy: set `RegisterAset.id_ruangan = null` saat KIR dihapus
+- [x] Show/edit/update: null-safe ruangan (ruangan?->id_unit_kerja) agar tidak error bila ruangan hilang (Feb 2026)
+- [ ] Filter index berdasarkan ruangan, unit kerja (opsional)
+- [ ] Export Excel/PDF untuk KIR (opsional)
 
-**Estimasi:** 4-5 hari
+**Estimasi:** Selesai
 
 ---
 
 #### 2.2 Mutasi Aset
-**Status:** ❌ Belum Diimplementasi  
-**Dampak:** Tidak bisa mencatat perpindahan aset
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Asset/MutasiAsetController.php`, views `asset/mutasi-aset/*`
 
 **Tugas:**
-- [ ] Review migration untuk tabel `mutasi_aset`
-- [ ] Buat controller `MutasiAsetController`
-- [ ] Buat views: index, create, edit, show
-- [ ] Tambahkan routes di `web.php`
-- [ ] Integrasi dengan Register Aset dan KIR
-- [ ] Tambahkan approval flow jika diperlukan
-- [ ] Update KIR otomatis saat mutasi
+- [x] Migration, controller, views (index, create, edit, show), routes sudah ada
+- [x] Create: filter Register Aset hanya yang sudah punya KIR; validasi ruangan asal = KIR
+- [x] Store: update KIR + RegisterAset.id_ruangan + InventoryItem.id_ruangan ke ruangan tujuan
+- [x] Update: simpan id_ruangan_tujuan lama sebelum update; bila berubah, sync KIR + RegisterAset + InventoryItem
+- [x] Index: filter unit kerja (kepala_unit/pegawai), tanggal, register aset
+- [x] Show: null-safe ruangan asal (ruanganAsal?->id_unit_kerja) agar tidak error bila ruangan hilang (Feb 2026)
+- [ ] Approval flow (opsional)
+- [ ] Revert ruangan saat mutasi dihapus (opsional)
 
-**Estimasi:** 4-5 hari
+**Estimasi:** Selesai
 
 ---
 
 #### 2.3 Pemakaian Barang
-**Status:** ❌ Belum Diimplementasi  
-**Dampak:** Tidak bisa mencatat pemakaian barang
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Transaction/PemakaianBarangController.php`, views `transaction/pemakaian-barang/*`
 
 **Tugas:**
-- [ ] Review migration untuk tabel `pemakaian_barang`
-- [ ] Buat controller `PemakaianBarangController`
-- [ ] Buat views: index, create, edit, show
-- [ ] Tambahkan routes di `web.php`
-- [ ] Integrasi dengan inventory untuk update stock
-- [ ] Tambahkan filter dan search
-- [ ] Tambahkan laporan pemakaian
+- [x] Migration, controller, views (index, create, edit, show), routes, ajukan/approve/reject sudah ada
+- [x] Create: inventory hanya PERSEDIAAN/FARMASI, gudang UNIT, hanya tampilkan item dengan qty_input > 0
+- [x] Approve: validasi stok (per inventory qty_pemakaian ≤ qty_input; aggregate per barang ≤ DataStock qty_akhir); update DataStock & DataInventory
+- [x] Role approve/reject: admin & kepala_unit (sesuai route)
+- [x] Index filter: status, gudang, unit kerja (admin), tanggal dari, tanggal sampai
+- [x] Store/update: bila admin auto-approve dan approve() gagal validasi stok → rollback, redirect dengan error (Feb 2026)
+- [ ] Laporan pemakaian (opsional)
 
-**Estimasi:** 3-4 hari
+**Estimasi:** Selesai
 
 ---
 
@@ -502,7 +505,13 @@ Fokus pada kualitas kode dan maintenance:
 
 Dokumen ini akan di-update secara berkala sesuai progress development. Setiap sprint akan di-review dan di-update statusnya.
 
-**Last Updated:** 30 Januari 2026
+**Last Updated:** 2 Februari 2026
+
+**Changelog (Feb 2026):**
+- Permintaan Barang index: cursor pointer pada tombol Ajukan (class `cursor-pointer` pada form) agar konsisten dengan Detail/Edit/Hapus.
+- Pemakaian Barang: handle gagal validasi stok saat admin auto-approve di store/update → rollback transaksi dan redirect dengan pesan error.
+- KIR: pengecekan null-safe untuk ruangan di show/edit/update (unit kerja) agar tidak error bila data ruangan tidak ada.
+- Mutasi Aset: null-safe ruangan asal di show (ruanganAsal?->id_unit_kerja).
 
 ---
 

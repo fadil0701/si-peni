@@ -29,75 +29,85 @@ class ClearTransactionData extends Command
         try {
             // Urutan penghapusan: Detail dulu, baru Header (untuk menghindari foreign key constraint)
 
-            // 1. Hapus Detail Retur Barang
-            $this->clearTable('detail_retur_barang', 'Detail Retur Barang');
-            
-            // 2. Hapus Retur Barang
-            $this->clearTable('retur_barang', 'Retur Barang');
-            
-            // 3. Hapus Detail Penerimaan Barang
-            $this->clearTable('detail_penerimaan_barang', 'Detail Penerimaan Barang');
-            
-            // 4. Hapus Penerimaan Barang
-            $this->clearTable('penerimaan_barang', 'Penerimaan Barang');
-            
-            // 5. Hapus Detail Distribusi
-            $this->clearTable('detail_distribusi', 'Detail Distribusi');
-            
-            // 6. Hapus Draft Detail Distribusi
-            if (Schema::hasTable('draft_detail_distribusi')) {
-                $this->clearTable('draft_detail_distribusi', 'Draft Detail Distribusi');
-            }
-            
-            // 7. Hapus Draft Distribusi (jika ada)
-            if (Schema::hasTable('draft_distribusi')) {
-                $this->clearTable('draft_distribusi', 'Draft Distribusi');
-            }
-            
-            // 8. Hapus Transaksi Distribusi
-            $this->clearTable('transaksi_distribusi', 'Transaksi Distribusi');
-            
-            // 9. Hapus Detail Permintaan Barang
-            $this->clearTable('detail_permintaan_barang', 'Detail Permintaan Barang');
-            
-            // 10. Hapus Permintaan Barang
-            $this->clearTable('permintaan_barang', 'Permintaan Barang');
-            
-            // 11. Hapus Approval Log (yang terkait transaksi)
+            // 1. Hapus Approval Log (transaksi) dulu agar tidak orphan
             if (Schema::hasTable('approval_log')) {
-                $this->info('Menghapus Approval Log...');
+                $this->info('Menghapus Approval Log (transaksi)...');
                 $deleted = DB::table('approval_log')
                     ->whereIn('modul_approval', ['PERMINTAAN_BARANG', 'PERMINTAAN_PEMELIHARAAN'])
                     ->delete();
                 $this->line("  ✓ Dihapus: {$deleted} record(s)");
             }
+
+            // 2. Hapus Detail Retur Barang
+            $this->clearTable('detail_retur_barang', 'Detail Retur Barang');
             
-            // 12. Hapus Approval Permintaan (jika masih ada)
+            // 3. Hapus Retur Barang
+            $this->clearTable('retur_barang', 'Retur Barang');
+            
+            // 4. Hapus Detail Penerimaan Barang
+            $this->clearTable('detail_penerimaan_barang', 'Detail Penerimaan Barang');
+            
+            // 5. Hapus Penerimaan Barang
+            $this->clearTable('penerimaan_barang', 'Penerimaan Barang');
+            
+            // 6. Hapus Detail Pemakaian Barang
+            if (Schema::hasTable('detail_pemakaian_barang')) {
+                $this->clearTable('detail_pemakaian_barang', 'Detail Pemakaian Barang');
+            }
+            
+            // 7. Hapus Pemakaian Barang
+            if (Schema::hasTable('pemakaian_barang')) {
+                $this->clearTable('pemakaian_barang', 'Pemakaian Barang');
+            }
+            
+            // 8. Hapus Detail Distribusi
+            $this->clearTable('detail_distribusi', 'Detail Distribusi');
+            
+            // 9. Hapus Draft Detail Distribusi
+            if (Schema::hasTable('draft_detail_distribusi')) {
+                $this->clearTable('draft_detail_distribusi', 'Draft Detail Distribusi');
+            }
+            
+            // 10. Hapus Draft Distribusi (jika ada)
+            if (Schema::hasTable('draft_distribusi')) {
+                $this->clearTable('draft_distribusi', 'Draft Distribusi');
+            }
+            
+            // 11. Hapus Transaksi Distribusi
+            $this->clearTable('transaksi_distribusi', 'Transaksi Distribusi');
+            
+            // 12. Hapus Detail Permintaan Barang
+            $this->clearTable('detail_permintaan_barang', 'Detail Permintaan Barang');
+            
+            // 13. Hapus Permintaan Barang
+            $this->clearTable('permintaan_barang', 'Permintaan Barang');
+            
+            // 14. Hapus Approval Permintaan (jika masih ada)
             if (Schema::hasTable('approval_permintaan')) {
                 $this->clearTable('approval_permintaan', 'Approval Permintaan');
             }
             
-            // 13. Hapus Riwayat Pemeliharaan
+            // 15. Hapus Riwayat Pemeliharaan
             if (Schema::hasTable('riwayat_pemeliharaan')) {
                 $this->clearTable('riwayat_pemeliharaan', 'Riwayat Pemeliharaan');
             }
             
-            // 14. Hapus Service Report
+            // 16. Hapus Service Report
             if (Schema::hasTable('service_report')) {
                 $this->clearTable('service_report', 'Service Report');
             }
             
-            // 15. Hapus Kalibrasi Aset
+            // 17. Hapus Kalibrasi Aset
             if (Schema::hasTable('kalibrasi_aset')) {
                 $this->clearTable('kalibrasi_aset', 'Kalibrasi Aset');
             }
             
-            // 16. Hapus Jadwal Maintenance
+            // 18. Hapus Jadwal Maintenance
             if (Schema::hasTable('jadwal_maintenance')) {
                 $this->clearTable('jadwal_maintenance', 'Jadwal Maintenance');
             }
             
-            // 17. Hapus Permintaan Pemeliharaan
+            // 19. Hapus Permintaan Pemeliharaan
             if (Schema::hasTable('permintaan_pemeliharaan')) {
                 $this->clearTable('permintaan_pemeliharaan', 'Permintaan Pemeliharaan');
             }

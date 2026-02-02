@@ -27,9 +27,9 @@ class DataInventoryController extends Controller
         $user = Auth::user();
         
         // GUDANG PUSAT (Admin/Admin Gudang): Melihat SEMUA data inventory (global view)
-        // GUDANG UNIT (Kepala Unit/Admin Unit): Hanya melihat data di unitnya saja (local view)
-        
-        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+        // GUDANG UNIT (Kepala Unit/Pegawai/Admin Gudang Unit): Hanya melihat data di unitnya saja (local view)
+        // ADMIN GUDANG PER KATEGORI: Hanya melihat gudang sesuai kategori (Aset/Persediaan/Farmasi) agar tidak konflik
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai', 'admin_gudang_unit']) && !$user->hasRole('admin')) {
             // GUDANG UNIT: Hanya melihat data yang ada di gudang UNIT mereka
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
@@ -78,8 +78,13 @@ class DataInventoryController extends Controller
                 // Jika user tidak memiliki pegawai atau unit kerja, tidak tampilkan data
                 $query = DataInventory::whereRaw('1 = 0');
             }
+        } elseif ($user->hasRole('admin_gudang_aset') || $user->hasRole('admin_gudang_persediaan') || $user->hasRole('admin_gudang_farmasi')) {
+            // Admin Gudang per kategori: hanya inventory di gudang dengan kategori yang sama (tidak konflik)
+            $kategori = $user->hasRole('admin_gudang_aset') ? 'ASET' : ($user->hasRole('admin_gudang_persediaan') ? 'PERSEDIAAN' : 'FARMASI');
+            $query = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan', 'inventoryItems.gudang', 'inventoryItems.ruangan'])
+                ->whereHas('gudang', fn ($q) => $q->where('kategori_gudang', $kategori));
         } else {
-            // GUDANG PUSAT: Melihat SEMUA data inventory (tidak ada filter)
+            // Admin / Admin Gudang (umum): Melihat SEMUA data inventory
             $query = DataInventory::with(['dataBarang', 'gudang', 'sumberAnggaran', 'subKegiatan', 'satuan', 'inventoryItems.gudang', 'inventoryItems.ruangan']);
         }
 
@@ -111,7 +116,7 @@ class DataInventoryController extends Controller
         $inventories = $query->latest()->paginate($perPage)->appends($request->query());
         
         // Untuk GUDANG UNIT: Hitung ulang qty dan update gudang berdasarkan inventory_item untuk ASET
-        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai', 'admin_gudang_unit']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
                 $gudangUnitIds = MasterGudang::where('jenis_gudang', 'UNIT')
@@ -140,8 +145,8 @@ class DataInventoryController extends Controller
             }
         }
         
-        // Filter gudang yang ditampilkan di dropdown berdasarkan role
-        if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
+        // Filter gudang yang ditampilkan di dropdown berdasarkan role (agar tidak konflik)
+        if ($user->hasAnyRole(['kepala_unit', 'pegawai', 'admin_gudang_unit']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
                 $gudangs = MasterGudang::where('jenis_gudang', 'UNIT')
@@ -150,6 +155,12 @@ class DataInventoryController extends Controller
             } else {
                 $gudangs = collect([]);
             }
+        } elseif ($user->hasRole('admin_gudang_aset')) {
+            $gudangs = MasterGudang::where('kategori_gudang', 'ASET')->get();
+        } elseif ($user->hasRole('admin_gudang_persediaan')) {
+            $gudangs = MasterGudang::where('kategori_gudang', 'PERSEDIAAN')->get();
+        } elseif ($user->hasRole('admin_gudang_farmasi')) {
+            $gudangs = MasterGudang::where('kategori_gudang', 'FARMASI')->get();
         } else {
             $gudangs = MasterGudang::all();
         }
@@ -215,6 +226,17 @@ class DataInventoryController extends Controller
             'upload_foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
             'upload_dokumen' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
+
+        // Untuk jenis inventory FARMASI, No Batch dan Tanggal Kedaluwarsa wajib
+        if (($validated['jenis_inventory'] ?? '') === 'FARMASI') {
+            $request->validate([
+                'no_batch' => 'required|string|max:255',
+                'tanggal_kedaluwarsa' => 'required|date',
+            ], [
+                'no_batch.required' => 'Nomor batch wajib diisi untuk inventory Farmasi.',
+                'tanggal_kedaluwarsa.required' => 'Tanggal kedaluwarsa wajib diisi untuk inventory Farmasi.',
+            ]);
+        }
 
         $validated['total_harga'] = $validated['qty_input'] * $validated['harga_satuan'];
         $validated['created_by'] = auth()->id();
@@ -534,6 +556,17 @@ class DataInventoryController extends Controller
             'upload_foto' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
             'upload_dokumen' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
         ]);
+
+        // Untuk jenis inventory FARMASI, No Batch dan Tanggal Kedaluwarsa wajib
+        if (($validated['jenis_inventory'] ?? '') === 'FARMASI') {
+            $request->validate([
+                'no_batch' => 'required|string|max:255',
+                'tanggal_kedaluwarsa' => 'required|date',
+            ], [
+                'no_batch.required' => 'Nomor batch wajib diisi untuk inventory Farmasi.',
+                'tanggal_kedaluwarsa.required' => 'Tanggal kedaluwarsa wajib diisi untuk inventory Farmasi.',
+            ]);
+        }
 
         $validated['total_harga'] = $validated['qty_input'] * $validated['harga_satuan'];
 

@@ -31,11 +31,13 @@
                     onchange="fillFromPegawai()"
                 >
                     <option value="">Pilih Pegawai (untuk auto-fill nama & email)</option>
-                    @foreach($pegawais as $pegawai)
-                        <option value="{{ $pegawai->id }}" data-nama="{{ $pegawai->nama_pegawai }}" data-email="{{ $pegawai->email_pegawai ?? '' }}">
+                    @forelse($pegawais as $pegawai)
+                        <option value="{{ $pegawai->id }}" data-nama="{{ e($pegawai->nama_pegawai) }}" data-email="{{ e($pegawai->email_pegawai ?? '') }}">
                             {{ $pegawai->nama_pegawai }} ({{ $pegawai->nip_pegawai }}){{ $pegawai->email_pegawai ? ' - ' . $pegawai->email_pegawai : '' }}
                         </option>
-                    @endforeach
+                    @empty
+                        <option value="" disabled>Tidak ada data pegawai</option>
+                    @endforelse
                 </select>
                 <p class="mt-2 text-xs text-blue-700">
                     Pilih pegawai untuk mengisi otomatis nama dan email. Jika pegawai tidak memiliki email, email harus diisi manual.

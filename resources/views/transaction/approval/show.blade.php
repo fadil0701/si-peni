@@ -159,13 +159,15 @@
                                 @php
                                     $detailStock = $stockData[$detail->id_detail_permintaan] ?? ['total' => 0, 'per_gudang' => collect()];
                                     $totalStock = $detailStock['total'];
-                                    $isOverStock = $detail->qty_diminta > $totalStock;
+                                    // Hanya tampilkan "melebihi stock" jika barang punya stock dan qty melebihi; barang tanpa stock/stock 0 tetap dapat didisposisikan
+                                    $isOverStock = $detail->id_data_barang && $totalStock > 0 && $detail->qty_diminta > $totalStock;
                                 @endphp
                                 <tr class="{{ $isOverStock ? 'bg-red-50' : '' }}">
                                     <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
-                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang->kode_data_barang ?? '-' }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang->nama_barang ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $detail->dataBarang?->kode_data_barang ?? '-' }}</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->dataBarang?->nama_barang ?? $detail->deskripsi_barang ?? '-' }}</td>
                                     <td class="px-4 py-3 text-sm">
+                                        @if($detail->id_data_barang)
                                         <span class="font-semibold {{ $totalStock > 0 ? 'text-green-600' : 'text-red-600' }}">
                                             {{ number_format($totalStock, 2, ',', '.') }}
                                         </span>
@@ -175,6 +177,9 @@
                                                 <div>{{ $stockGudang['nama_gudang'] }}: {{ number_format($stockGudang['qty_akhir'], 2, ',', '.') }}</div>
                                             @endforeach
                                         </div>
+                                        @endif
+                                        @else
+                                        <span class="text-gray-500">-</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-sm">
@@ -194,7 +199,7 @@
                                             value="{{ old('koreksi_qty.'.$detail->id_detail_permintaan, $detail->qty_diminta) }}"
                                             min="0.01"
                                             step="0.01"
-                                            max="{{ $totalStock }}"
+                                            @if($detail->id_data_barang && $totalStock > 0) max="{{ $totalStock }}" @endif
                                             class="w-24 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                                             placeholder="{{ number_format($detail->qty_diminta, 2, ',', '.') }}"
                                         >
@@ -362,7 +367,7 @@
                             </div>
                             <div class="ml-3">
                                 <p class="text-sm text-blue-700">
-                                    <strong>Koreksi Jumlah:</strong> Anda dapat mengoreksi jumlah permintaan jika diperlukan. Pastikan jumlah yang dikoreksi tidak melebihi stock tersedia.
+                                    <strong>Koreksi Jumlah:</strong> Anda dapat mengoreksi jumlah permintaan jika diperlukan. Untuk barang dari master, pastikan jumlah yang dikoreksi tidak melebihi stock tersedia. Barang tanpa stock (permintaan lainnya) atau stock 0 tetap dapat didisposisikan.
                                 </p>
                             </div>
                         </div>

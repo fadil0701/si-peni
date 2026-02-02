@@ -131,21 +131,9 @@
                         </label>
                         <div id="subJenisOptions" class="space-y-2">
                             @php
-                                $jenisPermintaan = old('jenis_permintaan', is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []));
+                                $rawJenis = is_array($permintaan->jenis_permintaan) ? $permintaan->jenis_permintaan : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []);
+                                $jenisPermintaan = array_values(array_intersect((array) old('jenis_permintaan', $rawJenis), ['PERSEDIAAN', 'FARMASI']));
                             @endphp
-                            <div class="flex items-center">
-                                <input 
-                                    type="checkbox" 
-                                    id="subjenis_aset" 
-                                    name="jenis_permintaan[]" 
-                                    value="ASET"
-                                    {{ in_array('ASET', $jenisPermintaan) ? 'checked' : '' }}
-                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                >
-                                <label for="subjenis_aset" class="ml-2 block text-sm text-gray-700">
-                                    Aset
-                                </label>
-                            </div>
                             <div class="flex items-center">
                                 <input 
                                     type="checkbox" 
@@ -172,6 +160,7 @@
                                     Farmasi
                                 </label>
                             </div>
+                            <p class="text-xs text-gray-500 mt-1">Satu SPB bisa ke satu gudang atau ke semua gudang (Persediaan + Farmasi). Aset tidak masuk permintaan rutin/cito.</p>
                         </div>
                         @error('jenis_permintaan')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -213,25 +202,50 @@
                 <div id="detailContainer" class="space-y-4">
                     @foreach(old('detail', $permintaan->detailPermintaan) as $index => $detail)
                     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-                            <div class="sm:col-span-4">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 items-end">
+                            <div class="sm:col-span-4 flex flex-col">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Data Barang <span class="text-red-500">*</span>
+                                    Data Barang / Permintaan lainnya <span class="text-red-500">*</span>
                                 </label>
-                                <select 
-                                    name="detail[{{ $index }}][id_data_barang]" 
-                                    required
-                                    class="select-data-barang block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error("detail.{$index}.id_data_barang") border-red-500 @enderror"
-                                >
-                                    <option value="">Pilih Data Barang</option>
-                                    @foreach($dataBarangs as $dataBarang)
-                                        <option value="{{ $dataBarang->id_data_barang }}" 
-                                            data-satuan="{{ $dataBarang->id_satuan }}"
-                                            {{ old("detail.{$index}.id_data_barang", is_object($detail) ? $detail->id_data_barang : ($detail['id_data_barang'] ?? '')) == $dataBarang->id_data_barang ? 'selected' : '' }}>
-                                            {{ $dataBarang->kode_data_barang }} - {{ $dataBarang->nama_barang }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                @php
+                                    $useLainnyaEdit = !empty(trim((string) (old("detail.{$index}.deskripsi_barang") ?? (is_object($detail) ? $detail->deskripsi_barang : ($detail['deskripsi_barang'] ?? '')))));
+                                @endphp
+                                <div class="flex gap-4 mb-2">
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="detail[{{ $index }}][tipe_barang]" value="master" class="tipe-barang-radio mr-1" {{ !$useLainnyaEdit ? 'checked' : '' }}>
+                                        Dari master
+                                    </label>
+                                    <label class="inline-flex items-center text-sm">
+                                        <input type="radio" name="detail[{{ $index }}][tipe_barang]" value="lainnya" class="tipe-barang-radio mr-1" {{ $useLainnyaEdit ? 'checked' : '' }}>
+                                        Permintaan lainnya (freetext)
+                                    </label>
+                                </div>
+                                <div class="min-h-[38px] w-full min-w-0">
+                                    <div class="wrap-master w-full min-w-0" style="{{ $useLainnyaEdit ? 'display:none' : '' }}">
+                                        <select 
+                                            name="detail[{{ $index }}][id_data_barang]" 
+                                            class="select-data-barang w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error("detail.{$index}.id_data_barang") border-red-500 @enderror"
+                                        >
+                                            <option value="">Pilih Data Barang</option>
+                                            @foreach($dataBarangs as $dataBarang)
+                                                <option value="{{ $dataBarang->id_data_barang }}" 
+                                                    data-satuan="{{ $dataBarang->id_satuan }}"
+                                                    {{ old("detail.{$index}.id_data_barang", is_object($detail) ? $detail->id_data_barang : ($detail['id_data_barang'] ?? '')) == $dataBarang->id_data_barang ? 'selected' : '' }}>
+                                                    {{ $dataBarang->kode_data_barang }} - {{ $dataBarang->nama_barang }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="wrap-lainnya w-full min-w-0" style="{{ $useLainnyaEdit ? '' : 'display:none' }}">
+                                        <input type="text" 
+                                            name="detail[{{ $index }}][deskripsi_barang]" 
+                                            value="{{ old("detail.{$index}.deskripsi_barang", is_object($detail) ? $detail->deskripsi_barang : ($detail['deskripsi_barang'] ?? '')) }}"
+                                            placeholder="Ketik deskripsi barang (tidak masuk master/stock)"
+                                            maxlength="500"
+                                            class="input-deskripsi-barang w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        >
+                                    </div>
+                                </div>
                                 @error("detail.{$index}.id_data_barang")
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror
@@ -299,10 +313,10 @@
                                 >
                             </div>
 
-                            <div class="sm:col-span-1 flex items-end">
+                            <div class="sm:col-span-1 flex items-center justify-center pb-0.5">
                                 <button 
                                     type="button" 
-                                    class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                                    class="btnHapusItem p-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
                                     title="Hapus Item"
                                 >
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,23 +355,44 @@
 <!-- Template untuk item detail baru (hidden) -->
 <template id="itemTemplate">
     <div class="item-row bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div class="sm:col-span-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 items-end">
+            <div class="sm:col-span-4 flex flex-col">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Data Barang <span class="text-red-500">*</span>
+                    Data Barang / Permintaan lainnya <span class="text-red-500">*</span>
                 </label>
-                <select 
-                    name="detail[INDEX][id_data_barang]" 
-                    required
-                    class="select-data-barang block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                    <option value="">Pilih Data Barang</option>
-                    @foreach($dataBarangs as $dataBarang)
-                        <option value="{{ $dataBarang->id_data_barang }}" data-satuan="{{ $dataBarang->id_satuan }}">
-                            {{ $dataBarang->kode_data_barang }} - {{ $dataBarang->nama_barang }}
-                        </option>
-                    @endforeach
-                </select>
+                <div class="flex gap-4 mb-2">
+                    <label class="inline-flex items-center text-sm">
+                        <input type="radio" name="detail[INDEX][tipe_barang]" value="master" class="tipe-barang-radio mr-1" checked>
+                        Dari master
+                    </label>
+                    <label class="inline-flex items-center text-sm">
+                        <input type="radio" name="detail[INDEX][tipe_barang]" value="lainnya" class="tipe-barang-radio mr-1">
+                        Permintaan lainnya (freetext)
+                    </label>
+                </div>
+                <div class="min-h-[38px] w-full min-w-0">
+                    <div class="wrap-master w-full min-w-0">
+                        <select 
+                            name="detail[INDEX][id_data_barang]" 
+                            class="select-data-barang w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        >
+                            <option value="">Pilih Data Barang</option>
+                            @foreach($dataBarangs as $dataBarang)
+                                <option value="{{ $dataBarang->id_data_barang }}" data-satuan="{{ $dataBarang->id_satuan }}">
+                                    {{ $dataBarang->kode_data_barang }} - {{ $dataBarang->nama_barang }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="wrap-lainnya w-full min-w-0" style="display:none">
+                        <input type="text" 
+                            name="detail[INDEX][deskripsi_barang]" 
+                            placeholder="Ketik deskripsi barang (tidak masuk master/stock)"
+                            maxlength="500"
+                            class="input-deskripsi-barang w-full min-w-0 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        >
+                    </div>
+                </div>
             </div>
 
             <div class="sm:col-span-1">
@@ -411,10 +446,10 @@
                 >
             </div>
 
-            <div class="sm:col-span-1 flex items-end">
+            <div class="sm:col-span-1 flex items-center justify-center pb-0.5">
                 <button 
                     type="button" 
-                    class="btnHapusItem w-full px-2 py-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
+                    class="btnHapusItem p-2 border border-red-300 text-red-700 bg-white hover:bg-red-50 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 flex items-center justify-center"
                     title="Hapus Item"
                 >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,7 +465,6 @@
 <script>
 let itemIndex = {{ count(old('detail', $permintaan->detailPermintaan)) }};
 const stockData = @json($stockData ?? []);
-const inventoryAsetIds = @json(array_map('intval', $inventoryAsetIds ?? []));
 const stockPersediaanIds = @json(array_map('intval', $stockPersediaanIds ?? []));
 const stockFarmasiIds = @json(array_map('intval', $stockFarmasiIds ?? []));
 
@@ -465,18 +499,14 @@ function getStockForBarang(barangId) {
     return stockData[id] || stockData[num] || null;
 }
 
-// Helper: nilai stock yang ditampilkan. ASET = aset_available, PERSEDIAAN/FARMASI = stock gudang pusat.
+// Helper: nilai stock yang ditampilkan (hanya Persediaan & Farmasi, stock gudang pusat).
 function getDisplayStock(barangId) {
     const info = getStockForBarang(barangId);
     if (!info) return null;
     const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
     const id = parseInt(barangId, 10);
-    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
     const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
     const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
-    if (inAsetIds && checkedJenis.includes('ASET') && info.aset_available !== undefined) {
-        return parseFloat(info.aset_available) || 0;
-    }
     if (inFarmasiIds && checkedJenis.includes('FARMASI') && info.stock_gudang_pusat_farmasi !== undefined) {
         return parseFloat(info.stock_gudang_pusat_farmasi) || 0;
     }
@@ -486,18 +516,43 @@ function getDisplayStock(barangId) {
     return parseFloat(info.total) || 0;
 }
 
-// Kapan wajib batasi Qty dengan stock? Hanya untuk PERSEDIAAN/FARMASI. Untuk ASET selalu abaikan stock.
+// Batasi Qty dengan stock gudang pusat untuk PERSEDIAAN/FARMASI
 function shouldEnforceMaxStock(barangId) {
     const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
     const id = parseInt(barangId, 10);
-    const inAsetIds = (inventoryAsetIds || []).map(Number).includes(id);
     const inFarmasiIds = (stockFarmasiIds || []).map(Number).includes(id);
     const inPersediaanIds = (stockPersediaanIds || []).map(Number).includes(id);
-    if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') return false;
-    if (inAsetIds && !inFarmasiIds && !inPersediaanIds) return false;
     if (checkedJenis.includes('FARMASI') && inFarmasiIds) return true;
     if (checkedJenis.includes('PERSEDIAAN') && inPersediaanIds) return true;
     return false;
+}
+
+// Toggle "Dari master" vs "Permintaan lainnya" per baris
+function setupTipeBarangToggle(row) {
+    if (!row) return;
+    const masterWrap = row.querySelector('.wrap-master');
+    const lainnyaWrap = row.querySelector('.wrap-lainnya');
+    const selectBarang = row.querySelector('.select-data-barang');
+    const inputDeskripsi = row.querySelector('.input-deskripsi-barang');
+    const stockDisplay = row.querySelector('.stock-display');
+    const qtyInput = row.querySelector('.qty-input');
+    const radios = row.querySelectorAll('.tipe-barang-radio');
+    if (!radios.length || !masterWrap || !lainnyaWrap) return;
+    radios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const isLainnya = this.value === 'lainnya';
+            masterWrap.style.display = isLainnya ? 'none' : '';
+            lainnyaWrap.style.display = isLainnya ? '' : 'none';
+            if (isLainnya) {
+                if (selectBarang) selectBarang.value = '';
+                if (stockDisplay) { stockDisplay.textContent = '-'; stockDisplay.className = 'stock-display block w-full px-2 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm font-semibold text-gray-700 text-center'; }
+                if (qtyInput) { qtyInput.removeAttribute('max'); qtyInput.setCustomValidity(''); }
+            } else {
+                if (inputDeskripsi) inputDeskripsi.value = '';
+                if (selectBarang && selectBarang.value) selectBarang.dispatchEvent(new Event('change'));
+            }
+        });
+    });
 }
 
 // Pesan validasi qty (max) dalam bahasa Indonesia
@@ -547,6 +602,7 @@ function tambahItem() {
     container.appendChild(finalItem);
     itemIndex++;
     
+    setupTipeBarangToggle(finalItem);
     // Auto-set satuan dan tampilkan stock ketika data barang dipilih
     const selectBarang = finalItem.querySelector('.select-data-barang');
     const selectSatuan = finalItem.querySelector('.select-satuan');
@@ -630,7 +686,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Auto-set satuan dan tampilkan stock untuk item yang sudah ada
+    // Setup toggle master/lainnya dan auto-set satuan/stock untuk item yang sudah ada
+    document.querySelectorAll('.item-row').forEach(row => setupTipeBarangToggle(row));
     document.querySelectorAll('.select-data-barang').forEach(select => {
         select.addEventListener('change', function() {
             const selectedOption = this.options[this.selectedIndex];
@@ -707,14 +764,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => select.dispatchEvent(new Event('change')), 50);
                 }
             });
-            // Jika hanya ASET yang dicentang, hapus max dari semua input qty
-            const checkedJenis = Array.from(document.querySelectorAll('input[name="jenis_permintaan[]"]:checked')).map(cb => cb.value);
-            if (checkedJenis.length === 1 && checkedJenis[0] === 'ASET') {
-                document.querySelectorAll('input[name*="[qty_diminta]"]').forEach(input => {
-                    input.removeAttribute('max');
-                    input.setCustomValidity('');
-                });
-            }
         });
     });
 });

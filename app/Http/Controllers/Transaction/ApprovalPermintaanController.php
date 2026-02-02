@@ -341,13 +341,18 @@ class ApprovalPermintaanController extends Controller
             abort(404, 'Permintaan tidak ditemukan.');
         }
         
-        // Get stock data for each detail
+        // Get stock data hanya gudang pusat (untuk detail yang dari master). Permintaan lainnya tidak punya stock.
         $stockData = [];
         foreach ($permintaan->detailPermintaan as $detail) {
-            $stockData[$detail->id_detail_permintaan] = [
-                'total' => DataStock::getTotalStock($detail->id_data_barang),
-                'per_gudang' => DataStock::getStockPerGudang($detail->id_data_barang),
-            ];
+            if ($detail->id_data_barang) {
+                $perGudangPusat = DataStock::getStockPerGudangPusat($detail->id_data_barang);
+                $stockData[$detail->id_detail_permintaan] = [
+                    'total' => $perGudangPusat->sum('qty_akhir'),
+                    'per_gudang' => $perGudangPusat,
+                ];
+            } else {
+                $stockData[$detail->id_detail_permintaan] = ['total' => 0, 'per_gudang' => collect()];
+            }
         }
         
         // Load approval history
@@ -482,14 +487,16 @@ class ApprovalPermintaanController extends Controller
         // Load permintaan untuk validasi stock
         $permintaan = PermintaanBarang::with('detailPermintaan')->find($approval->id_referensi);
         
-        // Validasi koreksi qty jika ada
+        // Validasi koreksi qty jika ada (hanya untuk barang dari master yang punya stock)
+        // Barang tanpa stock (permintaan lainnya / id_data_barang null) atau stock 0 tetap dapat didisposisikan
         if (isset($validated['koreksi_qty']) && is_array($validated['koreksi_qty'])) {
             foreach ($validated['koreksi_qty'] as $detailId => $qtyBaru) {
                 if ($qtyBaru !== null) {
                     $detail = $permintaan->detailPermintaan->find($detailId);
-                    if ($detail) {
+                    if ($detail && $detail->id_data_barang) {
                         $totalStock = DataStock::getTotalStock($detail->id_data_barang);
-                        if ($qtyBaru > $totalStock) {
+                        // Hanya blokir jika ada stock dan koreksi melebihi stock; jika stock 0 tetap boleh didisposisikan
+                        if ($totalStock > 0 && $qtyBaru > $totalStock) {
                             return back()->withInput()->withErrors([
                                 "koreksi_qty.{$detailId}" => "Jumlah yang dikoreksi ({$qtyBaru}) melebihi stock tersedia ({$totalStock})."
                             ]);
@@ -533,17 +540,8 @@ class ApprovalPermintaanController extends Controller
                 ? $permintaan->jenis_permintaan 
                 : (is_string($permintaan->jenis_permintaan) ? json_decode($permintaan->jenis_permintaan, true) : []);
             
-            // Tentukan kategori gudang yang perlu didisposisikan
-            $kategoriGudang = [];
-            if (in_array('ASET', $jenisPermintaan)) {
-                $kategoriGudang[] = 'ASET';
-            }
-            if (in_array('FARMASI', $jenisPermintaan)) {
-                $kategoriGudang[] = 'FARMASI';
-            }
-            if (in_array('PERSEDIAAN', $jenisPermintaan)) {
-                $kategoriGudang[] = 'PERSEDIAAN';
-            }
+            // Permintaan rutin/cito hanya Persediaan & Farmasi (Aset tidak masuk alur permintaan barang)
+            $kategoriGudang = array_values(array_intersect($jenisPermintaan, ['PERSEDIAAN', 'FARMASI']));
             
             // Jika tidak ada kategori spesifik, gunakan admin_gudang umum
             if (empty($kategoriGudang)) {
@@ -597,6 +595,49 @@ class ApprovalPermintaanController extends Controller
                                     'approved_at' => null,
                                 ]);
                             }
+                        }
+                    }
+                }
+            }
+            
+            // Jika ada item yang tidak ada di stock (permintaan lainnya atau stock gudang pusat = 0), disposisi ke Pengadaan Barang dan Jasa
+            $permintaan->load('detailPermintaan');
+            $adaItemTanpaStock = false;
+            foreach ($permintaan->detailPermintaan as $detail) {
+                if (!$detail->id_data_barang) {
+                    $adaItemTanpaStock = true; // permintaan lainnya / freetext
+                    break;
+                }
+                $stockPusat = DataStock::getStockPerGudangPusat($detail->id_data_barang);
+                $totalStockPusat = $stockPusat->sum('qty_akhir');
+                if ($totalStockPusat <= 0) {
+                    $adaItemTanpaStock = true;
+                    break;
+                }
+            }
+            if ($adaItemTanpaStock) {
+                $rolePengadaan = \App\Models\Role::where('name', 'pengadaan')->first();
+                if ($rolePengadaan) {
+                    $step4PengadaanFlow = ApprovalFlowDefinition::where('modul_approval', 'PERMINTAAN_BARANG')
+                        ->where('step_order', 4)
+                        ->where('role_id', $rolePengadaan->id)
+                        ->first();
+                    if ($step4PengadaanFlow) {
+                        $existingLogPengadaan = ApprovalLog::where('modul_approval', 'PERMINTAAN_BARANG')
+                            ->where('id_referensi', $permintaan->id_permintaan)
+                            ->where('id_approval_flow', $step4PengadaanFlow->id)
+                            ->first();
+                        if (!$existingLogPengadaan) {
+                            ApprovalLog::create([
+                                'modul_approval' => 'PERMINTAAN_BARANG',
+                                'id_referensi' => $permintaan->id_permintaan,
+                                'id_approval_flow' => $step4PengadaanFlow->id,
+                                'user_id' => null,
+                                'role_id' => $rolePengadaan->id,
+                                'status' => 'MENUNGGU',
+                                'catatan' => 'Didisposisikan ke Pengadaan Barang dan Jasa: terdapat item yang tidak ada di stock gudang pusat, untuk dilakukan pengadaan.',
+                                'approved_at' => null,
+                            ]);
                         }
                     }
                 }
@@ -949,20 +990,11 @@ class ApprovalPermintaanController extends Controller
                 }
             }
             
-            // Tentukan kategori gudang yang terlibat berdasarkan jenis_permintaan yang sudah dipilih user
-            // jenis_permintaan sudah berisi array: ["ASET", "PERSEDIAAN", "FARMASI"]
+            // Tentukan kategori gudang yang terlibat: permintaan rutin/cito hanya Persediaan & Farmasi
             $jenisPermintaan = is_array($permintaan->jenis_permintaan) 
                 ? $permintaan->jenis_permintaan 
                 : json_decode($permintaan->jenis_permintaan, true) ?? [];
-            
-            // Langsung gunakan jenis_permintaan sebagai kategori gudang
-            // Filter hanya yang valid (ASET, PERSEDIAAN, FARMASI)
-            $kategoriGudang = array_filter($jenisPermintaan, function($kategori) {
-                return in_array($kategori, ['ASET', 'PERSEDIAAN', 'FARMASI']);
-            });
-            
-            // Hapus duplikat dan re-index array
-            $kategoriGudang = array_values(array_unique($kategoriGudang));
+            $kategoriGudang = array_values(array_unique(array_intersect($jenisPermintaan, ['PERSEDIAAN', 'FARMASI'])));
             
             // Buat approval log untuk setiap kategori gudang yang terlibat
             foreach ($kategoriGudang as $kategori) {

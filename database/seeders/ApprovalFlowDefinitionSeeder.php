@@ -23,6 +23,7 @@ class ApprovalFlowDefinitionSeeder extends Seeder
             'admin_gudang_aset' => Role::where('name', 'admin_gudang_aset')->first(),
             'admin_gudang_persediaan' => Role::where('name', 'admin_gudang_persediaan')->first(),
             'admin_gudang_farmasi' => Role::where('name', 'admin_gudang_farmasi')->first(),
+            'pengadaan' => Role::where('name', 'pengadaan')->first(),
         ];
 
         // Flow approval untuk PERMINTAAN_BARANG
@@ -111,6 +112,18 @@ class ApprovalFlowDefinitionSeeder extends Seeder
                 'nama_step' => 'Didisposisikan',
                 'status' => 'MENUNGGU',
                 'status_text' => 'Permintaan telah didisposisikan ke Admin Gudang / Unit Terkait',
+                'is_required' => false,
+                'can_reject' => false,
+                'can_approve' => false,
+            ],
+            // Step 4.5: Disposisi ke Pengadaan Barang dan Jasa (jika ada item tidak ada di stock)
+            [
+                'modul_approval' => 'PERMINTAAN_BARANG',
+                'step_order' => 4,
+                'role_id' => $roles['pengadaan']->id ?? null,
+                'nama_step' => 'Didisposisikan ke Pengadaan',
+                'status' => 'MENUNGGU',
+                'status_text' => 'Permintaan mengandung item yang tidak ada di stock, didisposisikan ke Pengadaan Barang dan Jasa untuk pengadaan',
                 'is_required' => false,
                 'can_reject' => false,
                 'can_approve' => false,

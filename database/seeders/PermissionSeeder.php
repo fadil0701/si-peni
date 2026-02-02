@@ -163,11 +163,11 @@ class PermissionSeeder extends Seeder
                 'sort_order' => 120,
             ],
 
-            // Transaction - Permintaan Barang
+            // Permintaan Barang
             [
                 'name' => 'transaction.permintaan-barang.index',
                 'display_name' => 'View Permintaan Barang',
-                'module' => 'transaction',
+                'module' => 'permintaan',
                 'group' => 'transaction.permintaan-barang',
                 'description' => 'Melihat daftar permintaan barang',
                 'sort_order' => 200,
@@ -175,7 +175,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.permintaan-barang.create',
                 'display_name' => 'Create Permintaan Barang',
-                'module' => 'transaction',
+                'module' => 'permintaan',
                 'group' => 'transaction.permintaan-barang',
                 'description' => 'Membuat permintaan barang baru',
                 'sort_order' => 201,
@@ -183,7 +183,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.permintaan-barang.edit',
                 'display_name' => 'Edit Permintaan Barang',
-                'module' => 'transaction',
+                'module' => 'permintaan',
                 'group' => 'transaction.permintaan-barang',
                 'description' => 'Mengedit permintaan barang',
                 'sort_order' => 202,
@@ -191,17 +191,17 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.permintaan-barang.show',
                 'display_name' => 'View Detail Permintaan Barang',
-                'module' => 'transaction',
+                'module' => 'permintaan',
                 'group' => 'transaction.permintaan-barang',
                 'description' => 'Melihat detail permintaan barang',
                 'sort_order' => 203,
             ],
 
-            // Transaction - Approval
+            // Approval
             [
                 'name' => 'transaction.approval.index',
                 'display_name' => 'View Approval',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Melihat daftar approval',
                 'sort_order' => 210,
@@ -209,7 +209,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.approval.show',
                 'display_name' => 'View Detail Approval',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Melihat detail approval',
                 'sort_order' => 211,
@@ -217,7 +217,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.approval.mengetahui',
                 'display_name' => 'Mengetahui Approval',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Memberi status mengetahui pada approval',
                 'sort_order' => 212,
@@ -225,7 +225,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.approval.verifikasi',
                 'display_name' => 'Verifikasi Approval',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Memverifikasi approval',
                 'sort_order' => 213,
@@ -233,7 +233,7 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.approval.approve',
                 'display_name' => 'Approve Request',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Menyetujui permintaan',
                 'sort_order' => 214,
@@ -241,40 +241,100 @@ class PermissionSeeder extends Seeder
             [
                 'name' => 'transaction.approval.reject',
                 'display_name' => 'Reject Request',
-                'module' => 'transaction',
+                'module' => 'approval',
                 'group' => 'transaction.approval',
                 'description' => 'Menolak permintaan',
                 'sort_order' => 215,
             ],
 
-            // Transaction - Distribusi
+            // Distribusi (pisah)
             [
                 'name' => 'transaction.distribusi.*',
                 'display_name' => 'Distribusi Barang (All)',
-                'module' => 'transaction',
+                'module' => 'distribusi',
                 'group' => 'transaction.distribusi',
                 'description' => 'Akses penuh ke distribusi barang',
                 'sort_order' => 220,
             ],
 
-            // Transaction - Penerimaan
+            // Penerimaan Barang (pisah)
             [
                 'name' => 'transaction.penerimaan-barang.*',
                 'display_name' => 'Penerimaan Barang (All)',
-                'module' => 'transaction',
+                'module' => 'penerimaan-barang',
                 'group' => 'transaction.penerimaan-barang',
                 'description' => 'Akses penuh ke penerimaan barang',
                 'sort_order' => 230,
             ],
 
-            // Transaction - Retur
+            // Retur Barang (pisah)
             [
                 'name' => 'transaction.retur.*',
                 'display_name' => 'Retur Barang (All)',
-                'module' => 'transaction',
+                'module' => 'retur-barang',
                 'group' => 'transaction.retur',
                 'description' => 'Akses penuh ke retur barang',
                 'sort_order' => 240,
+            ],
+
+            // Draft Distribusi (pisah, bukan Transaction)
+            [
+                'name' => 'transaction.draft-distribusi.index',
+                'display_name' => 'View Draft Distribusi',
+                'module' => 'draft-distribusi',
+                'group' => 'transaction.draft-distribusi',
+                'description' => 'Melihat daftar draft distribusi',
+                'sort_order' => 250,
+            ],
+            [
+                'name' => 'transaction.draft-distribusi.create',
+                'display_name' => 'Create Draft Distribusi',
+                'module' => 'draft-distribusi',
+                'group' => 'transaction.draft-distribusi',
+                'description' => 'Membuat draft distribusi',
+                'sort_order' => 251,
+            ],
+            [
+                'name' => 'transaction.draft-distribusi.show',
+                'display_name' => 'View Detail Draft Distribusi',
+                'module' => 'draft-distribusi',
+                'group' => 'transaction.draft-distribusi',
+                'description' => 'Melihat detail draft distribusi',
+                'sort_order' => 252,
+            ],
+            [
+                'name' => 'transaction.draft-distribusi.*',
+                'display_name' => 'Draft Distribusi (All)',
+                'module' => 'draft-distribusi',
+                'group' => 'transaction.draft-distribusi',
+                'description' => 'Akses penuh ke draft distribusi',
+                'sort_order' => 253,
+            ],
+
+            // Compile Distribusi (pisah, bukan Transaction)
+            [
+                'name' => 'transaction.compile-distribusi.index',
+                'display_name' => 'View Compile Distribusi',
+                'module' => 'compile-distribusi',
+                'group' => 'transaction.compile-distribusi',
+                'description' => 'Melihat daftar compile distribusi',
+                'sort_order' => 260,
+            ],
+            [
+                'name' => 'transaction.compile-distribusi.create',
+                'display_name' => 'Create Compile Distribusi',
+                'module' => 'compile-distribusi',
+                'group' => 'transaction.compile-distribusi',
+                'description' => 'Membuat compile distribusi',
+                'sort_order' => 261,
+            ],
+            [
+                'name' => 'transaction.compile-distribusi.*',
+                'display_name' => 'Compile Distribusi (All)',
+                'module' => 'compile-distribusi',
+                'group' => 'transaction.compile-distribusi',
+                'description' => 'Akses penuh ke compile distribusi',
+                'sort_order' => 262,
             ],
 
             // Asset & KIR
@@ -329,6 +389,27 @@ class PermissionSeeder extends Seeder
                 ['name' => $permission['name']],
                 $permission
             );
+        }
+
+        // Perbaiki permission yang masih module=transaction (data lama): sesuaikan dengan modul terbaru (tanpa Transaction)
+        $transactionModuleMap = [
+            'permintaan' => ['transaction.permintaan-barang'],
+            'approval' => ['transaction.approval'],
+            'distribusi' => ['transaction.distribusi'],
+            'penerimaan-barang' => ['transaction.penerimaan-barang'],
+            'retur-barang' => ['transaction.retur'],
+            'draft-distribusi' => ['transaction.draft-distribusi'],
+            'compile-distribusi' => ['transaction.compile-distribusi'],
+        ];
+        foreach (Permission::where('module', 'transaction')->get() as $p) {
+            foreach ($transactionModuleMap as $newModule => $prefixes) {
+                foreach ($prefixes as $prefix) {
+                    if (str_starts_with($p->name, $prefix)) {
+                        $p->update(['module' => $newModule]);
+                        break 2;
+                    }
+                }
+            }
         }
     }
 }

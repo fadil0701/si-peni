@@ -59,6 +59,11 @@ class RoleSeeder extends Seeder
                 'description' => 'Admin Gudang Pusat Kategori Farmasi - Kelola stok farmasi, proses distribusi farmasi, cetak SBBK farmasi',
             ],
             [
+                'name' => 'admin_gudang_unit',
+                'display_name' => 'Admin Gudang Unit',
+                'description' => 'Admin Gudang Unit Kerja - Hanya akses inventory unit kerjanya, tidak bisa akses gudang pusat',
+            ],
+            [
                 'name' => 'perencanaan',
                 'display_name' => 'Perencanaan',
                 'description' => 'Unit Perencanaan - Menindaklanjuti disposisi pimpinan',

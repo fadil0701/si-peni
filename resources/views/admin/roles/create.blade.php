@@ -94,48 +94,36 @@
                 </div>
 
                 <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
-                    @foreach($permissions as $module => $modulePermissions)
-                        @php
-                            $moduleDisplayName = ucwords(str_replace(['-', '_'], ' ', $module));
-                            $moduleId = 'module-' . str_replace(['.', '-', '_'], '-', $module);
-                        @endphp
-                        <div class="mb-4 border border-gray-200 rounded-lg bg-white overflow-hidden module-container" data-module="{{ $module }}">
-                            <!-- Module Header (Collapsible) -->
+                    @foreach($permissionGroups as $group)
+                        @php $moduleId = 'module-' . str_replace(['.', '-', '_'], '-', $group['module']); @endphp
+                        <div class="mb-4 border border-gray-200 rounded-lg bg-white overflow-hidden module-container" data-module="{{ $group['module'] }}">
                             <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200 cursor-pointer module-header" data-target="{{ $moduleId }}">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-3">
                                         <svg class="w-5 h-5 text-blue-600 transition-transform transform module-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                         </svg>
-                                        <h4 class="text-sm font-semibold text-gray-900">
-                                            {{ $moduleDisplayName }}
-                                        </h4>
-                                        <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full module-count" data-module="{{ $module }}">
-                                            0/{{ $modulePermissions->count() }}
+                                        <h4 class="text-sm font-semibold text-gray-900">{{ $group['label'] }}</h4>
+                                        <span class="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full module-count" data-module="{{ $group['module'] }}">
+                                            0/{{ $group['items']->count() }}
                                         </span>
                                     </div>
                                     <label class="flex items-center text-xs text-blue-600 hover:text-blue-800 cursor-pointer" onclick="event.stopPropagation()">
-                                        <input 
-                                            type="checkbox" 
-                                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded module-select-all"
-                                            data-module="{{ $module }}"
-                                        >
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded module-select-all" data-module="{{ $group['module'] }}">
                                         <span class="ml-2 font-medium">Pilih Semua</span>
                                     </label>
                                 </div>
                             </div>
-                            
-                            <!-- Module Permissions (Collapsible Content) -->
                             <div id="{{ $moduleId }}" class="module-content hidden">
                                 <div class="p-4 space-y-3">
-                                    @foreach($modulePermissions as $permission)
+                                    @foreach($group['items'] as $permission)
                                         <label class="flex items-start p-3 rounded-lg hover:bg-gray-50 transition-colors permission-item" data-permission-name="{{ strtolower($permission->display_name . ' ' . $permission->name) }}">
                                             <input 
                                                 type="checkbox" 
                                                 name="permissions[]" 
                                                 value="{{ $permission->id }}"
                                                 class="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded permission-checkbox"
-                                                data-module="{{ $module }}"
+                                                data-module="{{ $group['module'] }}"
                                             >
                                             <div class="ml-3 flex-1">
                                                 <div class="flex items-center justify-between">

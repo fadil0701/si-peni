@@ -21,6 +21,10 @@ class MasterJabatanSeeder extends Seeder
             'kasubbag_tu' => Role::where('name', 'kasubbag_tu')->first(),
             'kepala_pusat' => Role::where('name', 'kepala_pusat')->first(),
             'admin_gudang' => Role::where('name', 'admin_gudang')->first(),
+            'admin_gudang_aset' => Role::where('name', 'admin_gudang_aset')->first(),
+            'admin_gudang_persediaan' => Role::where('name', 'admin_gudang_persediaan')->first(),
+            'admin_gudang_farmasi' => Role::where('name', 'admin_gudang_farmasi')->first(),
+            'admin_gudang_unit' => Role::where('name', 'admin_gudang_unit')->first(),
             'perencanaan' => Role::where('name', 'perencanaan')->first(),
             'pengadaan' => Role::where('name', 'pengadaan')->first(),
             'keuangan' => Role::where('name', 'keuangan')->first(),
@@ -80,22 +84,46 @@ class MasterJabatanSeeder extends Seeder
                 'role_id' => $roles['admin_gudang']->id ?? null,
                 'deskripsi' => 'Admin Gudang / Pengurus Barang - Kelola stok, proses distribusi, cetak SBBK',
             ],
-            
-            // 7. UNIT TERKAIT
             [
                 'urutan' => 8,
+                'nama_jabatan' => 'Admin Gudang Aset',
+                'role_id' => $roles['admin_gudang_aset']->id ?? null,
+                'deskripsi' => 'Admin Gudang Kategori Aset - Hanya akses gudang Aset, tidak bisa Persediaan/Farmasi',
+            ],
+            [
+                'urutan' => 9,
+                'nama_jabatan' => 'Admin Gudang Persediaan',
+                'role_id' => $roles['admin_gudang_persediaan']->id ?? null,
+                'deskripsi' => 'Admin Gudang Kategori Persediaan - Hanya akses gudang Persediaan, tidak bisa Aset/Farmasi',
+            ],
+            [
+                'urutan' => 10,
+                'nama_jabatan' => 'Admin Gudang Farmasi',
+                'role_id' => $roles['admin_gudang_farmasi']->id ?? null,
+                'deskripsi' => 'Admin Gudang Kategori Farmasi - Hanya akses gudang Farmasi, tidak bisa Aset/Persediaan',
+            ],
+            [
+                'urutan' => 11,
+                'nama_jabatan' => 'Admin Gudang Unit',
+                'role_id' => $roles['admin_gudang_unit']->id ?? null,
+                'deskripsi' => 'Admin Gudang Unit Kerja - Hanya akses inventory unit kerjanya, tidak bisa gudang pusat',
+            ],
+            
+            // UNIT TERKAIT
+            [
+                'urutan' => 12,
                 'nama_jabatan' => 'Perencanaan',
                 'role_id' => $roles['perencanaan']->id ?? null,
                 'deskripsi' => 'Unit Perencanaan - Menindaklanjuti disposisi pimpinan',
             ],
             [
-                'urutan' => 9,
+                'urutan' => 13,
                 'nama_jabatan' => 'Pengadaan Barang',
                 'role_id' => $roles['pengadaan']->id ?? null,
                 'deskripsi' => 'Unit Pengadaan - Menindaklanjuti disposisi pimpinan',
             ],
             [
-                'urutan' => 10,
+                'urutan' => 14,
                 'nama_jabatan' => 'Keuangan/Bendahara',
                 'role_id' => $roles['keuangan']->id ?? null,
                 'deskripsi' => 'Unit Keuangan - Menindaklanjuti disposisi pimpinan',

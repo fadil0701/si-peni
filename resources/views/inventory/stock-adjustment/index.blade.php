@@ -5,7 +5,7 @@
 <div class="mb-6 flex justify-between items-center">
     <div>
         <h1 class="text-2xl font-bold text-gray-900">Stock Adjustment</h1>
-        <p class="mt-1 text-sm text-gray-600">Daftar penyesuaian stock barang</p>
+        <p class="mt-1 text-sm text-gray-600">Daftar dan riwayat penyesuaian stock barang</p>
     </div>
     @php
         use App\Helpers\PermissionHelper;
@@ -26,7 +26,7 @@
 
 <!-- Filters -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-4 mb-6">
-    <form method="GET" action="{{ route('inventory.stock-adjustment.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <form method="GET" action="{{ route('inventory.stock-adjustment.index') }}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div>
             <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select 
@@ -39,6 +39,22 @@
                 <option value="DIAJUKAN" {{ request('status') == 'DIAJUKAN' ? 'selected' : '' }}>Diajukan</option>
                 <option value="DISETUJUI" {{ request('status') == 'DISETUJUI' ? 'selected' : '' }}>Disetujui</option>
                 <option value="DITOLAK" {{ request('status') == 'DITOLAK' ? 'selected' : '' }}>Ditolak</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="id_data_barang" class="block text-sm font-medium text-gray-700 mb-1">Barang</label>
+            <select 
+                id="id_data_barang" 
+                name="id_data_barang" 
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+                <option value="">Semua Barang</option>
+                @foreach($barangs ?? [] as $barang)
+                    <option value="{{ $barang->id_data_barang }}" {{ request('id_data_barang') == $barang->id_data_barang ? 'selected' : '' }}>
+                        {{ $barang->kode_data_barang ?? '' }} - {{ $barang->nama_barang }}
+                    </option>
+                @endforeach
             </select>
         </div>
 
@@ -69,16 +85,27 @@
             >
         </div>
 
-        <div class="flex items-end">
+        <div>
+            <label for="tanggal_sampai" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Sampai</label>
+            <input 
+                type="date" 
+                id="tanggal_sampai" 
+                name="tanggal_sampai" 
+                value="{{ request('tanggal_sampai') }}"
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+        </div>
+
+        <div class="flex items-end gap-2">
             <button 
                 type="submit" 
-                class="w-full px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                class="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
                 Filter
             </button>
             <a 
                 href="{{ route('inventory.stock-adjustment.index') }}" 
-                class="ml-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
             >
                 Reset
             </a>

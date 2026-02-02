@@ -250,19 +250,87 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {{ $permintaan->tanggal_permintaan->format('d/m/Y') }}
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td class="px-6 py-4 text-right text-sm font-medium">
                             @if($currentStep)
-                                <a 
-                                    href="{{ route('transaction.approval.show', $currentStep->id) }}" 
-                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-                                    title="Detail"
-                                >
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    Detail
-                                </a>
+                                @php
+                                    $user = auth()->user();
+                                    $stepOrder = $currentStep->approvalFlow->step_order ?? 0;
+                                    $canMengetahui = $currentStatus === 'MENUNGGU' && $stepOrder == 2 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.mengetahui');
+                                    $canVerifikasi = $currentStatus === 'MENUNGGU' && $stepOrder == 3 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.verifikasi');
+                                    $canApprove = $currentStatus === 'MENUNGGU' && $stepOrder == 4 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.approve');
+                                    $canReject = $currentStatus === 'MENUNGGU' && $stepOrder == 4 && \App\Helpers\PermissionHelper::canAccess($user, 'transaction.approval.reject');
+                                @endphp
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    {{-- Detail --}}
+                                    <a 
+                                        href="{{ route('transaction.approval.show', $currentStep->id) }}" 
+                                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                        title="Detail"
+                                    >
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Detail
+                                    </a>
+                                    {{-- Kepala Unit: Mengetahui (Step 2) --}}
+                                    @if($canMengetahui)
+                                        <form method="POST" action="{{ route('transaction.approval.mengetahui', $currentStep->id) }}" class="inline" onsubmit="return confirm('Setujui permintaan sebagai Diketahui?');">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors" title="Mengetahui">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Mengetahui
+                                            </button>
+                                        </form>
+                                    @endif
+                                    {{-- Kasubbag TU: Verifikasi (Step 3) - perlu form koreksi di halaman detail --}}
+                                    @if($canVerifikasi)
+                                        <a 
+                                            href="{{ route('transaction.approval.show', $currentStep->id) }}" 
+                                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200 transition-colors"
+                                            title="Verifikasi"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                            </svg>
+                                            Verifikasi
+                                        </a>
+                                    @endif
+                                    {{-- Kepala Pusat: Setujui / Tolak (Step 4) --}}
+                                    @if($canApprove)
+                                        <form method="POST" action="{{ route('transaction.approval.approve', $currentStep->id) }}" class="inline" onsubmit="return confirm('Setujui permintaan ini?');">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors" title="Setujui">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Setujui
+                                            </button>
+                                        </form>
+                                    @endif
+                                    @if($canReject)
+                                        <details class="inline relative group/details">
+                                            <summary class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors cursor-pointer list-none" title="Tolak">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                                Tolak
+                                            </summary>
+                                            <div class="absolute right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg z-10">
+                                                <form method="POST" action="{{ route('transaction.approval.reject', $currentStep->id) }}" onsubmit="var c = this.querySelector('textarea'); if (!c.value || c.value.trim().length < 10) { alert('Catatan penolakan wajib minimal 10 karakter.'); return false; } return confirm('Yakin menolak permintaan ini?');">
+                                                    @csrf
+                                                    <label class="block text-xs font-medium text-gray-700 mb-1">Catatan penolakan (min. 10 karakter)</label>
+                                                    <textarea name="catatan" rows="3" class="block w-full px-2 py-1.5 border border-gray-300 rounded text-sm" placeholder="Alasan penolakan..." required minlength="10"></textarea>
+                                                    <div class="mt-2 flex gap-2 justify-end">
+                                                        <button type="submit" class="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700">Kirim</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </details>
+                                    @endif
+                                </div>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif

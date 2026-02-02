@@ -14,6 +14,7 @@ use App\Models\MasterPegawai;
 use App\Models\MasterGudang;
 use App\Models\MasterSatuan;
 use App\Models\DataInventory;
+use App\Models\DataStock;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
@@ -131,7 +132,7 @@ class ReturBarangController extends Controller
             'id_gudang_asal' => 'required|exists:master_gudang,id_gudang',
             'id_gudang_tujuan' => 'required|exists:master_gudang,id_gudang',
             'id_pegawai_pengirim' => 'required|exists:master_pegawai,id',
-            'status_retur' => 'required|in:DRAFT,DIAJUKAN,DITERIMA,DITOLAK',
+            'status_retur' => 'required|in:DRAFT,DIAJUKAN',
             'alasan_retur' => 'nullable|string',
             'keterangan' => 'nullable|string',
             'detail' => 'required|array|min:1',
@@ -274,7 +275,7 @@ class ReturBarangController extends Controller
             'id_gudang_asal' => 'required|exists:master_gudang,id_gudang',
             'id_gudang_tujuan' => 'required|exists:master_gudang,id_gudang',
             'id_pegawai_pengirim' => 'required|exists:master_pegawai,id',
-            'status_retur' => 'required|in:DRAFT,DIAJUKAN,DITERIMA,DITOLAK',
+            'status_retur' => 'required|in:DRAFT,DIAJUKAN',
             'alasan_retur' => 'nullable|string',
             'keterangan' => 'nullable|string',
             'detail' => 'required|array|min:1',

@@ -62,6 +62,11 @@ class PemakaianBarangController extends Controller
             $query->where('tanggal_pemakaian', '<=', $request->tanggal_sampai);
         }
         
+        // Filter berdasarkan unit kerja (untuk admin)
+        if ($request->filled('id_unit_kerja') && ($user->hasRole('admin') || $user->hasRole('admin_gudang'))) {
+            $query->where('id_unit_kerja', $request->id_unit_kerja);
+        }
+        
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 15);
         $pemakaians = $query->latest('tanggal_pemakaian')->paginate($perPage)->appends($request->query());
         
@@ -73,11 +78,13 @@ class PemakaianBarangController extends Controller
             } else {
                 $gudangs = collect([]);
             }
+            $unitKerjas = collect([]);
         } else {
             $gudangs = MasterGudang::orderBy('nama_gudang')->get();
+            $unitKerjas = MasterUnitKerja::orderBy('nama_unit_kerja')->get();
         }
         
-        return view('transaction.pemakaian-barang.index', compact('pemakaians', 'gudangs'));
+        return view('transaction.pemakaian-barang.index', compact('pemakaians', 'gudangs', 'unitKerjas'));
     }
 
     /**
@@ -87,10 +94,11 @@ class PemakaianBarangController extends Controller
     {
         $user = Auth::user();
         
-        // Ambil inventory yang tersedia di gudang unit (untuk pemakaian)
+        // Ambil inventory yang tersedia di gudang unit (untuk pemakaian), hanya yang masih ada stok
         $query = DataInventory::with(['dataBarang', 'gudang', 'satuan'])
             ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI'])
-            ->where('status_inventory', 'AKTIF');
+            ->where('status_inventory', 'AKTIF')
+            ->where('qty_input', '>', 0);
         
         // Filter berdasarkan unit kerja untuk pegawai
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
@@ -198,12 +206,16 @@ class PemakaianBarangController extends Controller
                 ]);
             }
             
-            // Jika status DIAJUKAN dan user adalah admin, langsung approve
+            // Jika status DIAJUKAN dan user adalah admin, coba approve; jika gagal (validasi stok), tampilkan error
             if ($validated['status_pemakaian'] == 'DIAJUKAN' && Auth::user()->hasRole('admin')) {
-                $this->approve($pemakaian->id_pemakaian);
+                $response = $this->approve($pemakaian->id_pemakaian);
+                if (session()->has('error')) {
+                    DB::rollBack();
+                    return redirect()->route('transaction.pemakaian-barang.show', $pemakaian->id_pemakaian)
+                        ->with('error', session('error'));
+                }
                 DB::commit();
-                return redirect()->route('transaction.pemakaian-barang.show', $pemakaian->id_pemakaian)
-                    ->with('success', 'Pemakaian barang berhasil dibuat dan disetujui.');
+                return $response;
             }
             
             DB::commit();
@@ -353,12 +365,16 @@ class PemakaianBarangController extends Controller
                 ]);
             }
             
-            // Jika status DIAJUKAN dan user adalah admin, langsung approve
+            // Jika status DIAJUKAN dan user adalah admin, coba approve; jika gagal (validasi stok), tampilkan error
             if ($validated['status_pemakaian'] == 'DIAJUKAN' && Auth::user()->hasRole('admin')) {
-                $this->approve($pemakaian->id_pemakaian);
+                $response = $this->approve($pemakaian->id_pemakaian);
+                if (session()->has('error')) {
+                    DB::rollBack();
+                    return redirect()->route('transaction.pemakaian-barang.show', $pemakaian->id_pemakaian)
+                        ->with('error', session('error'));
+                }
                 DB::commit();
-                return redirect()->route('transaction.pemakaian-barang.show', $pemakaian->id_pemakaian)
-                    ->with('success', 'Pemakaian barang berhasil diperbarui dan disetujui.');
+                return $response;
             }
             
             DB::commit();
@@ -405,16 +421,47 @@ class PemakaianBarangController extends Controller
      */
     public function approve(string $id)
     {
-        // Hanya admin dan kepala_pusat yang bisa approve
-        if (!Auth::user()->hasAnyRole(['admin', 'kepala_pusat'])) {
+        // Hanya admin dan kepala_unit yang bisa approve (sesuai route middleware)
+        if (!Auth::user()->hasAnyRole(['admin', 'kepala_unit'])) {
             abort(403, 'Unauthorized');
         }
         
-        $pemakaian = PemakaianBarang::with(['detailPemakaian.inventory', 'gudang'])->findOrFail($id);
+        $pemakaian = PemakaianBarang::with(['detailPemakaian.inventory.dataBarang', 'gudang'])->findOrFail($id);
         
         // Hanya bisa approve jika status DIAJUKAN
         if ($pemakaian->status_pemakaian != 'DIAJUKAN') {
             return back()->with('error', 'Hanya pemakaian yang sudah diajukan yang dapat disetujui.');
+        }
+        
+        // Validasi stok sebelum approve: per inventory qty_pemakaian <= qty_input, dan aggregate per barang <= DataStock qty_akhir
+        foreach ($pemakaian->detailPemakaian as $detail) {
+            $inventory = $detail->inventory;
+            if (!$inventory) {
+                return back()->with('error', 'Data inventory tidak ditemukan untuk salah satu detail.');
+            }
+            if ($detail->qty_pemakaian > $inventory->qty_input) {
+                return back()->with('error', 'Qty pemakaian untuk ' . ($inventory->dataBarang->nama_barang ?? 'barang') . ' melebihi stok tersedia di inventory (' . number_format($inventory->qty_input, 2) . ').');
+            }
+        }
+        $groupedByBarang = [];
+        foreach ($pemakaian->detailPemakaian as $detail) {
+            $idBarang = $detail->inventory->id_data_barang;
+            if (!isset($groupedByBarang[$idBarang])) {
+                $groupedByBarang[$idBarang] = 0;
+            }
+            $groupedByBarang[$idBarang] += $detail->qty_pemakaian;
+        }
+        foreach ($groupedByBarang as $idDataBarang => $totalQty) {
+            $stock = DataStock::where('id_data_barang', $idDataBarang)
+                ->where('id_gudang', $pemakaian->id_gudang)
+                ->first();
+            if (!$stock) {
+                return back()->with('error', 'Stok gudang tidak ditemukan untuk salah satu barang.');
+            }
+            if ($totalQty > $stock->qty_akhir) {
+                $namaBarang = $pemakaian->detailPemakaian->first(fn($d) => $d->inventory->id_data_barang == $idDataBarang)?->inventory->dataBarang->nama_barang ?? 'Barang';
+                return back()->with('error', 'Total pemakaian ' . $namaBarang . ' (' . number_format($totalQty, 2) . ') melebihi stok gudang (' . number_format($stock->qty_akhir, 2) . ').');
+            }
         }
         
         DB::beginTransaction();
@@ -474,8 +521,8 @@ class PemakaianBarangController extends Controller
      */
     public function reject(Request $request, string $id)
     {
-        // Hanya admin dan kepala_pusat yang bisa reject
-        if (!Auth::user()->hasAnyRole(['admin', 'kepala_pusat'])) {
+        // Hanya admin dan kepala_unit yang bisa reject (sesuai route middleware)
+        if (!Auth::user()->hasAnyRole(['admin', 'kepala_unit'])) {
             abort(403, 'Unauthorized');
         }
         

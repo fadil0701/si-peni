@@ -341,26 +341,40 @@
                     </div>
 
                     <div id="no_batch_field" style="display: {{ in_array(old('jenis_inventory'), ['PERSEDIAAN', 'FARMASI']) ? 'block' : 'none' }};">
-                        <label for="no_batch" class="block text-sm font-medium text-gray-700 mb-2">No Batch (untuk PERSEDIAAN/FARMASI)</label>
+                        <label for="no_batch" class="block text-sm font-medium text-gray-700 mb-2">
+                            No Batch (untuk PERSEDIAAN/FARMASI)
+                            <span id="no_batch_required_star" class="text-red-500" style="display: {{ old('jenis_inventory') == 'FARMASI' ? 'inline' : 'none' }};">*</span>
+                            <span class="text-xs text-gray-500 block mt-0.5">Wajib diisi jika jenis Farmasi</span>
+                        </label>
                         <input 
                             type="text" 
                             id="no_batch" 
                             name="no_batch" 
                             value="{{ old('no_batch') }}"
                             placeholder="Masukkan nomor batch"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('no_batch') border-red-500 @enderror"
                         >
+                        @error('no_batch')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div id="tanggal_kedaluwarsa_field" style="display: {{ in_array(old('jenis_inventory'), ['PERSEDIAAN', 'FARMASI']) ? 'block' : 'none' }};">
-                        <label for="tanggal_kedaluwarsa" class="block text-sm font-medium text-gray-700 mb-2">Tanggal Kedaluwarsa</label>
+                        <label for="tanggal_kedaluwarsa" class="block text-sm font-medium text-gray-700 mb-2">
+                            Tanggal Kedaluwarsa
+                            <span id="tanggal_kedaluwarsa_required_star" class="text-red-500" style="display: {{ old('jenis_inventory') == 'FARMASI' ? 'inline' : 'none' }};">*</span>
+                            <span class="text-xs text-gray-500 block mt-0.5">Wajib diisi jika jenis Farmasi</span>
+                        </label>
                         <input 
                             type="date" 
                             id="tanggal_kedaluwarsa" 
                             name="tanggal_kedaluwarsa" 
                             value="{{ old('tanggal_kedaluwarsa') }}"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('tanggal_kedaluwarsa') border-red-500 @enderror"
                         >
+                        @error('tanggal_kedaluwarsa')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="sm:col-span-2">
@@ -515,12 +529,35 @@
                 // Clear values untuk field yang disembunyikan
                 document.getElementById('no_batch').value = '';
                 document.getElementById('tanggal_kedaluwarsa').value = '';
+                document.getElementById('no_batch').removeAttribute('required');
+                document.getElementById('tanggal_kedaluwarsa').removeAttribute('required');
+                const noBatchStar = document.getElementById('no_batch_required_star');
+                const tanggalKedaluwarsaStar = document.getElementById('tanggal_kedaluwarsa_required_star');
+                if (noBatchStar) noBatchStar.style.display = 'none';
+                if (tanggalKedaluwarsaStar) tanggalKedaluwarsaStar.style.display = 'none';
             } else if (jenisInventory === 'PERSEDIAAN' || jenisInventory === 'FARMASI') {
                 // PERSEDIAAN/FARMASI: sembunyikan tipe dan no_seri, tampilkan no_batch dan tanggal_kedaluwarsa
                 tipeField.style.display = 'none';
                 noSeriField.style.display = 'none';
                 noBatchField.style.display = 'block';
                 tanggalKedaluwarsaField.style.display = 'block';
+                
+                // FARMASI: No Batch dan Tanggal Kedaluwarsa wajib
+                const noBatchInput = document.getElementById('no_batch');
+                const tanggalKedaluwarsaInput = document.getElementById('tanggal_kedaluwarsa');
+                const noBatchStar = document.getElementById('no_batch_required_star');
+                const tanggalKedaluwarsaStar = document.getElementById('tanggal_kedaluwarsa_required_star');
+                if (jenisInventory === 'FARMASI') {
+                    if (noBatchInput) noBatchInput.setAttribute('required', 'required');
+                    if (tanggalKedaluwarsaInput) tanggalKedaluwarsaInput.setAttribute('required', 'required');
+                    if (noBatchStar) noBatchStar.style.display = 'inline';
+                    if (tanggalKedaluwarsaStar) tanggalKedaluwarsaStar.style.display = 'inline';
+                } else {
+                    if (noBatchInput) noBatchInput.removeAttribute('required');
+                    if (tanggalKedaluwarsaInput) tanggalKedaluwarsaInput.removeAttribute('required');
+                    if (noBatchStar) noBatchStar.style.display = 'none';
+                    if (tanggalKedaluwarsaStar) tanggalKedaluwarsaStar.style.display = 'none';
+                }
                 
                 // Clear values untuk field yang disembunyikan
                 document.getElementById('tipe').value = '';

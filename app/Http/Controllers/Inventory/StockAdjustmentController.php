@@ -52,6 +52,11 @@ class StockAdjustmentController extends Controller
             $query->where('id_gudang', $request->id_gudang);
         }
         
+        // Filter berdasarkan barang jika ada
+        if ($request->filled('id_data_barang')) {
+            $query->where('id_data_barang', $request->id_data_barang);
+        }
+        
         // Filter berdasarkan tanggal jika ada
         if ($request->filled('tanggal_dari')) {
             $query->where('tanggal_adjustment', '>=', $request->tanggal_dari);
@@ -75,7 +80,14 @@ class StockAdjustmentController extends Controller
             $gudangs = MasterGudang::orderBy('nama_gudang')->get();
         }
         
-        return view('inventory.stock-adjustment.index', compact('adjustments', 'gudangs'));
+        // Daftar barang untuk filter (barang yang punya stock di gudang Persediaan/Farmasi)
+        $barangs = MasterDataBarang::whereHas('dataStock', function($q) {
+            $q->whereHas('gudang', function($g) {
+                $g->whereIn('kategori_gudang', ['PERSEDIAAN', 'FARMASI']);
+            });
+        })->orderBy('nama_barang')->get(['id_data_barang', 'kode_data_barang', 'nama_barang']);
+        
+        return view('inventory.stock-adjustment.index', compact('adjustments', 'gudangs', 'barangs'));
     }
 
     /**
@@ -88,16 +100,14 @@ class StockAdjustmentController extends Controller
             abort(403, 'Unauthorized');
         }
         
-        // Ambil data stock yang tersedia
+        // Ambil data stock yang tersedia (hanya gudang Persediaan & Farmasi)
         $user = Auth::user();
         $query = DataStock::with(['dataBarang', 'gudang', 'satuan'])
-            ->whereHas('dataBarang', function($q) {
-                $q->whereHas('dataInventory', function($invQ) {
-                    $invQ->whereIn('jenis_inventory', ['PERSEDIAAN', 'FARMASI']);
-                });
+            ->whereHas('gudang', function($q) {
+                $q->whereIn('kategori_gudang', ['PERSEDIAAN', 'FARMASI']);
             });
         
-        // Filter berdasarkan unit kerja untuk pegawai
+        // Filter berdasarkan unit kerja untuk kepala_unit dan pegawai
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {

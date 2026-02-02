@@ -60,8 +60,8 @@
                 class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
                 <option value="">Semua Jenis</option>
-                <option value="BARANG" {{ request('jenis') == 'BARANG' ? 'selected' : '' }}>Barang</option>
-                <option value="ASET" {{ request('jenis') == 'ASET' ? 'selected' : '' }}>Aset</option>
+                <option value="PERSEDIAAN" {{ request('jenis') == 'PERSEDIAAN' ? 'selected' : '' }}>Persediaan</option>
+                <option value="FARMASI" {{ request('jenis') == 'FARMASI' ? 'selected' : '' }}>Farmasi</option>
             </select>
         </div>
 
@@ -147,6 +147,17 @@
         </div>
     </div>
 @endif
+
+@php
+    use App\Helpers\PermissionHelper;
+    $userPermintaanIndex = auth()->user();
+    $canEditPermintaan = PermissionHelper::canAccess($userPermintaanIndex, 'transaction.permintaan-barang.edit');
+    $canDeletePermintaan = PermissionHelper::canAccess($userPermintaanIndex, 'transaction.permintaan-barang.destroy');
+@endphp
+<style>
+    .btn-aksi-permintaan { cursor: pointer; }
+    .btn-aksi-permintaan:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
 
 <!-- Table Card -->
 <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
@@ -235,48 +246,64 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div class="flex items-center justify-end space-x-2">
+                            <div class="flex items-center justify-end gap-1">
                                 <a 
                                     href="{{ route('transaction.permintaan-barang.show', $permintaan->id_permintaan) }}" 
-                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                                    class="btn-aksi-permintaan inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
                                     title="Detail"
                                 >
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
-                                    Detail
                                 </a>
                                 @if($permintaan->status_permintaan == 'DRAFT')
+                                    <form 
+                                        action="{{ route('transaction.permintaan-barang.ajukan', $permintaan->id_permintaan) }}" 
+                                        method="POST" 
+                                        class="inline cursor-pointer"
+                                        onsubmit="return confirm('Apakah Anda yakin ingin mengajukan permintaan ini?');"
+                                    >
+                                        @csrf
+                                        <button 
+                                            type="submit" 
+                                            class="btn-aksi-permintaan cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 transition-colors border-0"
+                                            title="Ajukan"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </button>
+                                    </form>
                                     <a 
                                         href="{{ route('transaction.permintaan-barang.edit', $permintaan->id_permintaan) }}" 
-                                        class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 transition-colors"
+                                        class="btn-aksi-permintaan inline-flex items-center justify-center w-8 h-8 rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors"
                                         title="Edit"
                                     >
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
-                                        Edit
                                     </a>
+                                    @if($canDeletePermintaan)
                                     <form 
                                         action="{{ route('transaction.permintaan-barang.destroy', $permintaan->id_permintaan) }}" 
                                         method="POST" 
-                                        class="inline" 
+                                        class="inline cursor-pointer" 
                                         onsubmit="return confirm('Apakah Anda yakin ingin menghapus permintaan ini?');"
                                     >
                                         @csrf
                                         @method('DELETE')
                                         <button 
                                             type="submit" 
-                                            class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
+                                            class="btn-aksi-permintaan cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 transition-colors border-0"
                                             title="Hapus"
                                         >
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
-                                            Hapus
                                         </button>
                                     </form>
+                                    @endif
                                 @endif
                             </div>
                         </td>

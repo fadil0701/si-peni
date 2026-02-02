@@ -106,9 +106,10 @@ class KartuInventarisRuanganController extends Controller
             abort(403, 'Unauthorized');
         }
         
-        // Ambil register aset yang belum punya KIR atau bisa dipindahkan
+        // Ambil register aset yang belum punya KIR (belum tercatat di kartu inventaris ruangan)
         $registerAsets = RegisterAset::with(['inventory.dataBarang', 'unitKerja'])
             ->where('status_aset', 'AKTIF')
+            ->whereDoesntHave('kartuInventarisRuangan')
             ->orderBy('nomor_register')
             ->get();
         
@@ -145,15 +146,14 @@ class KartuInventarisRuanganController extends Controller
             return back()->withErrors(['id_register_aset' => 'Register aset ini sudah memiliki KIR. Gunakan Mutasi Aset untuk memindahkan.'])->withInput();
         }
         
-        // Update inventory_item untuk set id_ruangan
         $registerAset = RegisterAset::findOrFail($validated['id_register_aset']);
+        // Sinkronkan ruangan ke Register Aset dan InventoryItem
+        $registerAset->update(['id_ruangan' => $validated['id_ruangan']]);
         if ($registerAset->inventory) {
-            // Update inventory item yang terkait
             \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
                 ->update(['id_ruangan' => $validated['id_ruangan']]);
         }
         
-        // Buat KIR
         $kir = KartuInventarisRuangan::create($validated);
         
         return redirect()->route('asset.kartu-inventaris-ruangan.show', $kir->id_kir)
@@ -179,7 +179,8 @@ class KartuInventarisRuanganController extends Controller
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
-                if ($kir->ruangan->id_unit_kerja != $pegawai->id_unit_kerja) {
+                $idUnitKerjaKir = $kir->ruangan?->id_unit_kerja;
+                if ($idUnitKerjaKir === null || $idUnitKerjaKir != $pegawai->id_unit_kerja) {
                     abort(403, 'Unauthorized - Anda hanya dapat melihat KIR dari unit kerja Anda sendiri');
                 }
             } else {
@@ -207,7 +208,8 @@ class KartuInventarisRuanganController extends Controller
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
-                if ($kir->ruangan->id_unit_kerja != $pegawai->id_unit_kerja) {
+                $idUnitKerjaKir = $kir->ruangan?->id_unit_kerja;
+                if ($idUnitKerjaKir === null || $idUnitKerjaKir != $pegawai->id_unit_kerja) {
                     abort(403, 'Unauthorized - Anda hanya dapat mengedit KIR dari unit kerja Anda sendiri');
                 }
             } else {
@@ -241,7 +243,8 @@ class KartuInventarisRuanganController extends Controller
         if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasRole('admin')) {
             $pegawai = MasterPegawai::where('user_id', $user->id)->first();
             if ($pegawai && $pegawai->id_unit_kerja) {
-                if ($kir->ruangan->id_unit_kerja != $pegawai->id_unit_kerja) {
+                $idUnitKerjaKir = $kir->ruangan?->id_unit_kerja;
+                if ($idUnitKerjaKir === null || $idUnitKerjaKir != $pegawai->id_unit_kerja) {
                     abort(403, 'Unauthorized - Anda hanya dapat mengupdate KIR dari unit kerja Anda sendiri');
                 }
             } else {
@@ -256,16 +259,18 @@ class KartuInventarisRuanganController extends Controller
             'tanggal_penempatan' => 'required|date',
         ]);
         
-        // Jika ruangan berubah, update inventory_item juga
+        // Jika ruangan berubah, sinkronkan ke Register Aset dan InventoryItem
         if ($kir->id_ruangan != $validated['id_ruangan']) {
             $registerAset = $kir->registerAset;
-            if ($registerAset && $registerAset->inventory) {
-                \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
-                    ->update(['id_ruangan' => $validated['id_ruangan']]);
+            if ($registerAset) {
+                $registerAset->update(['id_ruangan' => $validated['id_ruangan']]);
+                if ($registerAset->inventory) {
+                    \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
+                        ->update(['id_ruangan' => $validated['id_ruangan']]);
+                }
             }
         }
         
-        // Update KIR
         $kir->update($validated);
         
         return redirect()->route('asset.kartu-inventaris-ruangan.show', $kir->id_kir)
@@ -283,12 +288,15 @@ class KartuInventarisRuanganController extends Controller
         }
         
         $kir = KartuInventarisRuangan::findOrFail($id);
-        
-        // Update inventory_item untuk remove id_ruangan
         $registerAset = $kir->registerAset;
-        if ($registerAset && $registerAset->inventory) {
-            \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
-                ->update(['id_ruangan' => null]);
+        
+        // Lepas ruangan dari Register Aset dan InventoryItem
+        if ($registerAset) {
+            $registerAset->update(['id_ruangan' => null]);
+            if ($registerAset->inventory) {
+                \App\Models\InventoryItem::where('id_inventory', $registerAset->inventory->id_inventory)
+                    ->update(['id_ruangan' => null]);
+            }
         }
         
         $kir->delete();
