@@ -42,7 +42,7 @@ Dokumen ini berisi rencana langkah selanjutnya untuk:
 - ⚠️ Laporan per Modul (perlu dilengkapi)
 
 ### ❌ Fitur yang Belum Ada / Perlu Verifikasi
-- ❌ Perencanaan - Rekap Tahunan
+- ✅ Perencanaan - Rekap Tahunan & Status Perencanaan (RKU index, rekap per Program/Kegiatan/Sub Kegiatan) (Feb 2026)
 - ❌ Pengadaan - Proses & Kontrak/SP/PO
 - ❌ Keuangan - Verifikasi Dokumen & Realisasi Anggaran
 - ❌ Pemeliharaan - Riwayat Pemeliharaan
@@ -158,47 +158,51 @@ Dokumen ini berisi rencana langkah selanjutnya untuk:
 ### 3. Fitur Perencanaan
 
 #### 3.1 Rekap Perencanaan Tahunan
-**Status:** ❌ Belum Diimplementasi
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Planning/RkuController.php`, `resources/views/planning/rekap-tahunan.blade.php`
 
 **Tugas:**
-- [ ] Buat method `rekapTahunan()` di `RkuController` atau controller baru
-- [ ] Buat view untuk rekap perencanaan tahunan
-- [ ] Tambahkan filter berdasarkan tahun
-- [ ] Tampilkan data per Program, Kegiatan, Sub Kegiatan
-- [ ] Tambahkan export Excel
-- [ ] Tambahkan grafik/chart jika diperlukan
+- [x] Buat method `rekapTahunan()` di `RkuController`
+- [x] Buat view untuk rekap perencanaan tahunan (filter tahun)
+- [x] Tambahkan filter berdasarkan tahun
+- [x] Tampilkan data per Program, Kegiatan, Sub Kegiatan (agregasi jumlah RKU & total anggaran)
+- [ ] Tambahkan export Excel (opsional)
+- [ ] Tambahkan grafik/chart jika diperlukan (opsional)
 
-**Estimasi:** 3-4 hari
+**Estimasi:** Selesai
 
 ---
 
 #### 3.2 Status Perencanaan
-**Status:** ❌ Belum Diimplementasi
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Planning/RkuController.php`, `resources/views/planning/rku/index.blade.php`, `show.blade.php`
 
 **Tugas:**
-- [ ] Buat view untuk status perencanaan
-- [ ] Tampilkan status semua RKU
-- [ ] Tambahkan filter berdasarkan status
-- [ ] Integrasi dengan approval flow
+- [x] Buat view untuk status perencanaan (index RKU)
+- [x] Tampilkan status semua RKU dengan pagination
+- [x] Tambahkan filter berdasarkan status, tahun anggaran, unit kerja
+- [ ] Integrasi dengan approval flow (opsional, tahap berikutnya)
 
-**Estimasi:** 2-3 hari
+**Estimasi:** Selesai
 
 ---
 
 ### 4. Fitur Pengadaan
 
-#### 4.1 Proses Pengadaan
-**Status:** ❌ Belum Diimplementasi
+#### 4.1 Proses Pengadaan & Paket Pengadaan
+**Status:** ✅ Selesai (Feb 2026)  
+**File:** `app/Http/Controllers/Procurement/PaketPengadaanController.php`, `ProsesPengadaanController.php`, views `procurement/paket-pengadaan/*`, `procurement/proses-pengadaan/index.blade.php`
 
 **Tugas:**
-- [ ] Buat controller `ProsesPengadaanController`
-- [ ] Buat migration untuk `proses_pengadaan` jika belum ada
-- [ ] Buat views: index, create, edit, show
-- [ ] Tambahkan routes di `web.php`
-- [ ] Integrasi dengan Paket Pengadaan
-- [ ] Tambahkan workflow proses pengadaan
+- [x] Paket Pengadaan: CRUD lengkap (index, create, store, show, edit, update, destroy) dengan filter status, metode, sub kegiatan
+- [x] Buat controller `ProsesPengadaanController` (index: daftar paket status DIAJUKAN/DIPROSES, show: redirect ke paket)
+- [x] Tambahkan routes: `procurement/proses-pengadaan`, `procurement/paket-pengadaan` (resource)
+- [x] Integrasi dengan Paket Pengadaan (Proses Pengadaan = view paket yang sedang diproses)
+- [x] Menu sidebar: Proses Pengadaan & Paket Pengadaan di modul Pengadaan
+- [ ] Migration untuk tahap proses pengadaan per paket (opsional, tahap berikutnya)
+- [ ] Workflow tahap (pengumuman, evaluasi, PO, dll) opsional
 
-**Estimasi:** 4-5 hari
+**Estimasi:** Selesai
 
 ---
 

@@ -38,6 +38,9 @@
                         $canAccessApproval = isset($accessibleMenus['approval']);
                         $canAccessPengurusBarang = isset($accessibleMenus['pengurus-barang']);
                         $canAccessAsset = isset($accessibleMenus['aset-kir']);
+                        $canAccessPlanning = isset($accessibleMenus['planning']);
+                        $canAccessProcurement = isset($accessibleMenus['procurement']);
+                        $canAccessFinance = isset($accessibleMenus['finance']);
                         $canAccessMaintenance = isset($accessibleMenus['maintenance']);
                         $canAccessReports = isset($accessibleMenus['laporan']);
                     @endphp
@@ -113,6 +116,9 @@
                                 @endif
                                 @if(isset($accessibleMenus['inventory']['submenus']['data-inventory']))
                                 <li><a href="{{ route('inventory.data-inventory.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Data Inventory</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['inventory']['submenus']['stock-adjustment']))
+                                <li><a href="{{ route('inventory.stock-adjustment.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Stock Adjustment</a></li>
                                 @endif
                             </ul>
                         </li>
@@ -200,12 +206,86 @@
                         @endif
                         @if($canAccessAsset)
                         <li>
-                            <a href="{{ route('asset.register-aset.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800">
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('aset-kir')">
                                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 Aset & KIR
-                            </a>
+                                <svg id="aset-kir-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="aset-kir-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['aset-kir']['submenus']['register-aset']))
+                                <li><a href="{{ route('asset.register-aset.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Register Aset</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['aset-kir']['submenus']['kartu-inventaris-ruangan']))
+                                <li><a href="{{ route('asset.kartu-inventaris-ruangan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Kartu Inventaris Ruangan</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['aset-kir']['submenus']['mutasi-aset']))
+                                <li><a href="{{ route('asset.mutasi-aset.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Mutasi Aset</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
+                        @if($canAccessPlanning)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('planning')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Perencanaan
+                                <svg id="planning-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="planning-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['planning']['submenus']['rku']))
+                                <li><a href="{{ route('planning.rku.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Status RKU</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['planning']['submenus']['rekap-tahunan']))
+                                <li><a href="{{ route('planning.rekap-tahunan') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Rekap Tahunan</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
+                        @if($canAccessProcurement)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('procurement')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                Pengadaan
+                                <svg id="procurement-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="procurement-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['procurement']['submenus']['proses-pengadaan']))
+                                <li><a href="{{ route('procurement.proses-pengadaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Proses Pengadaan</a></li>
+                                @endif
+                                @if(isset($accessibleMenus['procurement']['submenus']['paket-pengadaan']))
+                                <li><a href="{{ route('procurement.paket-pengadaan.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Paket Pengadaan</a></li>
+                                @endif
+                            </ul>
+                        </li>
+                        @endif
+                        @if($canAccessFinance)
+                        <li>
+                            <div class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 cursor-pointer" onclick="toggleSubmenu('finance')">
+                                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Keuangan
+                                <svg id="finance-arrow" class="w-4 h-4 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                            <ul id="finance-submenu" class="hidden pl-4 mt-2 space-y-1">
+                                @if(isset($accessibleMenus['finance']['submenus']['pembayaran']))
+                                <li><a href="{{ route('finance.pembayaran.index') }}" class="flex items-center px-4 py-2 rounded-lg text-blue-200 hover:bg-blue-800 text-sm">Pembayaran</a></li>
+                                @endif
+                            </ul>
                         </li>
                         @endif
                         @if($canAccessMaintenance)

@@ -396,6 +396,7 @@ class PermissionHelper
                 'submenus' => [
                     'data-stock' => ['route' => 'inventory.data-stock.index', 'permission' => 'inventory.data-stock.index'],
                     'data-inventory' => ['route' => 'inventory.data-inventory.index', 'permission' => 'inventory.data-inventory.index'],
+                    'stock-adjustment' => ['route' => 'inventory.stock-adjustment.index', 'permission' => 'inventory.stock-adjustment.index'],
                 ],
             ],
             'permintaan' => [
@@ -430,8 +431,36 @@ class PermissionHelper
                 ],
             ],
             'aset-kir' => [
-                'route' => 'asset.register-aset.index', 
-                'permission' => 'asset.register-aset.index'
+                'route' => null,
+                'permission' => 'asset.register-aset.index',
+                'submenus' => [
+                    'register-aset' => ['route' => 'asset.register-aset.index', 'permission' => 'asset.register-aset.index'],
+                    'kartu-inventaris-ruangan' => ['route' => 'asset.kartu-inventaris-ruangan.index', 'permission' => 'asset.kartu-inventaris-ruangan.index'],
+                    'mutasi-aset' => ['route' => 'asset.mutasi-aset.index', 'permission' => 'asset.mutasi-aset.index'],
+                ],
+            ],
+            'planning' => [
+                'route' => null,
+                'permission' => 'planning.*',
+                'submenus' => [
+                    'rku' => ['route' => 'planning.rku.index', 'permission' => 'planning.rku.index'],
+                    'rekap-tahunan' => ['route' => 'planning.rekap-tahunan', 'permission' => 'planning.rekap-tahunan'],
+                ],
+            ],
+            'procurement' => [
+                'route' => null,
+                'permission' => 'procurement.*',
+                'submenus' => [
+                    'proses-pengadaan' => ['route' => 'procurement.proses-pengadaan.index', 'permission' => 'procurement.proses-pengadaan.index'],
+                    'paket-pengadaan' => ['route' => 'procurement.paket-pengadaan.index', 'permission' => 'procurement.paket-pengadaan.index'],
+                ],
+            ],
+            'finance' => [
+                'route' => null,
+                'permission' => 'finance.*',
+                'submenus' => [
+                    'pembayaran' => ['route' => 'finance.pembayaran.index', 'permission' => 'finance.pembayaran.index'],
+                ],
             ],
             'maintenance' => [
                 'route' => null,
@@ -472,6 +501,9 @@ class PermissionHelper
                 'approval' => null,
                 'pengurus-barang' => null,
                 'aset-kir' => 'asset',
+                'planning' => 'planning',
+                'procurement' => 'procurement',
+                'finance' => 'finance',
                 'maintenance' => 'maintenance',
                 'laporan' => 'reports',
             ];

@@ -29,6 +29,7 @@ use App\Http\Controllers\Transaction\PemakaianBarangController;
 use App\Http\Controllers\Asset\RegisterAsetController;
 use App\Http\Controllers\Planning\RkuController;
 use App\Http\Controllers\Procurement\PaketPengadaanController;
+use App\Http\Controllers\Procurement\ProsesPengadaanController;
 use App\Http\Controllers\Finance\PembayaranController;
 use App\Http\Controllers\Report\ReportController;
 
@@ -211,11 +212,14 @@ Route::middleware(['auth'])->group(function () {
     
     // Planning - Admin only
     Route::prefix('planning')->name('planning.')->middleware(['role:admin'])->group(function () {
+        Route::get('rekap-tahunan', [RkuController::class, 'rekapTahunan'])->name('rekap-tahunan');
         Route::resource('rku', RkuController::class);
     });
     
     // Procurement - Admin only
     Route::prefix('procurement')->name('procurement.')->middleware(['role:admin'])->group(function () {
+        Route::get('proses-pengadaan', [ProsesPengadaanController::class, 'index'])->name('proses-pengadaan.index');
+        Route::get('proses-pengadaan/{id}', [ProsesPengadaanController::class, 'show'])->name('proses-pengadaan.show');
         Route::resource('paket-pengadaan', PaketPengadaanController::class);
     });
     
