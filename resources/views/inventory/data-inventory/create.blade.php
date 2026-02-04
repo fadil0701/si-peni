@@ -104,6 +104,24 @@
                         @enderror
                     </div>
 
+                    <div id="jenis_barang_field" style="display: {{ in_array(old('jenis_inventory'), ['ASET','PERSEDIAAN','FARMASI']) ? 'block' : 'none' }};">
+                        <label for="jenis_barang" class="block text-sm font-medium text-gray-700 mb-2">
+                            Jenis Barang <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="jenis_barang" 
+                            name="jenis_barang" 
+                            data-current-value="{{ old('jenis_barang') }}"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('jenis_barang') border-red-500 @enderror"
+                        >
+                            <option value="">Pilih Jenis Barang</option>
+                            {{-- Options diisi via JavaScript berdasarkan jenis_inventory --}}
+                        </select>
+                        @error('jenis_barang')
+                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <div>
                         <label for="id_gudang" class="block text-sm font-medium text-gray-700 mb-2">
                             Gudang <span class="text-red-500">*</span>
@@ -508,16 +526,65 @@
         }
     }
 
+    // Opsi jenis barang per jenis inventory
+    const JENIS_BARANG_OPTIONS = {
+        'ASET': [
+            { value: 'ALKES', label: 'ALKES' },
+            { value: 'NON ALKES', label: 'NON ALKES' }
+        ],
+        'FARMASI': [
+            { value: 'OBAT', label: 'OBAT' },
+            { value: 'Vaksin', label: 'Vaksin' },
+            { value: 'BHP', label: 'BHP' },
+            { value: 'BMHP', label: 'BMHP' },
+            { value: 'REAGEN', label: 'REAGEN' },
+            { value: 'ALKES', label: 'ALKES' }
+        ],
+        'PERSEDIAAN': [
+            { value: 'ATK', label: 'ATK' },
+            { value: 'ART', label: 'ART' },
+            { value: 'CETAKAN UMUM', label: 'CETAKAN UMUM' },
+            { value: 'CETAK KHUSUS', label: 'CETAK KHUSUS' }
+        ]
+    };
+
     // Toggle field visibility berdasarkan jenis inventory
     document.addEventListener('DOMContentLoaded', function() {
         const jenisInventorySelect = document.getElementById('jenis_inventory');
+        const jenisBarangField = document.getElementById('jenis_barang_field');
+        const jenisBarangSelect = document.getElementById('jenis_barang');
         const tipeField = document.getElementById('tipe_field');
         const noSeriField = document.getElementById('no_seri_field');
         const noBatchField = document.getElementById('no_batch_field');
         const tanggalKedaluwarsaField = document.getElementById('tanggal_kedaluwarsa_field');
 
+        function updateJenisBarangOptions() {
+            const jenisInventory = jenisInventorySelect.value;
+            const options = JENIS_BARANG_OPTIONS[jenisInventory] || [];
+            const currentValue = jenisBarangSelect.getAttribute('data-current-value') || jenisBarangSelect.value || '';
+
+            jenisBarangSelect.innerHTML = '<option value="">Pilih Jenis Barang</option>';
+            options.forEach(function(opt) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (opt.value === currentValue) option.selected = true;
+                jenisBarangSelect.appendChild(option);
+            });
+
+            if (options.length > 0) {
+                jenisBarangField.style.display = 'block';
+                jenisBarangSelect.setAttribute('required', 'required');
+            } else {
+                jenisBarangField.style.display = 'none';
+                jenisBarangSelect.removeAttribute('required');
+                jenisBarangSelect.value = '';
+            }
+        }
+
         function toggleFields() {
             const jenisInventory = jenisInventorySelect.value;
+            updateJenisBarangOptions();
 
             if (jenisInventory === 'ASET') {
                 // ASET: tampilkan tipe dan no_seri, sembunyikan no_batch dan tanggal_kedaluwarsa
@@ -576,6 +643,68 @@
         
         // Jalankan saat halaman dimuat untuk set initial state
         toggleFields();
+        
+        // Initialize Choices.js untuk select yang memiliki banyak opsi
+        // Tunggu sampai Choices.js ter-load dan DOM ready
+        function initChoicesForDataBarang() {
+            if (typeof Choices === 'undefined') {
+                console.log('Choices.js belum ter-load, menunggu...');
+                setTimeout(initChoicesForDataBarang, 100);
+                return;
+            }
+            
+            const dataBarangSelect = document.getElementById('id_data_barang');
+            if (dataBarangSelect) {
+                console.log('Found id_data_barang select, initializing Choices.js...');
+                
+                // Cek apakah sudah diinisialisasi
+                if (dataBarangSelect.choicesInstance) {
+                    try {
+                        dataBarangSelect.choicesInstance.destroy();
+                    } catch (e) {
+                        // Ignore
+                    }
+                }
+                
+                // Hitung opsi
+                const optionCount = Array.from(dataBarangSelect.options).filter(opt => opt.value !== '').length;
+                console.log('id_data_barang has', optionCount, 'options');
+                
+                if (optionCount > 1) {
+                    try {
+                        const choicesInstance = new Choices(dataBarangSelect, {
+                            searchEnabled: true,
+                            searchChoices: true,
+                            itemSelectText: '',
+                            placeholder: true,
+                            placeholderValue: 'Pilih Data Barang',
+                            searchPlaceholderValue: 'Cari...',
+                            shouldSort: true,
+                            fuseOptions: {
+                                threshold: 0.3,
+                                distance: 100
+                            }
+                        });
+                        dataBarangSelect.choicesInstance = choicesInstance;
+                        console.log('Choices.js initialized successfully for id_data_barang');
+                    } catch (error) {
+                        console.error('Error initializing Choices.js for id_data_barang:', error);
+                    }
+                } else {
+                    console.log('Not enough options to initialize Choices.js (need > 1, got', optionCount, ')');
+                }
+            } else {
+                console.warn('id_data_barang select not found');
+            }
+        }
+        
+        // Coba initialize setelah delay
+        setTimeout(initChoicesForDataBarang, 500);
+        
+        // Juga coba saat window load
+        window.addEventListener('load', function() {
+            setTimeout(initChoicesForDataBarang, 300);
+        });
     });
 </script>
 @endsection

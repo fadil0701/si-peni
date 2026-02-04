@@ -109,6 +109,12 @@
                             {{ $registerAset->inventory->dataBarang->kode_data_barang ?? '-' }}
                         </dd>
                     </div>
+                    @if($registerAset->inventory->jenis_barang)
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Jenis Barang</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->inventory->jenis_barang }}</dd>
+                    </div>
+                    @endif
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Merk</dt>
                         <dd class="mt-1 text-sm text-gray-900">
@@ -128,11 +134,13 @@
                         </dd>
                     </div>
                     <div>
-                        <dt class="text-sm font-medium text-gray-500">Qty</dt>
+                        <dt class="text-sm font-medium text-gray-500">Qty (Jumlah ter-register)</dt>
                         <dd class="mt-1 text-sm text-gray-900">
-                            {{ number_format($registerAset->inventory->qty_input ?? 0, 0, ',', '.') }}
+                            1
                             @if($registerAset->inventory && $registerAset->inventory->satuan)
                                 {{ $registerAset->inventory->satuan->nama_satuan }}
+                            @else
+                                Unit
                             @endif
                         </dd>
                     </div>
@@ -145,7 +153,7 @@
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Total Harga</dt>
                         <dd class="mt-1 text-sm text-gray-900 font-semibold">
-                            Rp {{ number_format($registerAset->inventory->total_harga ?? 0, 0, ',', '.') }}
+                            Rp {{ number_format($registerAset->inventory->harga_satuan ?? 0, 0, ',', '.') }}
                         </dd>
                     </div>
                     @if($registerAset->inventory->spesifikasi)

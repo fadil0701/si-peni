@@ -28,19 +28,20 @@
                         Inventory Item (ASET) <span class="text-red-500">*</span>
                     </label>
                     <select 
-                        id="id_inventory" 
-                        name="id_inventory" 
+                        id="id_item" 
+                        name="id_item" 
                         required
-                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('id_inventory') border-red-500 @enderror"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('id_item') border-red-500 @enderror"
                         onchange="generateNomorRegister()"
                     >
                         <option value="">Pilih Inventory Item</option>
                         @if(isset($inventoryItems) && $inventoryItems->isNotEmpty())
                             @foreach($inventoryItems as $item)
                                 <option 
-                                    value="{{ $item->id_inventory ?? '' }}" 
+                                    value="{{ $item->id_item ?? '' }}" 
                                     data-kode-register="{{ $item->kode_register ?? '' }}"
-                                    {{ old('id_inventory') == $item->id_inventory ? 'selected' : '' }}
+                                    data-id-inventory="{{ $item->id_inventory ?? '' }}"
+                                    {{ old('id_item') == $item->id_item ? 'selected' : '' }}
                                 >
                                     {{ $item->kode_register ?? 'NO-REGISTER' }} - {{ $item->inventory->dataBarang->nama_barang ?? 'Nama Barang' }} 
                                     @if($item->gudang && $item->gudang->nama_gudang)
@@ -54,6 +55,10 @@
                             <option value="" disabled>Tidak ada inventory item tersedia</option>
                         @endif
                     </select>
+                    <input type="hidden" id="id_inventory" name="id_inventory" value="">
+                    @error('id_item')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                     @error('id_inventory')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -224,19 +229,28 @@
 @push('scripts')
 <script>
 function generateNomorRegister() {
-    const inventorySelect = document.getElementById('id_inventory');
+    const itemSelect = document.getElementById('id_item');
+    const inventoryHidden = document.getElementById('id_inventory');
     const unitKerjaSelect = document.getElementById('id_unit_kerja');
     const ruanganSelect = document.getElementById('id_ruangan');
     const nomorRegisterInput = document.getElementById('nomor_register');
     
-    if (!inventorySelect || !unitKerjaSelect || !nomorRegisterInput) return;
+    if (!itemSelect || !unitKerjaSelect || !nomorRegisterInput) return;
     
-    const inventoryValue = inventorySelect.value;
+    const itemValue = itemSelect.value;
+    const selectedOption = itemSelect.options[itemSelect.selectedIndex];
+    const inventoryId = selectedOption ? selectedOption.dataset.idInventory : '';
+    
+    // Update hidden id_inventory field
+    if (inventoryHidden && inventoryId) {
+        inventoryHidden.value = inventoryId;
+    }
+    
     const unitKerjaId = unitKerjaSelect.value;
     const ruanganId = ruanganSelect ? ruanganSelect.value : '';
     
-    // Jika belum pilih inventory atau unit kerja, kosongkan
-    if (!inventoryValue || !unitKerjaId) {
+    // Jika belum pilih inventory item atau unit kerja, kosongkan
+    if (!itemValue || !unitKerjaId) {
         nomorRegisterInput.value = '';
         nomorRegisterInput.placeholder = 'Akan di-generate otomatis setelah memilih Inventory Item, Unit Kerja dan Ruangan';
         return;
@@ -250,9 +264,10 @@ function generateNomorRegister() {
         prefix = `${String(unitKerjaId).padStart(3, '0')}`;
     }
     
-    // Tampilkan preview (nomor urut akan di-generate di backend)
-    nomorRegisterInput.value = `${prefix}/XXXX`;
-    nomorRegisterInput.placeholder = `Akan di-generate: ${prefix}/[URUT]`;
+    // Jangan set value, biarkan kosong agar backend yang generate dengan angka yang benar
+    // Hanya tampilkan placeholder sebagai preview
+    nomorRegisterInput.value = '';
+    nomorRegisterInput.placeholder = `Akan di-generate otomatis: ${prefix}/[URUT] (contoh: ${prefix}/0001)`;
 }
 
 function filterRuangan(unitKerjaId) {
@@ -289,7 +304,7 @@ function filterRuangan(unitKerjaId) {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
-    const inventorySelect = document.getElementById('id_inventory');
+    const itemSelect = document.getElementById('id_item');
     const unitKerjaSelect = document.getElementById('id_unit_kerja');
     const ruanganSelect = document.getElementById('id_ruangan');
     
@@ -299,8 +314,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Generate nomor register saat inventory item berubah
-    if (inventorySelect) {
-        inventorySelect.addEventListener('change', generateNomorRegister);
+    if (itemSelect) {
+        itemSelect.addEventListener('change', generateNomorRegister);
     }
     
     // Generate nomor register saat unit kerja berubah

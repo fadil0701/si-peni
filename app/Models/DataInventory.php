@@ -18,6 +18,7 @@ class DataInventory extends Model
         'id_anggaran',
         'id_sub_kegiatan',
         'jenis_inventory',
+        'jenis_barang',
         'tahun_anggaran',
         'qty_input',
         'id_satuan',

@@ -97,6 +97,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jenis Barang</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Dikirim</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Diterima</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
@@ -150,6 +151,9 @@
                                     {{ $inventory->dataBarang->nama_barang ?? '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ $inventory->jenis_barang ?? '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
                                     {{ number_format($qtyDikirim, 2, ',', '.') }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">
@@ -195,7 +199,7 @@
                             @empty
                             <tr>
                                 @php
-                                    $colspan = 6;
+                                    $colspan = 7;
                                     if ($hasFarmasiPersediaan) $colspan += 2;
                                     if ($hasAset) $colspan += 1;
                                 @endphp

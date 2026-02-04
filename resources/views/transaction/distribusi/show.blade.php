@@ -115,6 +115,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jenis Barang</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gudang Asal</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Distribusi</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
@@ -159,6 +160,9 @@
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">
                                     {{ $inventory->dataBarang->nama_barang ?? '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ $inventory->jenis_barang ?? '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">
                                     {{ $inventory->gudang->nama_gudang ?? '-' }}

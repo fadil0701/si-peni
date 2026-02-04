@@ -42,6 +42,12 @@
                             </span>
                         </dd>
                     </div>
+                    @if($inventory->jenis_barang)
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500 mb-1">Jenis Barang</dt>
+                        <dd class="text-sm font-semibold text-gray-900">{{ $inventory->jenis_barang }}</dd>
+                    </div>
+                    @endif
                     <div>
                         <dt class="text-sm font-medium text-gray-500 mb-1">Gudang</dt>
                         <dd class="text-sm font-semibold text-gray-900">{{ $inventory->gudang->nama_gudang ?? '-' }}</dd>

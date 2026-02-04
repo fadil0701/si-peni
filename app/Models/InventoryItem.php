@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Support\Facades\Schema;
 
 class InventoryItem extends Model
 {
@@ -47,8 +48,45 @@ class InventoryItem extends Model
 
     public function registerAset(): HasMany
     {
-        // RegisterAset menggunakan id_inventory, jadi kita perlu relasi melalui inventory
+        // RegisterAset menggunakan id_inventory untuk backward compatibility
+        // Controller akan handle filtering berdasarkan id_item jika kolom sudah ada
         return $this->hasMany(RegisterAset::class, 'id_inventory', 'id_inventory');
+    }
+    
+    /**
+     * Relasi registerAset berdasarkan id_item (jika kolom sudah ada)
+     * Gunakan ini untuk query yang lebih tepat setelah migration
+     */
+    public function registerAsetByItem(): HasMany
+    {
+        return $this->hasMany(RegisterAset::class, 'id_item', 'id_item');
+    }
+    
+    /**
+     * Get single RegisterAset untuk InventoryItem ini (jika ada)
+     * Untuk backward compatibility dengan data lama yang mungkin belum punya id_item
+     */
+    public function singleRegisterAset()
+    {
+        $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+        
+        if ($hasIdItemColumn) {
+            // Cek berdasarkan id_item dulu (lebih tepat)
+            $registerAset = RegisterAset::where('id_item', $this->id_item)->first();
+            
+            // Jika tidak ada dan id_item null di RegisterAset, cek berdasarkan id_inventory
+            // (untuk backward compatibility dengan data lama)
+            if (!$registerAset) {
+                $registerAset = RegisterAset::where('id_inventory', $this->id_inventory)
+                    ->whereNull('id_item')
+                    ->first();
+            }
+        } else {
+            // Fallback untuk data lama: cek berdasarkan id_inventory saja
+            $registerAset = RegisterAset::where('id_inventory', $this->id_inventory)->first();
+        }
+        
+        return $registerAset;
     }
 
     public function kartuInventarisRuangan()

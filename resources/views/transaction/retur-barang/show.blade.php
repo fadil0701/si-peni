@@ -158,6 +158,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jenis Barang</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Retur</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Alasan Retur Item</th>
@@ -170,6 +171,9 @@
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $index + 1 }}</td>
                                 <td class="px-4 py-3 text-sm font-medium text-gray-900">
                                     {{ $detail->inventory->dataBarang->nama_barang ?? '-' }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900">
+                                    {{ $detail->inventory->jenis_barang ?? '-' }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ number_format($detail->qty_retur, 2, ',', '.') }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>

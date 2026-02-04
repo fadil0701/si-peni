@@ -515,6 +515,7 @@ class DistribusiController extends Controller
                 'nama_barang' => $inv->dataBarang->nama_barang ?? '-',
                 'kode_barang' => $inv->dataBarang->kode_data_barang ?? '-',
                 'jenis_inventory' => $inv->jenis_inventory,
+                'jenis_barang' => $inv->jenis_barang,
                 'harga_satuan' => $inv->harga_satuan,
                 'id_satuan' => $inv->id_satuan,
                 'qty_available' => max(0, $qtyAvailable),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
 use App\Models\DataInventory;
 use App\Models\InventoryItem;
 use App\Models\DataStock;
@@ -112,6 +113,10 @@ class DataInventoryController extends Controller
             $query->where('no_batch', 'like', "%{$request->no_batch}%");
         }
 
+        if ($request->filled('jenis_barang')) {
+            $query->where('jenis_barang', $request->jenis_barang);
+        }
+
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
         $inventories = $query->latest()->paginate($perPage)->appends($request->query());
         
@@ -210,6 +215,7 @@ class DataInventoryController extends Controller
             'id_anggaran' => 'required|exists:master_sumber_anggaran,id_anggaran',
             'id_sub_kegiatan' => 'required|exists:master_sub_kegiatan,id_sub_kegiatan',
             'jenis_inventory' => 'required|in:ASET,PERSEDIAAN,FARMASI',
+            'jenis_barang' => 'nullable|string|max:50',
             'tahun_anggaran' => 'required|integer|min:2000|max:2100',
             'qty_input' => 'required|numeric|min:1',
             'id_satuan' => 'required|exists:master_satuan,id_satuan',
@@ -235,6 +241,22 @@ class DataInventoryController extends Controller
             ], [
                 'no_batch.required' => 'Nomor batch wajib diisi untuk inventory Farmasi.',
                 'tanggal_kedaluwarsa.required' => 'Tanggal kedaluwarsa wajib diisi untuk inventory Farmasi.',
+            ]);
+        }
+
+        // Validasi jenis_barang sesuai jenis_inventory
+        $jenisBarangByJenis = [
+            'ASET' => ['ALKES', 'NON ALKES'],
+            'FARMASI' => ['OBAT', 'Vaksin', 'BHP', 'BMHP', 'REAGEN', 'ALKES'],
+            'PERSEDIAAN' => ['ATK', 'ART', 'CETAKAN UMUM', 'CETAK KHUSUS'],
+        ];
+        $allowedJenisBarang = $jenisBarangByJenis[$validated['jenis_inventory']] ?? [];
+        if (!empty($allowedJenisBarang)) {
+            $request->validate([
+                'jenis_barang' => 'required|in:' . implode(',', $allowedJenisBarang),
+            ], [
+                'jenis_barang.required' => 'Jenis barang wajib dipilih.',
+                'jenis_barang.in' => 'Jenis barang tidak valid untuk jenis inventory yang dipilih.',
             ]);
         }
 
@@ -337,21 +359,48 @@ class DataInventoryController extends Controller
             return;
         }
 
-        // Generate nomor register dari kode register pertama di InventoryItem
-        $firstInventoryItem = InventoryItem::where('id_inventory', $inventory->id_inventory)
-            ->orderBy('id_item')
-            ->first();
+        // Generate nomor register dari kode register pertama di InventoryItem yang belum ter-register
+        $hasIdItemColumn = \Schema::hasColumn('register_aset', 'id_item');
+        $registeredItemIds = [];
         
-        $nomorRegister = $firstInventoryItem ? $firstInventoryItem->kode_register : 'REG-' . $inventory->id_inventory;
+        if ($hasIdItemColumn) {
+            $registeredItemIds = RegisterAset::whereNotNull('id_item')
+                ->pluck('id_item')
+                ->toArray();
+        }
+        
+        $firstInventoryItemQuery = InventoryItem::where('id_inventory', $inventory->id_inventory);
+        
+        if ($hasIdItemColumn && !empty($registeredItemIds)) {
+            $firstInventoryItemQuery->whereNotIn('id_item', $registeredItemIds);
+        } elseif (!$hasIdItemColumn) {
+            $firstInventoryItemQuery->whereDoesntHave('registerAset');
+        }
+        
+        $firstInventoryItem = $firstInventoryItemQuery->orderBy('id_item')->first();
+        
+        if (!$firstInventoryItem) {
+            // Jika semua InventoryItem sudah ter-register, skip
+            return;
+        }
+        
+        $nomorRegister = $firstInventoryItem->kode_register;
 
-        RegisterAset::create([
+        $registerData = [
             'id_inventory' => $inventory->id_inventory,
             'id_unit_kerja' => $unitKerja->id_unit_kerja,
             'nomor_register' => $nomorRegister,
             'kondisi_aset' => 'BAIK',
             'tanggal_perolehan' => $data['tanggal_perolehan'] ?? now(),
             'status_aset' => 'AKTIF',
-        ]);
+        ];
+        
+        // Tambahkan id_item jika kolom sudah ada
+        if ($hasIdItemColumn) {
+            $registerData['id_item'] = $firstInventoryItem->id_item;
+        }
+        
+        RegisterAset::create($registerData);
     }
 
     public function show($id)
@@ -540,6 +589,7 @@ class DataInventoryController extends Controller
             'id_anggaran' => 'required|exists:master_sumber_anggaran,id_anggaran',
             'id_sub_kegiatan' => 'required|exists:master_sub_kegiatan,id_sub_kegiatan',
             'jenis_inventory' => 'required|in:ASET,PERSEDIAAN,FARMASI',
+            'jenis_barang' => 'nullable|string|max:50',
             'tahun_anggaran' => 'required|integer|min:2000|max:2100',
             'qty_input' => 'required|numeric|min:1',
             'id_satuan' => 'required|exists:master_satuan,id_satuan',
@@ -565,6 +615,22 @@ class DataInventoryController extends Controller
             ], [
                 'no_batch.required' => 'Nomor batch wajib diisi untuk inventory Farmasi.',
                 'tanggal_kedaluwarsa.required' => 'Tanggal kedaluwarsa wajib diisi untuk inventory Farmasi.',
+            ]);
+        }
+
+        // Validasi jenis_barang sesuai jenis_inventory (update)
+        $jenisBarangByJenis = [
+            'ASET' => ['ALKES', 'NON ALKES'],
+            'FARMASI' => ['OBAT', 'Vaksin', 'BHP', 'BMHP', 'REAGEN', 'ALKES'],
+            'PERSEDIAAN' => ['ATK', 'ART', 'CETAKAN UMUM', 'CETAK KHUSUS'],
+        ];
+        $allowedJenisBarang = $jenisBarangByJenis[$validated['jenis_inventory']] ?? [];
+        if (!empty($allowedJenisBarang)) {
+            $request->validate([
+                'jenis_barang' => 'required|in:' . implode(',', $allowedJenisBarang),
+            ], [
+                'jenis_barang.required' => 'Jenis barang wajib dipilih.',
+                'jenis_barang.in' => 'Jenis barang tidak valid untuk jenis inventory yang dipilih.',
             ]);
         }
 

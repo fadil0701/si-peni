@@ -468,6 +468,7 @@ class ReturBarangController extends Controller
                             'id_anggaran' => $inventory->id_anggaran,
                             'id_sub_kegiatan' => $inventory->id_sub_kegiatan,
                             'jenis_inventory' => $inventory->jenis_inventory,
+                            'jenis_barang' => $inventory->jenis_barang,
                             'tahun_anggaran' => $inventory->tahun_anggaran,
                             'qty_input' => $detail->qty_retur,
                             'id_satuan' => $inventory->id_satuan,

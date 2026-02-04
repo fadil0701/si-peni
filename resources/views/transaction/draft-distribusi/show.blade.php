@@ -54,6 +54,7 @@
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barang</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Jenis Barang</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gudang Asal</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty Distribusi</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Satuan</th>
@@ -66,6 +67,7 @@
                             @foreach($draftDetails as $draft)
                                 <tr>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->inventory->dataBarang->nama_barang ?? '-' }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->inventory->jenis_barang ?? '-' }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->gudangAsal->nama_gudang ?? '-' }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ number_format($draft->qty_distribusi, 2) }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-900">{{ $draft->satuan->nama_satuan ?? '-' }}</td>

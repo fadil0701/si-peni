@@ -21,27 +21,62 @@
         @method('PUT')
         
         <div class="space-y-6">
-            <!-- Informasi Register (Read-only) -->
-            <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Informasi Register</h3>
-                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Nomor Register</dt>
-                        <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $registerAset->nomor_register ?? '-' }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Nama Barang</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            {{ $registerAset->inventory->dataBarang->nama_barang ?? '-' }}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-sm font-medium text-gray-500">Gudang Unit</dt>
-                        <dd class="mt-1 text-sm text-gray-900">
-                            {{ $registerAset->unitKerja->nama_unit_kerja ?? '-' }}
-                        </dd>
-                    </div>
-                </dl>
+            <!-- Informasi Register & Barang (Read-only, sama seperti di Detail) -->
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Informasi Register</h3>
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Nomor Register</dt>
+                            <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $registerAset->nomor_register ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Gudang Unit</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->unitKerja->nama_unit_kerja ?? '-' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Informasi Barang</h3>
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Nama Barang</dt>
+                            <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $registerAset->inventory->dataBarang->nama_barang ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Kode Barang</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->inventory->dataBarang->kode_data_barang ?? '-' }}</dd>
+                        </div>
+                        @if($registerAset->inventory->jenis_barang ?? null)
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Jenis Barang</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->inventory->jenis_barang }}</dd>
+                        </div>
+                        @endif
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Merk</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->inventory->merk ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Tipe</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ $registerAset->inventory->tipe ?? '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Qty (Jumlah ter-register)</dt>
+                            <dd class="mt-1 text-sm text-gray-900">
+                                1 {{ $registerAset->inventory->satuan->nama_satuan ?? 'Unit' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Harga Satuan</dt>
+                            <dd class="mt-1 text-sm text-gray-900">Rp {{ number_format($registerAset->inventory->harga_satuan ?? 0, 0, ',', '.') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Total Harga</dt>
+                            <dd class="mt-1 text-sm text-gray-900 font-semibold">Rp {{ number_format($registerAset->inventory->harga_satuan ?? 0, 0, ',', '.') }}</dd>
+                        </div>
+                    </dl>
+                </div>
             </div>
 
             <!-- Form Fields -->

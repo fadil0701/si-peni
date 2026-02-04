@@ -358,6 +358,7 @@ const kategoriGudang = '{{ $kategoriGudang }}';
             'nama_barang' => ($inv->dataBarang->nama_barang ?? '-'),
             'kode_barang' => ($inv->dataBarang->kode_data_barang ?? ''),
             'jenis_inventory' => $inv->jenis_inventory,
+            'jenis_barang' => $inv->jenis_barang ?? null,
             'harga_satuan' => (float)($inv->harga_satuan ?? 0),
             'id_satuan' => $inv->id_satuan,
             'qty_input' => (float)($inv->qty_input ?? 0),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Inventory;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\DataStock;
+use App\Models\DataInventory;
 use App\Models\MasterGudang;
 use App\Models\MasterDataBarang;
 use App\Models\MasterPegawai;
@@ -124,7 +125,7 @@ class DataStockController extends Controller
             $gudangs = MasterGudang::all();
         }
 
-        return view('inventory.data-stock.index', compact('stocks', 'gudangs'));
+        return view('inventory.data-stock.index', compact('stocks', 'gudangs', 'jenisBarangMap'));
     }
     
     /**

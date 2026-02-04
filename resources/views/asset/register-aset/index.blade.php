@@ -11,7 +11,7 @@
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Register Aset (KIB & KIR)</h1>
-            <p class="mt-1 text-sm text-gray-600">Ringkasan aset per lokasi. KIB = aset di gudang, KIR = aset sudah ditempatkan di ruangan.</p>
+            <p class="mt-1 text-sm text-gray-600">Ringkasan aset per lokasi. KIB (Gudang Pusat) = semua aset yang belum maupun sudah ter-register. KIR (Gudang Unit) = hanya aset yang sudah ter-register dan ditempatkan di ruangan.</p>
         </div>
         @if(PermissionHelper::canAccess($user, 'asset.register-aset.create'))
         <a 
@@ -32,11 +32,11 @@
     <span class="font-medium text-gray-700">Keterangan:</span>
     <span class="inline-flex items-center gap-1.5">
         <span class="w-3 h-3 rounded-full bg-blue-500"></span>
-        <strong>KIB</strong> — Aset tercatat di gudang (belum ditempatkan di ruangan)
+        <strong>KIB</strong> — Kartu Inventaris Barang
     </span>
     <span class="inline-flex items-center gap-1.5">
         <span class="w-3 h-3 rounded-full bg-orange-500"></span>
-        <strong>KIR</strong> — Aset sudah memiliki Kartu Inventaris Ruangan (ditempatkan di ruangan)
+        <strong>KIR</strong> — Kartu Inventaris Ruangan
     </span>
 </div>
 
@@ -62,18 +62,10 @@
                 </div>
                 <span class="flex-shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-100 text-blue-800">KIB</span>
             </div>
-            <div class="grid grid-cols-3 gap-3 mb-4">
-                <div class="rounded-lg bg-gray-50 p-3 text-center">
-                    <div class="text-xl font-bold text-gray-900">{{ number_format($gudangPusatData['total_aset'], 0, ',', '.') }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Total Aset</div>
-                </div>
+            <div class="grid grid-cols-1 gap-3 mb-4">
                 <div class="rounded-lg bg-blue-50 p-3 text-center">
                     <div class="text-xl font-bold text-blue-700">{{ number_format($gudangPusatData['kib_count'], 0, ',', '.') }}</div>
-                    <div class="text-xs text-blue-600 mt-0.5">KIB</div>
-                </div>
-                <div class="rounded-lg bg-orange-50 p-3 text-center">
-                    <div class="text-xl font-bold text-orange-700">{{ number_format($gudangPusatData['kir_count'], 0, ',', '.') }}</div>
-                    <div class="text-xs text-orange-600 mt-0.5">KIR</div>
+                    <div class="text-xs text-blue-600 mt-0.5">Jumlah Aset Terdaftar</div>
                 </div>
             </div>
             <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-blue-600 font-medium text-sm group-hover:text-blue-700">
@@ -108,23 +100,15 @@
                         @endif
                     </div>
                 </div>
-                @php $total = $gudang->total_aset ?? 0; $kirCount = $gudang->kir_count ?? 0; @endphp
-                <span class="flex-shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg {{ $kirCount > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600' }}">
-                    {{ $kirCount > 0 ? 'KIR' : 'KIB' }}
+                @php $kirCount = $gudang->kir_count ?? 0; @endphp
+                <span class="flex-shrink-0 px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-100 text-orange-800">
+                    KIR
                 </span>
             </div>
-            <div class="grid grid-cols-3 gap-3 mb-4">
-                <div class="rounded-lg bg-gray-50 p-3 text-center">
-                    <div class="text-xl font-bold text-gray-900">{{ number_format($total, 0, ',', '.') }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Total Aset</div>
-                </div>
-                <div class="rounded-lg bg-blue-50 p-3 text-center">
-                    <div class="text-xl font-bold text-blue-700">{{ number_format($gudang->kib_count ?? 0, 0, ',', '.') }}</div>
-                    <div class="text-xs text-blue-600 mt-0.5">KIB</div>
-                </div>
+            <div class="grid grid-cols-1 gap-3 mb-4">
                 <div class="rounded-lg bg-orange-50 p-3 text-center">
-                    <div class="text-xl font-bold text-orange-700">{{ number_format($gudang->kir_count ?? 0, 0, ',', '.') }}</div>
-                    <div class="text-xs text-orange-600 mt-0.5">KIR</div>
+                    <div class="text-xl font-bold text-orange-700">{{ number_format($kirCount, 0, ',', '.') }}</div>
+                    <div class="text-xs text-orange-600 mt-0.5">Jumlah Aset Unit Kerja</div>
                 </div>
             </div>
             <div class="flex items-center justify-between pt-4 border-t border-gray-100 text-orange-600 font-medium text-sm group-hover:text-orange-700">

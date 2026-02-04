@@ -33,6 +33,9 @@
                         <dt class="text-sm font-medium text-gray-500">Nama Barang</dt>
                         <dd class="mt-1 text-sm text-gray-900">
                             {{ $mutasiAset->registerAset->inventory->dataBarang->nama_barang ?? '-' }}
+                            @if($mutasiAset->registerAset->inventory->jenis_barang)
+                                <span class="text-gray-500 text-sm block">Jenis Barang: {{ $mutasiAset->registerAset->inventory->jenis_barang }}</span>
+                            @endif
                         </dd>
                     </div>
                 </dl>

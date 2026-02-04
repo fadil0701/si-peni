@@ -101,6 +101,21 @@
                         @error('jenis_inventory')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
 
+                    <div id="jenis_barang_field" style="display: {{ in_array(old('jenis_inventory', $dataInventory->jenis_inventory), ['ASET','PERSEDIAAN','FARMASI']) ? 'block' : 'none' }};">
+                        <label for="jenis_barang" class="block text-sm font-medium text-gray-700 mb-2">
+                            Jenis Barang <span class="text-red-500">*</span>
+                        </label>
+                        <select 
+                            id="jenis_barang" 
+                            name="jenis_barang" 
+                            data-current-value="{{ old('jenis_barang', $dataInventory->jenis_barang) }}"
+                            class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm @error('jenis_barang') border-red-500 @enderror"
+                        >
+                            <option value="">Pilih Jenis Barang</option>
+                        </select>
+                        @error('jenis_barang')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                    </div>
+
                     <div>
                         <label for="status_inventory" class="block text-sm font-medium text-gray-700 mb-2">
                             Status Inventory <span class="text-red-500">*</span>
@@ -301,15 +316,46 @@
 </div>
 
 <script>
+    const JENIS_BARANG_OPTIONS = {
+        'ASET': [ { value: 'ALKES', label: 'ALKES' }, { value: 'NON ALKES', label: 'NON ALKES' } ],
+        'FARMASI': [ { value: 'OBAT', label: 'OBAT' }, { value: 'Vaksin', label: 'Vaksin' }, { value: 'BHP', label: 'BHP' }, { value: 'BMHP', label: 'BMHP' }, { value: 'REAGEN', label: 'REAGEN' }, { value: 'ALKES', label: 'ALKES' } ],
+        'PERSEDIAAN': [ { value: 'ATK', label: 'ATK' }, { value: 'ART', label: 'ART' }, { value: 'CETAKAN UMUM', label: 'CETAKAN UMUM' }, { value: 'CETAK KHUSUS', label: 'CETAK KHUSUS' } ]
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
         const jenisInventorySelect = document.getElementById('jenis_inventory');
+        const jenisBarangField = document.getElementById('jenis_barang_field');
+        const jenisBarangSelect = document.getElementById('jenis_barang');
         const tipeField = document.getElementById('tipe_field');
         const noSeriField = document.getElementById('no_seri_field');
         const noBatchField = document.getElementById('no_batch_field');
         const tanggalKedaluwarsaField = document.getElementById('tanggal_kedaluwarsa_field');
 
+        function updateJenisBarangOptions() {
+            const jenisInventory = jenisInventorySelect.value;
+            const options = JENIS_BARANG_OPTIONS[jenisInventory] || [];
+            const currentValue = jenisBarangSelect.getAttribute('data-current-value') || jenisBarangSelect.value || '';
+            jenisBarangSelect.innerHTML = '<option value="">Pilih Jenis Barang</option>';
+            options.forEach(function(opt) {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                if (opt.value === currentValue) option.selected = true;
+                jenisBarangSelect.appendChild(option);
+            });
+            if (options.length > 0) {
+                jenisBarangField.style.display = 'block';
+                jenisBarangSelect.setAttribute('required', 'required');
+            } else {
+                jenisBarangField.style.display = 'none';
+                jenisBarangSelect.removeAttribute('required');
+                jenisBarangSelect.value = '';
+            }
+        }
+
         function toggleFields() {
             const jenisInventory = jenisInventorySelect.value;
+            updateJenisBarangOptions();
 
             if (jenisInventory === 'ASET') {
                 // ASET: tampilkan tipe dan no_seri, sembunyikan no_batch dan tanggal_kedaluwarsa

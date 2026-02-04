@@ -70,6 +70,35 @@
         </div>
 
         <div>
+            <label for="jenis_barang" class="block text-sm font-medium text-gray-700 mb-1">Jenis Barang</label>
+            <select 
+                id="jenis_barang" 
+                name="jenis_barang" 
+                class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+                <option value="">Semua Jenis Barang</option>
+                <optgroup label="Aset">
+                    <option value="ALKES" {{ request('jenis_barang') == 'ALKES' ? 'selected' : '' }}>ALKES</option>
+                    <option value="NON ALKES" {{ request('jenis_barang') == 'NON ALKES' ? 'selected' : '' }}>NON ALKES</option>
+                </optgroup>
+                <optgroup label="Farmasi">
+                    <option value="OBAT" {{ request('jenis_barang') == 'OBAT' ? 'selected' : '' }}>OBAT</option>
+                    <option value="Vaksin" {{ request('jenis_barang') == 'Vaksin' ? 'selected' : '' }}>Vaksin</option>
+                    <option value="BHP" {{ request('jenis_barang') == 'BHP' ? 'selected' : '' }}>BHP</option>
+                    <option value="BMHP" {{ request('jenis_barang') == 'BMHP' ? 'selected' : '' }}>BMHP</option>
+                    <option value="REAGEN" {{ request('jenis_barang') == 'REAGEN' ? 'selected' : '' }}>REAGEN</option>
+                    <option value="ALKES" {{ request('jenis_barang') == 'ALKES' ? 'selected' : '' }}>ALKES</option>
+                </optgroup>
+                <optgroup label="Persediaan">
+                    <option value="ATK" {{ request('jenis_barang') == 'ATK' ? 'selected' : '' }}>ATK</option>
+                    <option value="ART" {{ request('jenis_barang') == 'ART' ? 'selected' : '' }}>ART</option>
+                    <option value="CETAKAN UMUM" {{ request('jenis_barang') == 'CETAKAN UMUM' ? 'selected' : '' }}>CETAKAN UMUM</option>
+                    <option value="CETAK KHUSUS" {{ request('jenis_barang') == 'CETAK KHUSUS' ? 'selected' : '' }}>CETAK KHUSUS</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <div>
             <label for="no_batch" class="block text-sm font-medium text-gray-700 mb-1">Nomor Batch</label>
             <input 
                 type="text" 
@@ -127,6 +156,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Barang</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merk</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nomor Batch</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
@@ -159,6 +189,9 @@
                             <span class="px-2 py-1 text-xs font-medium rounded-full {{ $jenisColor }}">
                                 {{ $inventory->jenis_inventory }}
                             </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {{ $inventory->jenis_barang ?? '-' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {{ $inventory->merk ?? '-' }}
@@ -224,7 +257,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="px-6 py-12 text-center">
+                        <td colspan="11" class="px-6 py-12 text-center">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
@@ -247,7 +280,7 @@
 @push('scripts')
 <script>
     // Auto submit form on filter change for selects
-    document.querySelectorAll('#jenis_inventory, #gudang').forEach(select => {
+    document.querySelectorAll('#jenis_inventory, #gudang, #jenis_barang').forEach(select => {
         select.addEventListener('change', function() {
             this.form.submit();
         });

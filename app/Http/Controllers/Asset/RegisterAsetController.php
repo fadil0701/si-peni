@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Asset;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\RegisterAset;
 use App\Models\MasterPegawai;
 use App\Models\MasterUnitKerja;
 use App\Models\MasterGudang;
+use App\Models\MasterRuangan;
 use App\Models\DataInventory;
 use Illuminate\Support\Facades\Auth;
 
@@ -65,21 +67,17 @@ class RegisterAsetController extends Controller
             ->with('unitKerja')
             ->get();
         
-        // Hitung KIB dan KIR untuk setiap gudang unit
+        // Hitung KIR untuk setiap gudang unit (hanya KIR, tidak perlu KIB)
         foreach ($gudangUnits as $gudang) {
-            // KIR: RegisterAset yang memiliki ruangan di unit kerja ini
+            // KIR: Hanya RegisterAset yang SUDAH ter-register dan memiliki ruangan di unit kerja ini
+            // Tidak menghitung aset yang belum ter-register
             $kirCount = RegisterAset::where('id_unit_kerja', $gudang->id_unit_kerja)
                 ->whereNotNull('id_ruangan')
                 ->count();
             
-            // KIB: RegisterAset yang id_unit_kerja = unit kerja gudang ini tapi belum punya ruangan (masih di gudang unit)
-            $kibCount = RegisterAset::where('id_unit_kerja', $gudang->id_unit_kerja)
-                ->whereNull('id_ruangan')
-                ->count();
-            
             $gudang->kir_count = $kirCount;
-            $gudang->kib_count = $kibCount;
-            $gudang->total_aset = $kirCount + $kibCount;
+            $gudang->kib_count = 0; // Tidak perlu KIB untuk gudang unit
+            $gudang->total_aset = $kirCount; // Total = KIR untuk gudang unit
         }
         
         // Ambil data gudang pusat (KIB saja) - HANYA untuk admin, admin_gudang, pengurus_barang, bukan untuk pegawai
@@ -90,31 +88,21 @@ class RegisterAsetController extends Controller
                 ->first();
             
             if ($gudangPusat) {
-                // KIB untuk gudang pusat:
-                // 1. InventoryItem yang masih di gudang pusat dan BELUM punya RegisterAset (belum didistribusikan)
-                // 2. RegisterAset yang masih di gudang pusat (id_unit_kerja = null atau belum didistribusikan)
+                // KIB untuk gudang pusat: Total SEMUA aset di gudang pusat
+                // Termasuk:
+                // 1. InventoryItem yang BELUM ter-register (belum punya RegisterAset)
+                // 2. InventoryItem yang SUDAH ter-register (sudah punya RegisterAset tapi masih di gudang pusat)
                 
-                // Hitung InventoryItem yang masih di gudang pusat dan belum punya RegisterAset
-                $inventoryItemsKib = \App\Models\InventoryItem::whereHas('inventory', function($q) use ($gudangPusat) {
+                // Hitung SEMUA InventoryItem yang masih di gudang pusat
+                // TIDAK ada filter untuk status register - menghitung semua aset
+                $kibCount = \App\Models\InventoryItem::whereHas('inventory', function($q) use ($gudangPusat) {
                         $q->where('id_gudang', $gudangPusat->id_gudang)
                           ->where('jenis_inventory', 'ASET');
                     })
                     ->where('id_gudang', $gudangPusat->id_gudang)
-                    ->whereDoesntHave('registerAset')
                     ->count();
                 
-                // Hitung RegisterAset yang masih di gudang pusat (belum didistribusikan ke unit kerja)
-                $registerAsetKib = RegisterAset::whereHas('inventory', function($q) use ($gudangPusat) {
-                        $q->where('id_gudang', $gudangPusat->id_gudang)
-                          ->where('jenis_inventory', 'ASET');
-                    })
-                    ->whereNull('id_unit_kerja')
-                    ->whereNull('id_ruangan')
-                    ->count();
-                
-                $kibCount = $inventoryItemsKib + $registerAsetKib;
-                
-                // KIR untuk gudang pusat biasanya 0 (karena KIR adalah aset di ruangan unit)
+                // Untuk gudang pusat: hanya KIB saja, tidak perlu KIR
                 $kirCount = 0;
                 
                 $gudangPusatData = [
@@ -137,12 +125,11 @@ class RegisterAsetController extends Controller
     {
         $user = Auth::user();
         
-        // Filter KIB/KIR
-        $filter = $request->get('filter', 'semua');
-        
         // Inisialisasi variabel
         $isPusat = false;
         $gudangUnit = null;
+        $unitKerjas = collect([]);
+        $ruangans = collect([]);
         
         // Jika 'pusat', ambil data gudang pusat
         if ($unitKerjaId == 'pusat') {
@@ -164,67 +151,68 @@ class RegisterAsetController extends Controller
                 $q->where('jenis_inventory', 'ASET');
             });
             
-            // Filter KIB/KIR untuk gudang pusat
-            if ($filter == 'kir') {
-                // Gudang pusat tidak punya KIR, jadi kosongkan query
-                $allInventoryItems->whereRaw('1 = 0');
-            } elseif ($filter == 'kib') {
-                // KIB: InventoryItem yang masih di gudang pusat (belum didistribusikan ke unit)
-                $allInventoryItems->where(function($q) use ($gudangPusat) {
-                    $q->where('id_gudang', $gudangPusat->id_gudang)
-                      ->orWhereNull('id_gudang'); // Belum didistribusikan
-                });
-            } else {
-                // Filter 'semua': semua InventoryItem yang terkait dengan gudang pusat
-                $allInventoryItems->where(function($q) use ($gudangPusat) {
-                    $q->where('id_gudang', $gudangPusat->id_gudang)
-                      ->orWhereNull('id_gudang');
-                });
-            }
-            
-            // Ambil semua InventoryItem yang memenuhi kriteria di atas
-            $inventoryItemsList = $allInventoryItems->orderBy('kode_register')->get();
-            
-            // Hitung jumlah RegisterAset per id_inventory yang sudah di-register ke unit kerja
-            $inventoryIds = $inventoryItemsList->pluck('id_inventory')->unique()->toArray();
-            $registerAsetCounts = RegisterAset::whereIn('id_inventory', $inventoryIds)
-                ->whereNotNull('id_unit_kerja')
-                ->selectRaw('id_inventory, COUNT(*) as count')
-                ->groupBy('id_inventory')
-                ->pluck('count', 'id_inventory');
-            
-            // Hitung jumlah InventoryItem per id_inventory
-            $inventoryItemCounts = $inventoryItemsList->groupBy('id_inventory')->map(function($items) {
-                return $items->count();
+            // Untuk KIB di gudang pusat: tampilkan SEMUA InventoryItem (baik yang sudah ter-register maupun belum)
+            $query = \App\Models\InventoryItem::with([
+                'inventory.dataBarang',
+                'inventory.gudang.unitKerja',
+                'gudang.unitKerja',
+                'ruangan.unitKerja',
+                'registerAset' // Load RegisterAset untuk menentukan badge KIB/KIR
+            ])->whereHas('inventory', function($q) use ($gudangPusat) {
+                $q->where('jenis_inventory', 'ASET');
+            })->where(function($q) use ($gudangPusat) {
+                $q->where('id_gudang', $gudangPusat->id_gudang)
+                  ->orWhereNull('id_gudang'); // Belum didistribusikan
             });
             
-            // Filter: hanya ambil InventoryItem yang jumlahnya masih lebih besar dari jumlah RegisterAset
-            $filteredItems = $inventoryItemsList->filter(function($item) use ($inventoryItemCounts, $registerAsetCounts) {
-                $inventoryId = $item->id_inventory;
-                $itemCount = $inventoryItemCounts[$inventoryId] ?? 0;
-                $registerCount = $registerAsetCounts[$inventoryId] ?? 0;
+            // Filter berdasarkan Unit Kerja (jika dipilih)
+            if ($request->filled('filter_unit_kerja')) {
+                $filterUnitKerjaId = $request->filter_unit_kerja;
+                // Filter berdasarkan gudang yang memiliki unit kerja tersebut
+                $gudangIds = MasterGudang::where('id_unit_kerja', $filterUnitKerjaId)
+                    ->where('kategori_gudang', 'ASET')
+                    ->pluck('id_gudang')
+                    ->toArray();
                 
-                // Jika jumlah RegisterAset sudah sama atau lebih dari jumlah InventoryItem, sembunyikan
-                return $registerCount < $itemCount;
-            })->pluck('id_item')->toArray();
-            
-            // Buat query dari filtered items
-            if (!empty($filteredItems)) {
-                $query = \App\Models\InventoryItem::with([
-                    'inventory.dataBarang',
-                    'inventory.gudang.unitKerja',
-                    'gudang.unitKerja',
-                    'ruangan.unitKerja'
-                ])->whereIn('id_item', $filteredItems);
-            } else {
-                $query = \App\Models\InventoryItem::whereRaw('1 = 0');
+                // Filter InventoryItem yang terkait dengan unit kerja tersebut
+                $query->where(function($q) use ($gudangPusat, $gudangIds, $filterUnitKerjaId) {
+                    // Aset yang masih di gudang pusat (belum didistribusikan) atau sudah ter-register ke unit kerja tersebut
+                    $q->where(function($subQ) use ($gudangPusat, $filterUnitKerjaId) {
+                        $subQ->where('id_gudang', $gudangPusat->id_gudang)
+                             ->where(function($regQ) use ($filterUnitKerjaId) {
+                                 // Belum ter-register atau sudah ter-register ke unit kerja tersebut
+                                 $regQ->whereDoesntHave('registerAset')
+                                      ->orWhereHas('registerAset', function($raQ) use ($filterUnitKerjaId) {
+                                          $raQ->where('id_unit_kerja', $filterUnitKerjaId);
+                                      });
+                             });
+                    })
+                    // Atau aset yang sudah didistribusikan ke gudang unit tersebut
+                    ->orWhereIn('id_gudang', $gudangIds);
+                });
             }
+            
+            // Ambil daftar Unit Kerja yang memiliki aset di gudang pusat
+            // Unit kerja yang memiliki RegisterAset dengan inventory di gudang pusat
+            $unitKerjas = MasterUnitKerja::whereHas('registerAsets', function($q) use ($gudangPusat) {
+                    $q->whereHas('inventory', function($invQ) use ($gudangPusat) {
+                        $invQ->where('id_gudang', $gudangPusat->id_gudang)
+                             ->where('jenis_inventory', 'ASET');
+                    });
+                })
+                ->orWhereHas('gudang', function($q) {
+                    $q->where('kategori_gudang', 'ASET')
+                      ->where('jenis_gudang', 'UNIT');
+                })
+                ->orderBy('nama_unit_kerja')
+                ->get();
             
             // Urutkan berdasarkan kode_register
             $query->orderBy('kode_register');
             
             $title = $gudangPusat->nama_gudang;
             $isPusat = true;
+            $filter = 'kib'; // Untuk gudang pusat selalu KIB
         } else {
             // Ambil data gudang unit
             $gudangUnit = MasterGudang::where('id_gudang', $unitKerjaId)
@@ -233,68 +221,102 @@ class RegisterAsetController extends Controller
                 ->firstOrFail();
             
             // Untuk gudang unit, ambil data dari RegisterAset yang id_unit_kerja = unit kerja gudang ini
-            // Lalu ambil InventoryItem yang sesuai dengan RegisterAset tersebut
-            // Pendekatan: Ambil RegisterAset dulu dengan filter KIB/KIR
-            $registerAsetQuery = RegisterAset::where('id_unit_kerja', $gudangUnit->id_unit_kerja);
+            // Hanya ambil yang sudah memiliki ruangan (KIR)
+            $registerAsetQuery = RegisterAset::where('id_unit_kerja', $gudangUnit->id_unit_kerja)
+                ->whereNotNull('id_ruangan'); // Hanya KIR yang ditampilkan
             
-            // Filter KIB/KIR untuk RegisterAset
-            if ($filter == 'kir') {
-                $registerAsetQuery->whereNotNull('id_ruangan');
-            } elseif ($filter == 'kib') {
-                $registerAsetQuery->whereNull('id_ruangan');
+            // Filter berdasarkan Ruangan (jika dipilih)
+            if ($request->filled('filter_ruangan')) {
+                $registerAsetQuery->where('id_ruangan', $request->filter_ruangan);
             }
-            // else: filter 'semua' - tidak perlu filter tambahan
             
             $registerAsets = $registerAsetQuery->get();
+            
+            // Ambil daftar Ruangan yang memiliki KIR di unit kerja ini
+            // Ambil dari RegisterAset yang memiliki ruangan di unit kerja ini
+            $ruanganIds = RegisterAset::where('id_unit_kerja', $gudangUnit->id_unit_kerja)
+                ->whereNotNull('id_ruangan')
+                ->pluck('id_ruangan')
+                ->unique()
+                ->toArray();
+            
+            $ruangans = \App\Models\MasterRuangan::whereIn('id_ruangan', $ruanganIds)
+                ->with('unitKerja')
+                ->orderBy('nama_ruangan')
+                ->get();
             
             if ($registerAsets->isEmpty()) {
                 // Jika tidak ada RegisterAset, return empty collection
                 $query = \App\Models\InventoryItem::whereRaw('1 = 0');
             } else {
-                // Ambil InventoryItem berdasarkan mapping RegisterAset
-                // Untuk setiap RegisterAset, ambil InventoryItem yang sesuai
-                // Mapping: RegisterAset.id_inventory -> InventoryItem.id_inventory
-                // Tapi hanya ambil InventoryItem yang belum digunakan oleh RegisterAset lain di unit kerja ini
-                $registerAsetInventoryIds = $registerAsets->pluck('id_inventory')->unique()->toArray();
+                // Ambil InventoryItem berdasarkan mapping RegisterAset menggunakan id_item
+                // Mapping: RegisterAset.id_item -> InventoryItem.id_item (lebih tepat)
+                $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
                 
-                // Ambil semua InventoryItem untuk id_inventory tersebut
-                $allInventoryItems = \App\Models\InventoryItem::whereIn('id_inventory', $registerAsetInventoryIds)
-                    ->whereHas('inventory', function($q) {
-                        $q->where('jenis_inventory', 'ASET');
-                    })
-                    ->orderBy('id_item')
-                    ->get();
-                
-                // Mapping: untuk setiap RegisterAset, ambil InventoryItem yang sesuai
-                // Strategi: ambil InventoryItem pertama yang belum digunakan untuk id_inventory tersebut
-                $usedItemIds = [];
-                $selectedItemIds = [];
-                
-                foreach ($registerAsets as $registerAset) {
-                    // Cari InventoryItem untuk id_inventory ini yang belum digunakan
-                    $availableItems = $allInventoryItems->where('id_inventory', $registerAset->id_inventory)
-                        ->whereNotIn('id_item', $usedItemIds)
-                        ->first();
+                if ($hasIdItemColumn) {
+                    $registerAsetItemIds = $registerAsets->pluck('id_item')
+                        ->filter() // Hapus null
+                        ->unique()
+                        ->toArray();
                     
-                    if ($availableItems) {
-                        $selectedItemIds[] = $availableItems->id_item;
-                        $usedItemIds[] = $availableItems->id_item;
+                    if (!empty($registerAsetItemIds)) {
+                        // Ambil InventoryItem yang sudah dipilih dengan eager loading
+                        $query = \App\Models\InventoryItem::with([
+                            'inventory.dataBarang',
+                            'inventory.gudang.unitKerja',
+                            'inventory.registerAset' => function($q) use ($gudangUnit) {
+                                $q->where('id_unit_kerja', $gudangUnit->id_unit_kerja);
+                            },
+                            'gudang.unitKerja',
+                            'ruangan.unitKerja'
+                        ])->whereIn('id_item', $registerAsetItemIds);
+                    } else {
+                        // Jika tidak ada id_item, gunakan fallback
+                        $query = \App\Models\InventoryItem::whereRaw('1 = 0');
                     }
-                }
-                
-                if (!empty($selectedItemIds)) {
-                    // Ambil InventoryItem yang sudah dipilih dengan eager loading
-                    $query = \App\Models\InventoryItem::with([
-                        'inventory.dataBarang',
-                        'inventory.gudang.unitKerja',
-                        'inventory.registerAset' => function($q) use ($gudangUnit) {
-                            $q->where('id_unit_kerja', $gudangUnit->id_unit_kerja);
-                        },
-                        'gudang.unitKerja',
-                        'ruangan.unitKerja'
-                    ])->whereIn('id_item', $selectedItemIds);
                 } else {
-                    $query = \App\Models\InventoryItem::whereRaw('1 = 0');
+                    // Fallback untuk data lama yang belum punya id_item: gunakan id_inventory
+                    $registerAsetInventoryIds = $registerAsets->pluck('id_inventory')->unique()->toArray();
+                    
+                    // Ambil semua InventoryItem untuk id_inventory tersebut
+                    $allInventoryItems = \App\Models\InventoryItem::whereIn('id_inventory', $registerAsetInventoryIds)
+                        ->whereHas('inventory', function($q) {
+                            $q->where('jenis_inventory', 'ASET');
+                        })
+                        ->orderBy('id_item')
+                        ->get();
+                    
+                    // Mapping: untuk setiap RegisterAset, ambil InventoryItem yang sesuai
+                    // Strategi: ambil InventoryItem pertama yang belum digunakan untuk id_inventory tersebut
+                    $usedItemIds = [];
+                    $selectedItemIds = [];
+                    
+                    foreach ($registerAsets as $registerAset) {
+                        // Cari InventoryItem untuk id_inventory ini yang belum digunakan
+                        $availableItems = $allInventoryItems->where('id_inventory', $registerAset->id_inventory)
+                            ->whereNotIn('id_item', $usedItemIds)
+                            ->first();
+                        
+                        if ($availableItems) {
+                            $selectedItemIds[] = $availableItems->id_item;
+                            $usedItemIds[] = $availableItems->id_item;
+                        }
+                    }
+                    
+                    if (!empty($selectedItemIds)) {
+                        // Ambil InventoryItem yang sudah dipilih dengan eager loading
+                        $query = \App\Models\InventoryItem::with([
+                            'inventory.dataBarang',
+                            'inventory.gudang.unitKerja',
+                            'inventory.registerAset' => function($q) use ($gudangUnit) {
+                                $q->where('id_unit_kerja', $gudangUnit->id_unit_kerja);
+                            },
+                            'gudang.unitKerja',
+                            'ruangan.unitKerja'
+                        ])->whereIn('id_item', $selectedItemIds);
+                    } else {
+                        $query = \App\Models\InventoryItem::whereRaw('1 = 0');
+                    }
                 }
             }
             
@@ -303,6 +325,7 @@ class RegisterAsetController extends Controller
             
             $title = $gudangUnit->nama_gudang . ($gudangUnit->unitKerja ? ' (' . $gudangUnit->unitKerja->nama_unit_kerja . ')' : '');
             $isPusat = false;
+            $filter = 'kir'; // Untuk gudang unit selalu KIR
             
             // Filter berdasarkan gudang unit untuk kepala_unit dan pegawai
             if ($user->hasAnyRole(['kepala_unit', 'pegawai']) && !$user->hasAnyRole(['admin', 'admin_gudang', 'pengurus_barang'])) {
@@ -313,13 +336,8 @@ class RegisterAsetController extends Controller
             }
         }
         
-        // Filter berdasarkan gudang (jika ada request)
-        if ($request->filled('id_gudang')) {
-            $query->where('id_gudang', $request->id_gudang);
-        }
-        
         $perPage = \App\Helpers\PaginationHelper::getPerPage($request, 10);
-        $inventoryItems = $query->paginate($perPage)->appends($request->query());
+        $inventoryItems = $query->paginate($perPage)->appends($request->except(['id_gudang', 'page']));
         
         // Preload RegisterAset untuk setiap InventoryItem untuk menghindari N+1 query
         $inventoryItemIds = $inventoryItems->pluck('id_item')->toArray();
@@ -329,9 +347,26 @@ class RegisterAsetController extends Controller
         if (!empty($inventoryItemIds)) {
             // Untuk gudang pusat, ambil semua RegisterAset (tidak filter berdasarkan unit kerja)
             // Untuk gudang unit, ambil RegisterAset berdasarkan unit kerja
+            // Ambil RegisterAset berdasarkan id_item (lebih tepat) atau id_inventory (untuk backward compatibility)
+            $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+            
             if ($isPusat) {
-                $registerAsets = RegisterAset::whereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique())
-                    ->with([
+                // Untuk gudang pusat: hanya ambil RegisterAset yang masih di gudang pusat (belum didistribusikan)
+                $registerAsetsQuery = RegisterAset::whereNull('id_unit_kerja');
+                
+                if ($hasIdItemColumn) {
+                    $registerAsetsQuery->where(function($q) use ($inventoryItemIds, $inventoryItems) {
+                        // Cari berdasarkan id_item dulu (lebih tepat)
+                        $q->whereIn('id_item', $inventoryItemIds)
+                          // Atau berdasarkan id_inventory untuk data lama yang belum punya id_item
+                          ->orWhereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique());
+                    });
+                } else {
+                    // Fallback untuk data lama
+                    $registerAsetsQuery->whereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique());
+                }
+                
+                $registerAsets = $registerAsetsQuery->with([
                         'ruangan.unitKerja', 
                         'kartuInventarisRuangan.penanggungJawab',
                         'unitKerja.gudang' => function($q) {
@@ -339,13 +374,24 @@ class RegisterAsetController extends Controller
                         }
                     ])
                     ->orderBy('created_at')
-                    ->get()
-                    ->groupBy('id_inventory');
+                    ->get();
             } else {
                 $unitKerjaIdForQuery = isset($gudangUnit) && $gudangUnit->unitKerja ? $gudangUnit->unitKerja->id_unit_kerja : null;
-                $registerAsets = RegisterAset::where('id_unit_kerja', $unitKerjaIdForQuery)
-                    ->whereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique())
-                    ->with([
+                $registerAsetsQuery = RegisterAset::where('id_unit_kerja', $unitKerjaIdForQuery);
+                
+                if ($hasIdItemColumn) {
+                    $registerAsetsQuery->where(function($q) use ($inventoryItemIds, $inventoryItems) {
+                        // Cari berdasarkan id_item dulu (lebih tepat)
+                        $q->whereIn('id_item', $inventoryItemIds)
+                          // Atau berdasarkan id_inventory untuk data lama yang belum punya id_item
+                          ->orWhereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique());
+                    });
+                } else {
+                    // Fallback untuk data lama
+                    $registerAsetsQuery->whereIn('id_inventory', $inventoryItems->pluck('id_inventory')->unique());
+                }
+                
+                $registerAsets = $registerAsetsQuery->with([
                         'ruangan.unitKerja', 
                         'kartuInventarisRuangan.penanggungJawab',
                         'unitKerja.gudang' => function($q) {
@@ -353,27 +399,45 @@ class RegisterAsetController extends Controller
                         }
                     ])
                     ->orderBy('created_at')
-                    ->get()
-                    ->groupBy('id_inventory');
+                    ->get();
             }
             
-            // Map RegisterAset berdasarkan id_inventory untuk akses cepat di view
-            foreach ($registerAsets as $inventoryId => $registers) {
-                $registerAsetsMap[$inventoryId] = $registers;
+            // Map RegisterAset berdasarkan id_inventory untuk backward compatibility
+            foreach ($registerAsets as $register) {
+                if ($register->id_inventory) {
+                    if (!isset($registerAsetsMap[$register->id_inventory])) {
+                        $registerAsetsMap[$register->id_inventory] = collect([]);
+                    }
+                    $registerAsetsMap[$register->id_inventory]->push($register);
+                }
             }
             
-            // Buat mapping yang lebih tepat: InventoryItem -> RegisterAset
-            // Karena format nomor_register sudah terpisah dari kode_register, kita mapping berdasarkan urutan
-            // InventoryItem dan RegisterAset dengan id_inventory yang sama akan dipasangkan berdasarkan urutan
+            // Buat mapping yang lebih tepat: InventoryItem -> RegisterAset berdasarkan id_item
+            // Mapping langsung berdasarkan id_item (lebih tepat dan menghindari masalah multiple register)
+            $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+            
             foreach ($inventoryItems as $item) {
+                if ($hasIdItemColumn) {
+                    // Cari RegisterAset berdasarkan id_item (lebih tepat)
+                    $registerAset = RegisterAset::where('id_item', $item->id_item)->first();
+                    
+                    if ($registerAset) {
+                        $registerAsetItemMap[$item->id_item] = $registerAset;
+                        continue;
+                    }
+                }
+                
+                // Fallback untuk data lama atau jika id_item belum ada
                 if (isset($registerAsetsMap[$item->id_inventory])) {
+                    // Fallback untuk data lama yang belum punya id_item: mapping berdasarkan urutan
                     // Ambil semua InventoryItem dengan id_inventory yang sama, urutkan berdasarkan id_item
                     $itemsForInventory = $inventoryItems->where('id_inventory', $item->id_inventory)
                         ->sortBy('id_item')
                         ->values();
                     
-                    // Ambil semua RegisterAset dengan id_inventory yang sama, urutkan berdasarkan created_at
+                    // Ambil semua RegisterAset dengan id_inventory yang sama dan id_item null, urutkan berdasarkan created_at
                     $registersForInventory = $registerAsetsMap[$item->id_inventory]
+                        ->whereNull('id_item')
                         ->sortBy('created_at')
                         ->values();
                     
@@ -390,16 +454,10 @@ class RegisterAsetController extends Controller
             }
         }
         
-        // Ambil data untuk dropdown filter
-        $gudangs = MasterGudang::where('kategori_gudang', 'ASET')
-            ->with('unitKerja')
-            ->orderBy('nama_gudang')
-            ->get();
-        
         // Pass gudangUnit ke view untuk digunakan di view
         $gudangUnitForView = isset($gudangUnit) ? $gudangUnit : null;
         
-        return view('asset.register-aset.unit-kerja.show', compact('inventoryItems', 'title', 'filter', 'unitKerjaId', 'gudangs', 'isPusat', 'gudangUnitForView', 'registerAsetsMap', 'registerAsetItemMap'));
+        return view('asset.register-aset.unit-kerja.show', compact('inventoryItems', 'title', 'filter', 'unitKerjaId', 'isPusat', 'gudangUnitForView', 'registerAsetsMap', 'registerAsetItemMap', 'unitKerjas', 'ruangans'));
     }
 
     /**
@@ -417,38 +475,33 @@ class RegisterAsetController extends Controller
         
         // Query: Ambil InventoryItem yang belum punya RegisterAset
         // RegisterAset dibuat otomatis saat penerimaan, jadi ini untuk kasus khusus saja
-        // Filter: InventoryItem yang id_inventory-nya belum penuh dibuat RegisterAset
-        // Logika: Untuk setiap id_inventory, hitung jumlah InventoryItem dan jumlah RegisterAset
-        // Jika jumlah RegisterAset < jumlah InventoryItem, tampilkan InventoryItem yang tersisa
+        // Filter: InventoryItem yang belum punya RegisterAset (berdasarkan id_item, bukan id_inventory)
         
-        // Ambil semua InventoryItem ASET yang aktif
-        $allInventoryItems = \App\Models\InventoryItem::with('inventory.dataBarang', 'inventory.gudang', 'gudang')
+        // Ambil semua InventoryItem ASET yang aktif dan belum ter-register
+        // Filter: InventoryItem yang belum punya RegisterAset (berdasarkan id_item)
+        $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+        $registeredItemIds = [];
+        
+        if ($hasIdItemColumn) {
+            $registeredItemIds = RegisterAset::whereNotNull('id_item')
+                ->pluck('id_item')
+                ->toArray();
+        }
+        
+        $inventoryItemsQuery = \App\Models\InventoryItem::with('inventory.dataBarang', 'inventory.gudang', 'gudang')
             ->whereHas('inventory', function($q) {
                 $q->where('jenis_inventory', 'ASET')
                   ->where('status_inventory', 'AKTIF');
-            })
-            ->orderBy('kode_register')
-            ->get();
+            });
         
-        // Kelompokkan berdasarkan id_inventory dan hitung jumlah RegisterAset per id_inventory
-        $inventoryItemCounts = $allInventoryItems->groupBy('id_inventory')->map(function($items) {
-            return $items->count();
-        });
+        if ($hasIdItemColumn && !empty($registeredItemIds)) {
+            $inventoryItemsQuery->whereNotIn('id_item', $registeredItemIds);
+        } elseif (!$hasIdItemColumn) {
+            // Fallback untuk data lama: gunakan whereDoesntHave
+            $inventoryItemsQuery->whereDoesntHave('registerAset');
+        }
         
-        $registerAsetCounts = RegisterAset::whereIn('id_inventory', $inventoryItemCounts->keys())
-            ->selectRaw('id_inventory, COUNT(*) as count')
-            ->groupBy('id_inventory')
-            ->pluck('count', 'id_inventory');
-        
-        // Filter: hanya ambil InventoryItem yang id_inventory-nya masih punya slot untuk RegisterAset
-        $inventoryItems = $allInventoryItems->filter(function($item) use ($inventoryItemCounts, $registerAsetCounts) {
-            $inventoryId = $item->id_inventory;
-            $itemCount = $inventoryItemCounts[$inventoryId] ?? 0;
-            $registerCount = $registerAsetCounts[$inventoryId] ?? 0;
-            
-            // Jika jumlah RegisterAset sudah sama atau lebih dari jumlah InventoryItem, sembunyikan
-            return $registerCount < $itemCount;
-        })->values();
+        $inventoryItems = $inventoryItemsQuery->orderBy('kode_register')->get();
         
         // Ambil semua unit kerja
         $unitKerjas = MasterUnitKerja::orderBy('nama_unit_kerja')->get();
@@ -473,6 +526,7 @@ class RegisterAsetController extends Controller
         
         // Validasi input
         $validated = $request->validate([
+            'id_item' => 'required|exists:inventory_item,id_item',
             'id_inventory' => 'required|exists:data_inventory,id_inventory',
             'id_unit_kerja' => 'required|exists:master_unit_kerja,id_unit_kerja',
             'id_ruangan' => 'nullable|exists:master_ruangan,id_ruangan',
@@ -482,14 +536,43 @@ class RegisterAsetController extends Controller
             'tanggal_perolehan' => 'required|date',
         ]);
         
+        // Cek apakah inventory item sudah ter-register
+        $inventoryItem = \App\Models\InventoryItem::findOrFail($validated['id_item']);
+        
+        // Cek apakah kolom id_item sudah ada
+        $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+        if ($hasIdItemColumn) {
+            $existingRegister = RegisterAset::where('id_item', $validated['id_item'])->first();
+            if ($existingRegister) {
+                return back()->withErrors(['id_item' => 'Inventory item ini sudah ter-register'])->withInput();
+            }
+        } else {
+            // Fallback untuk data lama: cek berdasarkan id_inventory (kurang akurat tapi tetap berfungsi)
+            $existingRegister = RegisterAset::where('id_inventory', $validated['id_inventory'])->first();
+            if ($existingRegister) {
+                return back()->withErrors(['id_item' => 'Inventory ini sudah ter-register. Silakan jalankan migration terlebih dahulu.'])->withInput();
+            }
+        }
+        
         // Cek apakah inventory adalah jenis ASET
         $inventory = DataInventory::findOrFail($validated['id_inventory']);
         if ($inventory->jenis_inventory !== 'ASET') {
-            return back()->withErrors(['id_inventory' => 'Inventory yang dipilih harus berjenis ASET'])->withInput();
+            return back()->withErrors(['id_item' => 'Inventory yang dipilih harus berjenis ASET'])->withInput();
         }
         
-        // Generate nomor register otomatis jika tidak diisi
-        if (empty($validated['nomor_register'])) {
+        // Pastikan id_item sesuai dengan id_inventory
+        if ($inventoryItem->id_inventory != $validated['id_inventory']) {
+            return back()->withErrors(['id_item' => 'Inventory item tidak sesuai dengan inventory yang dipilih'])->withInput();
+        }
+        
+        // Jika kolom id_item belum ada, hanya simpan id_inventory (backward compatibility)
+        $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+        if (!$hasIdItemColumn) {
+            unset($validated['id_item']);
+        }
+        
+        // Generate nomor register otomatis jika tidak diisi atau masih mengandung "XXXX"
+        if (empty($validated['nomor_register']) || strpos($validated['nomor_register'], 'XXXX') !== false) {
             $validated['nomor_register'] = $this->generateNomorRegister(
                 $validated['id_unit_kerja'],
                 $validated['id_ruangan'] ?? null,
@@ -526,21 +609,8 @@ class RegisterAsetController extends Controller
                 ]);
             }
             
-            // Update InventoryItem untuk set id_ruangan
-            // Ambil InventoryItem pertama dari inventory ini yang belum punya ruangan
-            $inventoryItem = \App\Models\InventoryItem::where('id_inventory', $validated['id_inventory'])
-                ->whereNull('id_ruangan')
-                ->first();
-            
-            // Jika tidak ada yang belum punya ruangan, ambil yang pertama saja
-            if (!$inventoryItem) {
-                $inventoryItem = \App\Models\InventoryItem::where('id_inventory', $validated['id_inventory'])
-                    ->first();
-            }
-            
-            if ($inventoryItem) {
-                $inventoryItem->update(['id_ruangan' => $validated['id_ruangan']]);
-            }
+            // Update InventoryItem spesifik yang ter-register untuk set id_ruangan
+            $inventoryItem->update(['id_ruangan' => $validated['id_ruangan']]);
         }
         
         return redirect()->route('asset.register-aset.show', $registerAset->id_register_aset)
@@ -687,14 +757,22 @@ class RegisterAsetController extends Controller
 
             // Jika ada ruangan, update InventoryItem dan buat/update KIR
             if ($validated['id_ruangan']) {
-                // Update InventoryItem yang sesuai dengan RegisterAset ini
-                // Ambil InventoryItem pertama yang belum punya ruangan untuk id_inventory ini
-                $inventoryItem = \App\Models\InventoryItem::where('id_inventory', $registerAset->id_inventory)
-                    ->where(function($q) {
-                        $q->whereNull('id_ruangan')
-                          ->orWhere('id_ruangan', '');
-                    })
-                    ->first();
+                // Update InventoryItem spesifik yang ter-register (berdasarkan id_item)
+                $inventoryItem = null;
+                $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+                
+                if ($hasIdItemColumn && $registerAset->id_item) {
+                    // Gunakan id_item jika ada (lebih tepat)
+                    $inventoryItem = \App\Models\InventoryItem::find($registerAset->id_item);
+                } else {
+                    // Fallback untuk data lama: ambil InventoryItem pertama yang belum punya ruangan
+                    $inventoryItem = \App\Models\InventoryItem::where('id_inventory', $registerAset->id_inventory)
+                        ->where(function($q) {
+                            $q->whereNull('id_ruangan')
+                              ->orWhere('id_ruangan', '');
+                        })
+                        ->first();
+                }
 
                 if ($inventoryItem) {
                     $inventoryItem->update(['id_ruangan' => $validated['id_ruangan']]);
@@ -714,12 +792,22 @@ class RegisterAsetController extends Controller
                     $kir->update(['id_penanggung_jawab' => $validated['id_penanggung_jawab']]);
                 }
             } else {
-                // Jika ruangan dihapus: update InventoryItem dulu (pakai old id_ruangan), baru hapus KIR
+                // Jika ruangan dihapus: update InventoryItem spesifik yang ter-register
                 if ($oldIdRuangan) {
-                    $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $registerAset->id_inventory)
-                        ->where('id_ruangan', $oldIdRuangan)
-                        ->get();
-                    foreach ($inventoryItems as $inventoryItem) {
+                    $inventoryItem = null;
+                    $hasIdItemColumn = Schema::hasColumn('register_aset', 'id_item');
+                    
+                    if ($hasIdItemColumn && $registerAset->id_item) {
+                        // Gunakan id_item jika ada (lebih tepat)
+                        $inventoryItem = \App\Models\InventoryItem::find($registerAset->id_item);
+                    } else {
+                        // Fallback untuk data lama: ambil InventoryItem pertama dengan ruangan tersebut
+                        $inventoryItem = \App\Models\InventoryItem::where('id_inventory', $registerAset->id_inventory)
+                            ->where('id_ruangan', $oldIdRuangan)
+                            ->first();
+                    }
+                    
+                    if ($inventoryItem) {
                         $inventoryItem->update(['id_ruangan' => null]);
                     }
                 }
@@ -772,6 +860,7 @@ class RegisterAsetController extends Controller
         }
         
         // Cari nomor urut terakhir untuk kombinasi unit kerja + ruangan + tahun ini
+        // Exclude nomor register yang masih mengandung XXXX
         $lastRegister = RegisterAset::where('id_unit_kerja', $idUnitKerja)
             ->where(function($q) use ($idRuangan) {
                 if ($idRuangan) {
@@ -782,6 +871,7 @@ class RegisterAsetController extends Controller
             })
             ->whereYear('tanggal_perolehan', $tahun)
             ->where('nomor_register', 'like', $prefix . '/%')
+            ->where('nomor_register', 'not like', '%XXXX%') // Exclude yang masih XXXX
             ->orderByRaw('CAST(SUBSTRING_INDEX(nomor_register, "/", -1) AS UNSIGNED) DESC')
             ->first();
         

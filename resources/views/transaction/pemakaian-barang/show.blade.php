@@ -164,6 +164,7 @@
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barang</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jenis Barang</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty Pemakaian</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Satuan</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alasan Pemakaian Item</th>
@@ -177,6 +178,9 @@
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ $detail->inventory->dataBarang->nama_barang ?? '-' }}
                                     </td>
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ $detail->inventory->jenis_barang ?? '-' }}
+                                    </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{{ number_format($detail->qty_pemakaian, 2) }}</td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{{ $detail->satuan->nama_satuan ?? '-' }}</td>
                                     <td class="px-4 py-4 text-sm text-gray-900">{{ $detail->alasan_pemakaian_item ?? '-' }}</td>
@@ -184,7 +188,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500">Tidak ada detail pemakaian</td>
+                                    <td colspan="7" class="px-4 py-4 text-center text-sm text-gray-500">Tidak ada detail pemakaian</td>
                                 </tr>
                             @endforelse
                         </tbody>

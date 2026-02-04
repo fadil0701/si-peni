@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\PenerimaanBarang;
 use App\Models\DetailPenerimaanBarang;
 use App\Models\TransaksiDistribusi;
@@ -448,11 +449,27 @@ class PenerimaanBarangController extends Controller
             }
 
             // Ambil InventoryItem yang masih di gudang asal dan belum punya RegisterAset
-            $inventoryItems = \App\Models\InventoryItem::where('id_inventory', $detail['id_inventory'])
-                ->where('id_gudang', $distribusi->id_gudang_asal)
-                ->whereDoesntHave('registerAset')
-                ->limit((int)$detail['qty_diterima'])
-                ->get();
+            // Filter berdasarkan id_item yang belum ter-register
+            $hasIdItemColumn = \Schema::hasColumn('register_aset', 'id_item');
+            $registeredItemIds = [];
+            
+            if ($hasIdItemColumn) {
+                $registeredItemIds = \App\Models\RegisterAset::whereNotNull('id_item')
+                    ->pluck('id_item')
+                    ->toArray();
+            }
+            
+            $inventoryItemsQuery = \App\Models\InventoryItem::where('id_inventory', $detail['id_inventory'])
+                ->where('id_gudang', $distribusi->id_gudang_asal);
+            
+            if ($hasIdItemColumn && !empty($registeredItemIds)) {
+                $inventoryItemsQuery->whereNotIn('id_item', $registeredItemIds);
+            } elseif (!$hasIdItemColumn) {
+                // Fallback untuk data lama
+                $inventoryItemsQuery->whereDoesntHave('registerAset');
+            }
+            
+            $inventoryItems = $inventoryItemsQuery->limit((int)$detail['qty_diterima'])->get();
 
             foreach ($inventoryItems as $item) {
                 // Update lokasi fisik InventoryItem ke gudang tujuan
@@ -465,8 +482,8 @@ class PenerimaanBarangController extends Controller
                     $validated['tanggal_penerimaan']
                 );
 
-                // Buat RegisterAset otomatis
-                \App\Models\RegisterAset::create([
+                // Buat RegisterAset otomatis dengan id_item spesifik
+                $registerData = [
                     'id_inventory' => $detail['id_inventory'],
                     'id_unit_kerja' => $unitKerjaId,
                     'id_ruangan' => null, // Bisa diisi nanti via edit
@@ -474,7 +491,14 @@ class PenerimaanBarangController extends Controller
                     'kondisi_aset' => $item->kondisi_item ?? 'BAIK',
                     'status_aset' => $item->status_item === 'AKTIF' ? 'AKTIF' : 'NONAKTIF',
                     'tanggal_perolehan' => $validated['tanggal_penerimaan'],
-                ]);
+                ];
+                
+                // Tambahkan id_item jika kolom sudah ada
+                if ($hasIdItemColumn) {
+                    $registerData['id_item'] = $item->id_item;
+                }
+                
+                \App\Models\RegisterAset::create($registerData);
             }
         }
     }

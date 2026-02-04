@@ -81,6 +81,12 @@
                             {{ $kir->registerAset->inventory->dataBarang->nama_barang ?? '-' }}
                         </dd>
                     </div>
+                    @if($kir->registerAset->inventory->jenis_barang)
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Jenis Barang</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ $kir->registerAset->inventory->jenis_barang }}</dd>
+                    </div>
+                    @endif
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Unit Kerja</dt>
                         <dd class="mt-1 text-sm text-gray-900">

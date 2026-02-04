@@ -14,6 +14,7 @@ class RegisterAset extends Model
 
     protected $fillable = [
         'id_inventory',
+        'id_item',
         'id_unit_kerja',
         'id_ruangan',
         'nomor_register',
@@ -32,6 +33,11 @@ class RegisterAset extends Model
     public function inventory(): BelongsTo
     {
         return $this->belongsTo(DataInventory::class, 'id_inventory', 'id_inventory');
+    }
+
+    public function inventoryItem(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class, 'id_item', 'id_item');
     }
 
     public function unitKerja(): BelongsTo
